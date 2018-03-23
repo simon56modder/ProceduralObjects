@@ -8,6 +8,8 @@ using System.IO;
 using ProceduralObjects.Classes;
 using ProceduralObjects.Tools;
 
+using ColossalFramework.UI;
+
 namespace ProceduralObjects
 {
     public class ProceduralObjectsLogic : MonoBehaviour
@@ -18,17 +20,21 @@ namespace ProceduralObjects
         public ProceduralInfo chosenProceduralInfo = null;
 
         public CacheProceduralObject copiedObject = null;
-        public float storedHeight = 0f;
+        public float storedHeight = 0f, yOffset = 0f;
 
-        public bool proceduralTool = false, editingVertex = false, movingWholeModel = false, editingWholeModel = false, generalShowUI = true;
+        public bool proceduralTool = false, editingVertex = false, movingWholeModel = false, editingWholeModel = false, generalShowUI = true, showExternals = false;
         public List<int> editingVertexIndex;
         public Rect window = new Rect(155, 100, 400, 400);
-        public Vector2 scrollVertices = Vector2.zero, scrollObjects = Vector2.zero, scrollTextures = Vector2.zero, scrollTextureResources = Vector2.zero;
+        public Rect externalsWindow = new Rect(555, 100, 400, 400);
+        public string externalsSaveTextfield = "Enter object name here";
+        public Vector2 scrollVertices = Vector2.zero, scrollObjects = Vector2.zero, scrollTextures = Vector2.zero, scrollTextureResources = Vector2.zero, scrollExternals = Vector2.zero;
         public Vertex[] temp_storageVertex;
      // public System.Type previousToolType;
         public List<Texture2D> basicTextures;
         public AxisEditionState axisState = AxisEditionState.none;
+        public Vector3 axisHitPoint = Vector3.zero;
         public LineRenderer xLine, yLine, zLine;
+        private RotationWizardData rotWizardData = null;
 
     //  public Dictionary<Vertex, Vector3> vertexShifting;
 
@@ -39,13 +45,22 @@ namespace ProceduralObjects
         public Vector2 topLeftRegion = Vector2.zero, bottomRightRegion = Vector2.zero;
         public bool clickingRegion = false;
 
+        ExternalProceduralObjectsManager ExPObjManager;
+        ProceduralObjectsButton mainButton;
 
         void Start()
         {
+            UIView view = UIView.GetAView();
+            mainButton = view.AddUIComponent(typeof(ProceduralObjectsButton)) as ProceduralObjectsButton;
+            mainButton.logic = this;
+
             KeyBindingsManager.Initialize();
             basicTextures = basicTextures.LoadModConfigTextures().OrderBy(tex => tex.name).ToList();
             availableProceduralInfos = ProceduralUtils.CreateProceduralInfosList();
             Debug.Log("[ProceduralObjects] Found " + availableProceduralInfos.Count.ToString() + " procedural infos.");
+            ExPObjManager = new ExternalProceduralObjectsManager();
+            ExPObjManager.LoadExternals(basicTextures);
+
             if (ProceduralObjectsMod.tempContainerData != null)
             {
                 this.LoadContainerData(ProceduralObjectsMod.tempContainerData);
@@ -62,65 +77,17 @@ namespace ProceduralObjects
 
         void Update()
         {
+            var currentToolType = ToolsModifierControl.toolController.CurrentTool.GetType();
+
+            if ((currentToolType == typeof(PropTool)) || (currentToolType == typeof(BuildingTool)))
+                mainButton.text = "Convert this to PO";
+            else
+                mainButton.text = "Procedural Objects";
+
+
             if (KeyBindingsManager.instance.GetBindingFromName("convertToProcedural").GetBindingDown())
             {
-                var tool = ToolsModifierControl.toolController.CurrentTool;
-                if (tool.GetType() == typeof(PropTool))
-                {
-                    availableProceduralInfos = ProceduralUtils.CreateProceduralInfosList();
-                    ProceduralInfo info = availableProceduralInfos.Where(pInf => pInf.propPrefab != null).FirstOrDefault(pInf => pInf.propPrefab == ((PropTool)tool).m_prefab);
-                    if (info.isBasicShape && basicTextures.Count > 0)
-                    {
-                        chosenProceduralInfo = info;
-                        ToolHelper.FullySetTool<ProceduralTool>();
-                    }
-                    else
-                    {
-                        editingVertex = false;
-                        editingVertexIndex.Clear();
-                        editingWholeModel = false;
-                        proceduralTool = false;
-                        ToolHelper.FullySetTool<DefaultTool>();
-                        Gizmos.DestroyGizmo();
-                        xLine = null;
-                        yLine = null;
-                        zLine = null;
-                        SpawnObject(info);
-                        temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
-                        ToolHelper.FullySetTool<ProceduralTool>();
-                        proceduralTool = true;
-                        movingWholeModel = true;
-                        editingVertex = false;
-                    }
-                }
-                else if (tool.GetType() == typeof(BuildingTool))
-                {
-                    availableProceduralInfos = ProceduralUtils.CreateProceduralInfosList();
-                    ProceduralInfo info = availableProceduralInfos.Where(pInf => pInf.buildingPrefab != null).FirstOrDefault(pInf => pInf.buildingPrefab == ((BuildingTool)tool).m_prefab);
-                    if (info.isBasicShape && basicTextures.Count > 0)
-                    {
-                        chosenProceduralInfo = info;
-                        ToolHelper.FullySetTool<ProceduralTool>();
-                    }
-                    else
-                    {
-                        editingVertex = false;
-                        editingVertexIndex.Clear();
-                        editingWholeModel = false;
-                        proceduralTool = false;
-                        ToolHelper.FullySetTool<DefaultTool>();
-                        Gizmos.DestroyGizmo();
-                        xLine = null;
-                        yLine = null;
-                        zLine = null;
-                        SpawnObject(info);
-                        temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
-                        ToolHelper.FullySetTool<ProceduralTool>();
-                        proceduralTool = true;
-                        movingWholeModel = true;
-                        editingVertex = false;
-                    }
-                }
+                ConvertToProcedural(ToolsModifierControl.toolController.CurrentTool);
             }
 
             if (KeyBindingsManager.instance.GetBindingFromName("generalShowHideUI").GetBindingDown())
@@ -138,21 +105,14 @@ namespace ProceduralObjects
                     catch {}
                 }
             }
-            if (ToolsModifierControl.toolController.CurrentTool.GetType() == typeof(ProceduralTool))
+            if (currentToolType == typeof(ProceduralTool))
             {
                 // PASTE object
                 if (KeyBindingsManager.instance.GetBindingFromName("paste").GetBindingDown())
                 {
                     if (copiedObject != null)
                     {
-                        ToolHelper.FullySetTool<ProceduralTool>();
-                        ToolsModifierControl.mainToolbar.CloseEverything();
-                        var v = new ProceduralObject(copiedObject, proceduralObjects.GetNextUnusedId(), ToolsModifierControl.cameraController.m_currentPosition + new Vector3(0, -8, 0));
-                        proceduralObjects.Add(v);
-                        currentlyEditingObject = v;
-                        temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
-                        movingWholeModel = true;
-                        proceduralTool = true;
+                        PlaceCacheObject(copiedObject);
                     }
                 }
              /* if (previousToolType != null)
@@ -195,6 +155,9 @@ namespace ProceduralObjects
                             movingWholeModel = false;
                             editingWholeModel = false;
                             editingVertex = true;
+                            showExternals = false;
+                            rotWizardData = null;
+                            yOffset = 0f;
                             // StoreLineComponents(Gizmos.CreateGizmo(currentlyEditingObject.m_position, true));
                             ToolHelper.FullySetTool<ProceduralTool>();
                         }
@@ -202,8 +165,35 @@ namespace ProceduralObjects
                     }
                     else
                     {
+                        if (Input.GetMouseButton(1))
+                        {
+                            if (rotWizardData == null)
+                            {
+                                rotWizardData = RotationWizardData.GetCurrentRotationData(currentlyEditingObject);
+                            }
+                            else
+                            {
+                                float diff = (rotWizardData.GUIMousePositionX - Input.mousePosition.x);
+                                if (diff < 0)
+                                {
+                                    currentlyEditingObject.gameObject.transform.Rotate(0, (diff * 245f) / Screen.width, 0);
+                                }
+                                else
+                                {
+                                    currentlyEditingObject.gameObject.transform.Rotate(0, -(((-diff) * 245f) / Screen.width), 0);
+                                }
+                                rotWizardData.UpdateMouseCoords();
+                            }
+                        }
+                        else if (Input.GetMouseButtonUp(1))
+                            rotWizardData = null;
+
+                        if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBinding())
+                            yOffset += Time.deltaTime * 8.7f;
+                        if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBinding())
+                            yOffset -= Time.deltaTime * 8.7f;
+
                         ToolBase.RaycastInput rayInput = new ToolBase.RaycastInput(Camera.main.ScreenPointToRay(Input.mousePosition), Camera.main.farClipPlane);
-                        // bool rayValid = (!ToolsModifierControl.toolController.IsInsideUI && Cursor.visible);
                         try
                         {
                             ToolBase.RaycastOutput rayOutput;
@@ -211,16 +201,17 @@ namespace ProceduralObjects
                             {
                                 if (!rayOutput.m_currentEditObject)
                                 {
-                                    if (Input.GetMouseButton(1) && storedHeight != 0)
+                                    if (KeyBindingsManager.instance.GetBindingFromName("snapStoredHeight").GetBinding() && storedHeight != 0)
                                         currentlyEditingObject.gameObject.transform.position = new Vector3(rayOutput.m_hitPos.x, storedHeight, rayOutput.m_hitPos.z);
                                     else
-                                        currentlyEditingObject.gameObject.transform.position = rayOutput.m_hitPos;
+                                        currentlyEditingObject.gameObject.transform.position = new Vector3(rayOutput.m_hitPos.x, rayOutput.m_hitPos.y + yOffset, rayOutput.m_hitPos.z);
                                 }
                             }
                         }
                         catch { }
                         // ToolsModifierControl.cameraController.m_currentPosition + new Vector3(0, -8, 0);
                         currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+
                     }
                 }
                 else
@@ -238,11 +229,20 @@ namespace ProceduralObjects
                                 if (Physics.Raycast(Camera.main.ScreenPointToRay(Input.mousePosition), out hit))
                                 {
                                     if (hit.transform.gameObject.name == "ProceduralAxis_X")
+                                    {
                                         axisState = AxisEditionState.X;
+                                        axisHitPoint = Gizmos.AxisHitPoint(hit.point, currentlyEditingObject.gameObject.transform.position);
+                                    }
                                     else if (hit.transform.gameObject.name == "ProceduralAxis_Y")
+                                    {
                                         axisState = AxisEditionState.Y;
+                                        axisHitPoint = Gizmos.AxisHitPoint(hit.point, currentlyEditingObject.gameObject.transform.position);
+                                    }
                                     else if (hit.transform.gameObject.name == "ProceduralAxis_Z")
+                                    {
                                         axisState = AxisEditionState.Z;
+                                        axisHitPoint = Gizmos.AxisHitPoint(hit.point, currentlyEditingObject.gameObject.transform.position);
+                                    }
                                 }
                             }
                         }
@@ -252,6 +252,7 @@ namespace ProceduralObjects
                         if (axisState != AxisEditionState.none)
                         {
                             axisState = AxisEditionState.none;
+                            axisHitPoint = Vector3.zero;
                             //   Debug.LogError("LMB up ");
                         }
                     }
@@ -288,28 +289,28 @@ namespace ProceduralObjects
                         {
                             if (axisState != AxisEditionState.none)
                             {
-                                if (actionMode == 0)
+                                if (actionMode == 0 && axisHitPoint != Vector3.zero)
                                 {
                                     switch (axisState)
                                     {
                                         // POSITION
                                         case AxisEditionState.X:
                                             currentlyEditingObject.gameObject.transform.position = new Vector3(Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y,
-                                                Vector3.Distance(Camera.main.transform.position, currentlyEditingObject.m_position))).x,
+                                                Vector3.Distance(Camera.main.transform.position, currentlyEditingObject.m_position))).x + axisHitPoint.x,
                                                 currentlyEditingObject.gameObject.transform.position.y,
                                                 currentlyEditingObject.gameObject.transform.position.z);
                                             break;
                                         case AxisEditionState.Y:
                                             currentlyEditingObject.gameObject.transform.position = new Vector3(currentlyEditingObject.gameObject.transform.position.x,
                                                 Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y,
-                                                Vector3.Distance(Camera.main.transform.position, currentlyEditingObject.m_position))).y,
+                                                Vector3.Distance(Camera.main.transform.position, currentlyEditingObject.m_position))).y + axisHitPoint.y,
                                                 currentlyEditingObject.gameObject.transform.position.z);
                                             break;
                                         case AxisEditionState.Z:
                                             currentlyEditingObject.gameObject.transform.position = new Vector3(currentlyEditingObject.gameObject.transform.position.x,
                                                 currentlyEditingObject.gameObject.transform.position.y,
                                                 Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y,
-                                                Vector3.Distance(Camera.main.transform.position, currentlyEditingObject.m_position))).z);
+                                                Vector3.Distance(Camera.main.transform.position, currentlyEditingObject.m_position))).z + axisHitPoint.z);
                                             break;
                                     }
                                 }
@@ -992,18 +993,16 @@ namespace ProceduralObjects
         {
             if (!ToolsModifierControl.cameraController.m_freeCamera && generalShowUI)
             {
-                System.Type toolType = ToolsModifierControl.toolController.CurrentTool.GetType();
-                if (toolType == typeof(PropTool) || toolType == typeof(BuildingTool))
-                    GUI.Label(new Rect(Screen.width - 155, 95, 150, 30), KeyBindingsManager.instance.GetBindingFromName("convertToProcedural").m_fullKeys.Replace("LeftShift", "Shift") + " ► Procedural");
-                if (ToolsModifierControl.toolController.CurrentTool.GetType() != typeof(ProceduralTool))
+                /* if (toolType != typeof(ProceduralTool))
                 {
                     if (GUI.Button(new Rect(Screen.width - 130, 60, 125, 30), "Procedural Objects"))
                     {
                         ToolHelper.FullySetTool<ProceduralTool>();
                         ToolsModifierControl.mainToolbar.CloseEverything();
                     }
-                }
-                else
+                } 
+                else*/
+                if (ToolsModifierControl.toolController.CurrentTool.GetType() == typeof(ProceduralTool))
                 {
                     if (!proceduralTool)
                     {
@@ -1023,8 +1022,16 @@ namespace ProceduralObjects
                     }
                     if (!movingWholeModel)
                     {
-                        window = GUI.Window(1094334744, window, DrawUIWindow, "Procedural Objects v" + ProceduralObjectsMod.VERSION);
-                        #region GUI quand TOOL actif
+                        var winrect = GUI.Window(1094334744, window, DrawUIWindow, "Procedural Objects v" + ProceduralObjectsMod.VERSION);
+                        if (proceduralTool && editingWholeModel && !movingWholeModel)
+                            window = new Rect(winrect.x, winrect.y, winrect.width, 435);
+                        else
+                            window = new Rect(winrect.x, winrect.y, winrect.width, 400);
+
+                        if (showExternals)
+                            externalsWindow = GUI.Window(1094334745, externalsWindow, DrawExternalsWindow, "Saved Procedural Objects");
+
+                        #region GUI when TOOL is active
                         if (currentlyEditingObject != null)
                         {
                             if (!editingWholeModel)
@@ -1125,6 +1132,7 @@ namespace ProceduralObjects
             GUI.DragWindow(new Rect(0, 0, 350, 30));
             if (GUI.Button(new Rect(356, 3, 30, 30), "X"))
             {
+                showExternals = false;
                 editingVertex = false;
                 editingVertexIndex.Clear();
                 editingWholeModel = false;
@@ -1142,7 +1150,7 @@ namespace ProceduralObjects
 
             if (proceduralTool)
             {
-                GUI.BeginGroup(new Rect(10, 30, 380, 360));
+                GUI.BeginGroup(new Rect(10, 30, 380, 412));
                 if (editingWholeModel)
                 {
                     if (movingWholeModel)
@@ -1176,6 +1184,22 @@ namespace ProceduralObjects
                             "\n" + KeyBindingsManager.instance.GetBindingFromName("switchGeneralToVertexTools").m_fullKeys + " : Quick switch between General/Vertices tool\n\n<b>Buttons : </b>\nDelete : deletes the object\nMove to : move the object to a new position");
                         GUI.Label(new Rect(0, 330, 380, 30), "Render Distance : " + currentlyEditingObject.renderDistance.ToString("N").Replace(".00", ""));
                         currentlyEditingObject.renderDistance = GUI.HorizontalSlider(new Rect(0, 350, 380, 30), Mathf.Floor(currentlyEditingObject.renderDistance), 50f, 10000f);
+
+                        externalsSaveTextfield = GUI.TextField(new Rect(0, 370, 285, 28), externalsSaveTextfield);
+                        if (File.Exists(ProceduralObjectsMod.ExternalsConfigPath + externalsSaveTextfield.ToFileName() + ".pobj"))
+                        {
+                            GUI.color = Color.red;
+                            GUI.Label(new Rect(290, 370, 90, 28), "X", GUI.skin.button);
+                            GUI.color = Color.white;
+                        }
+                        else
+                        {
+                            if (GUI.Button(new Rect(290, 370, 90, 28), "Save"))
+                            {
+                                ExPObjManager.SaveToExternal(externalsSaveTextfield, new CacheProceduralObject(currentlyEditingObject));
+                                externalsSaveTextfield = "Enter object name here";
+                            }
+                        }
                     }
                     GUI.EndGroup();
                 }
@@ -1223,8 +1247,8 @@ namespace ProceduralObjects
                         basicTextures = basicTextures.LoadModConfigTextures();
                     if (GUI.Button(new Rect(230, 55, 155, 28), "Open Texture Folder"))
                     {
-                        if (Directory.Exists(ProceduralObjectsMod.ModConfigPath))
-                            Application.OpenURL("file://" + ProceduralObjectsMod.ModConfigPath);
+                        if (Directory.Exists(ProceduralObjectsMod.TextureConfigPath))
+                            Application.OpenURL("file://" + ProceduralObjectsMod.TextureConfigPath);
                     }
                     if (GUI.Button(new Rect(10, 84, 375, 24), "Go to the Documentation Wiki Page"))
                         Application.OpenURL(ProceduralObjectsMod.DOCUMENTATION_URL);
@@ -1237,8 +1261,8 @@ namespace ProceduralObjects
                     if (TextureUtils.TextureResources.Count > 0)
                     {
                         GUI.Label(new Rect(10, 135, 375, 28), "Workshop Texture Packages loaded : " + TextureUtils.TextureResources.Count.ToString());
-                        GUI.Box(new Rect(10, 160, 375, 200), string.Empty);
-                        scrollTextureResources = GUI.BeginScrollView(new Rect(10, 160, 375, 200), scrollTextureResources, new Rect(0, 0, 350, TextureUtils.TextureResources.Count * 30));
+                        GUI.Box(new Rect(10, 160, 375, 170), string.Empty);
+                        scrollTextureResources = GUI.BeginScrollView(new Rect(10, 160, 375, 170), scrollTextureResources, new Rect(0, 0, 350, TextureUtils.TextureResources.Count * 30));
                         for (int i = 0; i < TextureUtils.TextureResources.Count; i++)
                         {
                             GUI.Label(new Rect(5, i * 30, 248, 28), TextureUtils.TextureResources[i].HasCustomName ? TextureUtils.TextureResources[i].m_name : "<i>Package with no custom name</i>");
@@ -1250,21 +1274,24 @@ namespace ProceduralObjects
                     else
                         GUI.Label(new Rect(10, 130, 375, 28), "No subscribed Workshop Texture Package loaded.");
 
-                    GUI.Label(new Rect(10, 365, 375, 28), basicTextures.Count().ToString() + " textures in total : " + TextureUtils.LocalTexturesCount.ToString() + " local + " + TextureResourceInfo.TotalTextureCount(TextureUtils.TextureResources) + " from the Workshop");
+                    GUI.Label(new Rect(10, 331, 375, 35), basicTextures.Count().ToString() + " textures in total : " + TextureUtils.LocalTexturesCount.ToString() + " local + " + TextureResourceInfo.TotalTextureCount(TextureUtils.TextureResources) + " from the Workshop\n<size=10>Total objects count on the map : " + proceduralObjects.Count.ToString("N").Replace(".00", "") + "</size>");
+
+                    if (GUI.Button(new Rect(10, 365, 375, 28), "Saved Procedural Objects"))
+                        showExternals = true;
                 }
                 else
                 {
                     if (chosenProceduralInfo.infoType == "PROP")
                         GUI.Label(new Rect(10, 30, 350, 30), "Choose texture to apply to the model \"" + chosenProceduralInfo.propPrefab.GetLocalizedTitle() + "\"");
-                    else
-                        GUI.Label(new Rect(10, 30, 350, 30), "Choose texture to apply to the model \"" + chosenProceduralInfo.buildingPrefab.GetLocalizedTitle() + "\"");                    
+                    else if (chosenProceduralInfo.infoType == "BUILDING")
+                        GUI.Label(new Rect(10, 30, 350, 30), "Choose texture to apply to the model \"" + chosenProceduralInfo.buildingPrefab.GetLocalizedTitle() + "\"");                       
                     // Texture selection
                     scrollTextures = GUI.BeginScrollView(new Rect(10, 60, 350, 330), scrollTextures, new Rect(0, 0, 320, 80 * basicTextures.Count() + 65));
                     GUI.Label(new Rect(10, 0, 300, 28), basicTextures.Count().ToString() + " textures in total : " + TextureUtils.LocalTexturesCount.ToString() + " local + " + TextureResourceInfo.TotalTextureCount(TextureUtils.TextureResources) + " from the Workshop");
                     if (GUI.Button(new Rect(10, 30, 147.5f, 30), "Open Folder"))
                     {
-                        if (Directory.Exists(ProceduralObjectsMod.ModConfigPath))
-                            Application.OpenURL("file://" + ProceduralObjectsMod.ModConfigPath);
+                        if (Directory.Exists(ProceduralObjectsMod.TextureConfigPath))
+                            Application.OpenURL("file://" + ProceduralObjectsMod.TextureConfigPath);
                     }
                     if (GUI.Button(new Rect(162.5f, 30, 147.5f, 30), "Refresh list"))
                         basicTextures = basicTextures.LoadModConfigTextures();
@@ -1290,10 +1317,47 @@ namespace ProceduralObjects
                             chosenProceduralInfo = null;
                         }
                         GUI.Label(new Rect(15, i * 80 + 65, 85, 74), basicTextures[i]);
-                        GUI.Label(new Rect(105, i * 80 + 72, 190, 52), basicTextures[i].name.Replace(ProceduralObjectsMod.ModConfigPath, ""));
+                        GUI.Label(new Rect(105, i * 80 + 72, 190, 52), basicTextures[i].name.Replace(ProceduralObjectsMod.TextureConfigPath, ""));
                     }
                     GUI.EndScrollView();
                 }
+            }
+        }
+        public void DrawExternalsWindow(int id)
+        {
+            GUI.DragWindow(new Rect(0, 0, 350, 30));
+            if (GUI.Button(new Rect(356, 3, 30, 30), "X"))
+                showExternals = false;
+            GUI.Label(new Rect(10, 30, 298, 37), "Find your saved procedural objects here. Won't work if an asset is missing.");
+            if (GUI.Button(new Rect(310, 35, 85, 28), "Refresh"))
+                ExPObjManager.LoadExternals(basicTextures);
+            if (ExPObjManager.m_externals.Count == 0)
+            {
+                GUI.Box(new Rect(10, 70, 380, 320), "No Procedural Objects saved !\nEdit an object and go to the General Tool to save one");
+            }
+            else
+            {
+                GUI.Box(new Rect(10, 70, 380, 320), string.Empty);
+                GUI.BeginScrollView(new Rect(10, 70, 380, 320), scrollExternals, new Rect(0, 0, 350, 40 * ExPObjManager.m_externals.Count + 5));
+                for (int i = 0; i < ExPObjManager.m_externals.Count; i++)
+                {
+                    GUI.Box(new Rect(5, i * 40 + 2, 343, 36), string.Empty);
+                    GUI.Label(new Rect(8, i * 40 + 12, 250, 30), ExPObjManager.m_externals[i].m_name);
+                    if (GUI.Button(new Rect(190, i * 40 + 5, 67, 30), "Place"))
+                    {
+                        PlaceCacheObject(ExPObjManager.m_externals[i].m_object);
+                    }
+                    if (ExPObjManager.m_externals[i].isWorkshop)
+                        GUI.Label(new Rect(260, i * 40 + 5, 80, 30), "[<i>Workshop</i>]", GUI.skin.button);
+                    else
+                    {
+                        if (GUI.Button(new Rect(260, i * 40 + 5, 80, 30), "Delete"))
+                        {
+                            ExPObjManager.DeleteExternal(ExPObjManager.m_externals[i], basicTextures);
+                        }
+                    }
+                }
+                GUI.EndScrollView();
             }
         }
 
@@ -1330,10 +1394,33 @@ namespace ProceduralObjects
             var v = new ProceduralObject();
             if (infoBase.infoType == "PROP")
                 v.ConstructObject(infoBase.propPrefab, proceduralObjects.GetNextUnusedId(), customTex);
-            else
+            else if (infoBase.infoType == "BUILDING")
                 v.ConstructObject(infoBase.buildingPrefab, proceduralObjects.GetNextUnusedId(), customTex);
             proceduralObjects.Add(v);
             currentlyEditingObject = v;
+        }
+        public void PlaceCacheObject(CacheProceduralObject cacheObj)
+        {
+            if (cacheObj.basePrefabName == "PROP")
+            {
+                if (!Resources.FindObjectsOfTypeAll<PropInfo>().Any(info => info.name == cacheObj.basePrefabName))
+                    return;
+            }
+            else if (cacheObj.basePrefabName == "BUILDING")
+            {
+                if (!Resources.FindObjectsOfTypeAll<BuildingInfo>().Any(info => info.name == cacheObj.basePrefabName))
+                    return;
+            }
+            ToolHelper.FullySetTool<ProceduralTool>();
+            ToolsModifierControl.mainToolbar.CloseEverything();
+            var obj = new ProceduralObject(cacheObj, proceduralObjects.GetNextUnusedId(), ToolsModifierControl.cameraController.m_currentPosition + new Vector3(0, -8, 0));
+            proceduralObjects.Add(obj);
+            currentlyEditingObject = obj;
+            temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
+            movingWholeModel = true;
+            proceduralTool = true;
+            if (currentlyEditingObject.RequiresUVRecalculation)
+                obj.gameObject.GetComponent<MeshFilter>().mesh.uv = Vertex.RecalculateUVMap(obj, temp_storageVertex);
         }
         public void SwitchToMainTool()
         {
@@ -1385,6 +1472,100 @@ namespace ProceduralObjects
                 actionMode += 1;
             }
         }
+        public void MainButtonClick()
+        {
+            var currentToolType = ToolsModifierControl.toolController.CurrentTool.GetType();
+
+            if ((currentToolType == typeof(PropTool)) || (currentToolType == typeof(BuildingTool)))
+            {
+                ConvertToProcedural(ToolsModifierControl.toolController.CurrentTool);
+            }
+            else if (currentToolType != typeof(ProceduralTool))
+            {
+                ToolHelper.FullySetTool<ProceduralTool>();
+                ToolsModifierControl.mainToolbar.CloseEverything();
+            }
+            else
+            {
+                showExternals = false;
+                editingVertex = false;
+                editingVertexIndex.Clear();
+                editingWholeModel = false;
+                proceduralTool = false;
+                currentlyEditingObject = null;
+                chosenProceduralInfo = null;
+                rotWizardData = null;
+                ToolHelper.FullySetTool<DefaultTool>();
+                Gizmos.DestroyGizmo();
+                xLine = null;
+                yLine = null;
+                zLine = null;
+            }
+        }
+        private void ConvertToProcedural(ToolBase tool)
+        {
+            showExternals = false;
+            if (availableProceduralInfos == null)
+                availableProceduralInfos = ProceduralUtils.CreateProceduralInfosList();
+            if (availableProceduralInfos.Count == 0)
+                availableProceduralInfos = ProceduralUtils.CreateProceduralInfosList();
+
+            if (tool.GetType() == typeof(PropTool))
+            {
+                ProceduralInfo info = availableProceduralInfos.Where(pInf => pInf.propPrefab != null).FirstOrDefault(pInf => pInf.propPrefab == ((PropTool)tool).m_prefab);
+                if (info.isBasicShape && basicTextures.Count > 0)
+                {
+                    chosenProceduralInfo = info;
+                    ToolHelper.FullySetTool<ProceduralTool>();
+                }
+                else
+                {
+                    editingVertex = false;
+                    editingVertexIndex.Clear();
+                    editingWholeModel = false;
+                    proceduralTool = false;
+                    ToolHelper.FullySetTool<DefaultTool>();
+                    Gizmos.DestroyGizmo();
+                    xLine = null;
+                    yLine = null;
+                    zLine = null;
+                    SpawnObject(info);
+                    temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
+                    ToolHelper.FullySetTool<ProceduralTool>();
+                    proceduralTool = true;
+                    movingWholeModel = true;
+                    editingVertex = false;
+                }
+            }
+            else if (tool.GetType() == typeof(BuildingTool))
+            {
+                ProceduralInfo info = availableProceduralInfos.Where(pInf => pInf.buildingPrefab != null).FirstOrDefault(pInf => pInf.buildingPrefab == ((BuildingTool)tool).m_prefab);
+                if (info.isBasicShape && basicTextures.Count > 0)
+                {
+                    chosenProceduralInfo = info;
+                    ToolHelper.FullySetTool<ProceduralTool>();
+                }
+                else
+                {
+                    editingVertex = false;
+                    editingVertexIndex.Clear();
+                    editingWholeModel = false;
+                    proceduralTool = false;
+                    ToolHelper.FullySetTool<DefaultTool>();
+                    Gizmos.DestroyGizmo();
+                    xLine = null;
+                    yLine = null;
+                    zLine = null;
+                    SpawnObject(info);
+                    temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
+                    ToolHelper.FullySetTool<ProceduralTool>();
+                    proceduralTool = true;
+                    movingWholeModel = true;
+                    editingVertex = false;
+                }
+            }
+        }
+
         public Vector3 VertexWorldPosition(Vertex vertex)
         {
 

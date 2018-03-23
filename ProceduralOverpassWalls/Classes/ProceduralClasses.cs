@@ -47,7 +47,7 @@ namespace ProceduralObjects.Classes
                 }
                 this.rendererComponent = rendererComponent;
             }
-            else // building
+            else if (container.objectType == "BUILDING")// building
             {
                 BuildingInfo sourceProp = Resources.FindObjectsOfTypeAll<BuildingInfo>().FirstOrDefault(info => info.name == container.basePrefabName);
                 gameObject = new GameObject("ProceduralObject_" + container.id.ToString());
@@ -114,7 +114,7 @@ namespace ProceduralObjects.Classes
                 }
                 this.rendererComponent = rendererComponent;
             }
-            else // building
+            else if (sourceCacheObj.baseInfoType == "BUILDING")// building
             {
                 BuildingInfo sourceProp = Resources.FindObjectsOfTypeAll<BuildingInfo>().FirstOrDefault(info => info.name == sourceCacheObj.basePrefabName);
                 gameObject = new GameObject("ProceduralObject_" + id.ToString());
@@ -144,6 +144,7 @@ namespace ProceduralObjects.Classes
                 this.rendererComponent = rendererComponent;
             }
         }
+
         public void ConstructObject(PropInfo sourceProp, int id, Texture2D customTex = null)
         {
             gameObject = new GameObject("ProceduralObject_" + id.ToString());
@@ -151,7 +152,7 @@ namespace ProceduralObjects.Classes
             this.basePrefabName = sourceProp.name;
             this.isPloppableAsphalt = (sourceProp.m_mesh.name == "ploppableasphalt-prop");
             this.baseInfoType = "PROP";
-            this.renderDistance = 850;
+            this.renderDistance = 820;
             gameObject.transform.position = ToolsModifierControl.cameraController.m_currentPosition;
             m_position = gameObject.transform.position;
             m_rotation = gameObject.transform.rotation;
@@ -177,7 +178,7 @@ namespace ProceduralObjects.Classes
             this.basePrefabName = sourceBuilding.name;
             this.isPloppableAsphalt = false;
             this.baseInfoType = "BUILDING";
-            this.renderDistance = 850;
+            this.renderDistance = 920;
             gameObject.transform.position = ToolsModifierControl.cameraController.m_currentPosition;
             m_position = gameObject.transform.position;
             m_rotation = gameObject.transform.rotation;
@@ -257,14 +258,15 @@ namespace ProceduralObjects.Classes
         public PropInfo propPrefab;
         public BuildingInfo buildingPrefab;
         public bool isBasicShape;
+        public string infoType;
+
         public string GetShowName()
         {
             if (infoType == "PROP")
                 return propPrefab.GetLocalizedTitle() + (isBasicShape ? " (Basic)" : string.Empty);
-            else
+            else // if (infoType == "BUILDING")
                 return buildingPrefab.GetLocalizedTitle() + (isBasicShape ? " (Basic)" : string.Empty);
         }
-        public string infoType;
     }
 
     public static class ProceduralUtils

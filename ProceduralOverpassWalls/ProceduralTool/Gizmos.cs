@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using ProceduralObjects.Classes;
 
 namespace ProceduralObjects
 {
@@ -13,7 +14,7 @@ namespace ProceduralObjects
 
             GameObject xAxis = new GameObject("ProceduralAxis_X");
             var xCollid = xAxis.AddComponent<BoxCollider>();
-            xCollid.size = new Vector3(20, 2, 2);
+            xCollid.size = new Vector3(2, 2, 2);
             LineRenderer xLineComp = xAxis.AddComponent<LineRenderer>();
             xLineComp.material = spriteMat;
             xLineComp.startColor = Color.red;
@@ -28,7 +29,7 @@ namespace ProceduralObjects
 
             GameObject yAxis = new GameObject("ProceduralAxis_Y");
             var yCollid = yAxis.AddComponent<BoxCollider>();
-            yCollid.size = new Vector3(2, 20f, 2);
+            yCollid.size = new Vector3(2, 2, 2);
             LineRenderer yLineComp = yAxis.AddComponent<LineRenderer>();
             yLineComp.material = spriteMat;
             yLineComp.startColor = Color.green;
@@ -43,7 +44,7 @@ namespace ProceduralObjects
 
             GameObject zAxis = new GameObject("ProceduralAxis_Z");
             var zCollid = zAxis.AddComponent<BoxCollider>();
-            zCollid.size = new Vector3(2, 2, 20f);
+            zCollid.size = new Vector3(2, 2, 2);
             LineRenderer zLineComp = zAxis.AddComponent<LineRenderer>();
             zLineComp.material = spriteMat;
             zLineComp.startColor = Color.blue;
@@ -90,6 +91,40 @@ namespace ProceduralObjects
             {
                 return GameObject.Find("ProceduralAxis_X") != null;
             }
+        }
+        public static Vector3 AxisHitPoint(Vector3 hitPoint, Vector3 originObjPosition)
+        {
+            return new Vector3(originObjPosition.x - hitPoint.x, originObjPosition.y - hitPoint.y, originObjPosition.z - hitPoint.z);
+        }
+    }
+
+    public class RotationWizardData
+    {
+        public RotationWizardData() { }
+        public Vector3 initialMousePosition;
+        private float _initMousePosXGUI;
+        public Quaternion initialRotation;
+
+        public float GUIMousePositionX
+        {
+            get
+            {
+                return this._initMousePosXGUI;
+            }
+        }
+        public void UpdateMouseCoords()
+        {
+            this.initialMousePosition = Input.mousePosition;
+            this._initMousePosXGUI = this.initialMousePosition.x;
+        }
+
+        public static RotationWizardData GetCurrentRotationData(ProceduralObject obj)
+        {
+            var data = new RotationWizardData();
+            data.initialMousePosition = Input.mousePosition;
+            data.initialRotation = obj.gameObject.transform.rotation;
+            data._initMousePosXGUI = data.initialMousePosition.x;
+            return data;
         }
     }
 }

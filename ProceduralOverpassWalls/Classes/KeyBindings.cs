@@ -19,7 +19,7 @@ namespace ProceduralObjects.Classes
 
                 var _fullBinding = inputConfigLine.Split(new string[] { " = " }, StringSplitOptions.RemoveEmptyEntries)[1].Replace(" ", "");
 
-                this.m_fullKeys = _fullBinding.Replace("+", " + ");
+                this.m_fullKeys = _fullBinding;
 
                 List<KeyCode> keyCodes = new List<KeyCode>();
                 int plusCharCount = _fullBinding.Count(c => c == '+');
@@ -200,10 +200,24 @@ namespace ProceduralObjects.Classes
                 tw.WriteLine("");
                 tw.WriteLine("scale_scaleUp = PageUp");
                 tw.WriteLine("scale_scaleDown = PageDown");
+                tw.WriteLine("");
+                tw.WriteLine("snapStoredHeight = H");
                 tw.Close();
             }
             m_keyBindings = new List<KeyBindingInfo>();
-            foreach (string line in File.ReadAllLines(BindingsConfigPath))
+            var lines = File.ReadAllLines(BindingsConfigPath);
+            if (!lines.Any(line => line.Contains("snapStoredHeight = ")))
+            {
+                if (File.Exists(BindingsConfigPath))
+                    File.Delete(BindingsConfigPath);
+                TextWriter tw = new StreamWriter(BindingsConfigPath);
+                foreach (string line in lines)
+                    tw.WriteLine(line);
+                tw.WriteLine("");
+                tw.WriteLine("snapStoredHeight = H");
+                tw.Close();
+            }
+            foreach (string line in lines)
             {
                 if (line != string.Empty && line.Contains("="))
                 {

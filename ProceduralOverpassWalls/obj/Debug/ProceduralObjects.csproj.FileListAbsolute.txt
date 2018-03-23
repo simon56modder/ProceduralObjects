@@ -11,3 +11,10 @@ C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\Pro
 C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\ProceduralOverpassWalls\obj\Debug\ProceduralObjects.dll
 C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\ProceduralOverpassWalls\obj\Debug\ProceduralObjects.pdb
 C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\ProceduralOverpassWalls\obj\Debug\ProceduralObjects.csprojResolveAssemblyReference.cache
+C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\ProceduralObjects\ProceduralOverpassWalls\bin\Debug\ProceduralObjects.dll
+C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\ProceduralObjects\ProceduralOverpassWalls\bin\Debug\ProceduralObjects.pdb
+C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\ProceduralObjects\ProceduralOverpassWalls\bin\Debug\PopsApiWrapper.dll
+C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\ProceduralObjects\ProceduralOverpassWalls\bin\Debug\ICSharpCode.SharpZipLib.dll
+C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\ProceduralObjects\ProceduralOverpassWalls\obj\Debug\ProceduralObjects.csprojResolveAssemblyReference.cache
+C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\ProceduralObjects\ProceduralOverpassWalls\obj\Debug\ProceduralObjects.dll
+C:\Users\Simon\Documents\Visual Studio 2013\Projects\ProceduralOverpassWalls\ProceduralObjects\ProceduralOverpassWalls\obj\Debug\ProceduralObjects.pdb

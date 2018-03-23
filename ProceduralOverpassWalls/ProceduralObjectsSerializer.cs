@@ -18,6 +18,7 @@ namespace ProceduralObjects
         public override void OnSaveData()
         {
             base.OnSaveData();
+            Debug.Log("[ProceduralObjects] Data saving started.");
             MemoryStream proceduralObjStream = new MemoryStream();
             if (ProceduralObjectsMod.gameLogicObject == null)
                 return;
@@ -43,11 +44,12 @@ namespace ProceduralObjects
             finally
             {
                 proceduralObjStream.Close();
+                Debug.Log("[ProceduralObjects] Data saving ended.");
             }
         }
         public override void OnLoadData()
         {
-            Debug.Log("[ProceduralObjects] Starting data loading");
+            Debug.Log("[ProceduralObjects] Data loading started.");
             byte[] byteProceduralObjectsArray = serializableDataManager.LoadData(dataKey);
             if (byteProceduralObjectsArray != null)
             {
@@ -60,6 +62,7 @@ namespace ProceduralObjects
                     if (data.Count() > 0)
                     {
                         ProceduralObjectsMod.tempContainerData = data;
+                        Debug.Log("[ProceduralObjects] Data Loading : transfered " + data.Count() + " ProceduralObjectContainer instances to the ProceduralObjectsLogic.");
                     }
                     else
                         Debug.LogWarning("[ProceduralObjects] No procedural object found while loading the map.");
@@ -71,6 +74,7 @@ namespace ProceduralObjects
                 finally
                 {
                     proceduralObjStream.Close();
+                    Debug.Log("[ProceduralObjects] Data loading ended.");
                 }
             }
             else

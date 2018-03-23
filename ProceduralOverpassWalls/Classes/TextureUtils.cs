@@ -20,14 +20,14 @@ namespace ProceduralObjects.Classes
             textures = new List<Texture2D>();
 
             // local textures loading
-            if (!Directory.Exists(ProceduralObjectsMod.ModConfigPath))
+            if (!Directory.Exists(ProceduralObjectsMod.TextureConfigPath))
             {
-                Directory.CreateDirectory(ProceduralObjectsMod.ModConfigPath);
+                Directory.CreateDirectory(ProceduralObjectsMod.TextureConfigPath);
                 Debug.Log("[ProceduralObjects] Local Texture Loading : ModConfig directory doesn't exist ! Creating it and skipping texture loading.");
             }
             else
             {
-                foreach (string file in Directory.GetFiles(ProceduralObjectsMod.ModConfigPath, "*.png", SearchOption.AllDirectories))
+                foreach (string file in Directory.GetFiles(ProceduralObjectsMod.TextureConfigPath, "*.png", SearchOption.AllDirectories))
                 {
                     try
                     {

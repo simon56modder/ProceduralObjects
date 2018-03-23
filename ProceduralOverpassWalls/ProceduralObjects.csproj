@@ -57,10 +57,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\ExternalProceduralObjectsManager.cs" />
     <Compile Include="Classes\KeyBindings.cs" />
     <Compile Include="Classes\ProceduralClasses.cs" />
     <Compile Include="Classes\SerializationUtils.cs" />
     <Compile Include="Classes\TextureUtils.cs" />
+    <Compile Include="Classes\UIMainButton.cs" />
     <Compile Include="Classes\UpdateInformant.cs" />
     <Compile Include="Classes\VertexClass.cs" />
     <Compile Include="AssetHelper\ProceduralEditorHelper.cs" />
@@ -74,6 +76,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>xcopy /y  "$(TargetDir)ProceduralObjects.dll" "C:\Users\Simon\AppData\Local\Colossal Order\Cities_Skylines\Addons\Mods\ProceduralObjects"</PostBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

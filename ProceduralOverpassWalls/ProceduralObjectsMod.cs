@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using ICities;
@@ -6,6 +7,7 @@ using ColossalFramework.IO;
 using ColossalFramework.Plugins;
 using UnityEngine;
 using ColossalFramework.PlatformServices;
+using ColossalFramework;
 
 using ProceduralObjects.Tools;
 using ProceduralObjects.Classes;
@@ -25,16 +27,29 @@ namespace ProceduralObjects
         {
             get { return "Extreme procedural objects customization tool"; }
         }
-        public const string VERSION = "1.2.2.2";
-        public const string DOCUMENTATION_URL = "http://cscreators.referata.com/wiki/Procedural_Objects";
 
-        public static string ModConfigPath
+
+        public const string VERSION = "1.3.0";
+        public const string DOCUMENTATION_URL = "http://cscreators.referata.com/wiki/Procedural_Objects";
+        public const string OTHER_SETTINGS_FILENAME = "ProceduralObjectsSettings";
+
+
+        public static string TextureConfigPath
         {
             get
             {
                 if (IsLinux)
                     return DataLocation.localApplicationData + @"/ModConfig/ProceduralObjects/";
                 return DataLocation.localApplicationData + @"\ModConfig\ProceduralObjects\";
+            }
+        }
+        public static string ExternalsConfigPath
+        {
+            get
+            {
+                if (IsLinux)
+                    return DataLocation.localApplicationData + @"/ModConfig/SavedProceduralObjects/";
+                return DataLocation.localApplicationData + @"\ModConfig\SavedProceduralObjects\";
             }
         }
         public static bool IsLinux
@@ -59,7 +74,7 @@ namespace ProceduralObjects
             {
                 if (gameLogicObject == null)
                 {
-                    gameLogicObject = new GameObject("ProceduralOverpassWallsMod_logicObject");
+                    gameLogicObject = new GameObject("Logic_ProceduralObjects");
                     gameLogicObject.AddComponent<ProceduralObjectsLogic>();
                     gameLogicObject.AddComponent<UpdateInformant>();
                 }
@@ -68,7 +83,7 @@ namespace ProceduralObjects
             {
                 if (editorHelperObject == null)
                 {
-                    editorHelperObject = new GameObject("ProceduralOverpassWallsMod_editorHelper");
+                    editorHelperObject = new GameObject("EditorHelper_ProceduralObjects");
                     editorHelperObject.AddComponent<ProceduralEditorHelper>();
                 }
             }
@@ -79,13 +94,27 @@ namespace ProceduralObjects
 
             if (gameLogicObject != null)
             {
-                Object.Destroy(gameLogicObject);
+                UnityEngine.Object.Destroy(gameLogicObject);
                 gameLogicObject = null;
             }
             if (editorHelperObject != null)
             {
-                Object.Destroy(editorHelperObject);
+                UnityEngine.Object.Destroy(editorHelperObject);
                 editorHelperObject = null;
+            }
+        }
+
+
+        public ProceduralObjectsMod()
+        {
+            try
+            {
+                GameSettings.AddSettingsFile(new SettingsFile[] { new SettingsFile() { fileName = OTHER_SETTINGS_FILENAME } });
+            }
+            catch (Exception e)
+            {
+                Debug.Log("[ProceduralObj] Failed to add the settings file :");
+                Debug.LogException(e);
             }
         }
     }

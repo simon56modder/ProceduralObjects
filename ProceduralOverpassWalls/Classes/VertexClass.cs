@@ -187,5 +187,22 @@ namespace ProceduralObjects.Classes
         {
             return rect.Contains(new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y));
         }
+        public static Quaternion ParseQuaternion(this string s)
+        {
+            string[] str = s.Replace("(", "").Replace(")", "").Split(new string[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
+            return new Quaternion(
+                float.Parse(str[0]),
+                float.Parse(str[1]),
+                float.Parse(str[2]),
+                float.Parse(str[3]));
+        }
+        public static Vector3 ParseVector3(this string s)
+        {
+            string[] str = s.Replace("(", "").Replace(")", "").Split(new string[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
+            return new Vector3(
+                float.Parse(str[0]),
+                float.Parse(str[1]),
+                float.Parse(str[2]));
+        }
     }
 }
