@@ -80,19 +80,31 @@ namespace ProceduralObjects.Classes
                 Directory.CreateDirectory(ProceduralObjectsMod.ExternalsConfigPath);
                 return;
             }
+            if (!Directory.Exists(ProceduralObjectsMod.ExternalsConfigPath))
+            {
+                Debug.LogError("[ProceduralObjects] Fatal Directory error : couldn't create the Externals folder properly. Skipping Externals loading.");
+                return;
+            }
             foreach (string path in Directory.GetFiles(ProceduralObjectsMod.ExternalsConfigPath, "*.pobj", SearchOption.AllDirectories))
             {
+                if (!File.Exists(path))
+                    continue;
                 LoadSingleExternal(path, availableTextures, false);
             }
 
             // workshop externals
             foreach (PublishedFileId fileId in PlatformService.workshop.GetSubscribedItems())
             {
-                var pobjFiles = Directory.GetFiles(PlatformService.workshop.GetSubscribedItemPath(fileId), "*.pobj", SearchOption.AllDirectories);
+                var dirPath = PlatformService.workshop.GetSubscribedItemPath(fileId);
+                if (!Directory.Exists(dirPath))
+                    continue;
+                var pobjFiles = Directory.GetFiles(dirPath, "*.pobj", SearchOption.AllDirectories);
                 if (pobjFiles.Any())
                 {
                     foreach (string file in pobjFiles)
                     {
+                        if (!File.Exists(file))
+                            continue;
                         LoadSingleExternal(file, availableTextures, true);
                     }
                 }

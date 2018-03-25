@@ -29,6 +29,8 @@ namespace ProceduralObjects.Classes
             {
                 foreach (string file in Directory.GetFiles(ProceduralObjectsMod.TextureConfigPath, "*.png", SearchOption.AllDirectories))
                 {
+                    if (!File.Exists(file))
+                        continue;
                     try
                     {
                         textures.Add(LoadPNG(file));

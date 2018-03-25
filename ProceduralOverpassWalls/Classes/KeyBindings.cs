@@ -136,7 +136,14 @@ namespace ProceduralObjects.Classes
         public static void Initialize()
         {
             instance = new KeyBindingsManager();
-            instance.LoadData();
+            try
+            {
+                instance.LoadData();
+            }
+            catch
+            {
+                Debug.LogError("[ProceduralObjects] Fatal Loading exception : couldn't load key bindings !");
+            }
         }
 
         public KeyBindingsManager()
@@ -156,8 +163,7 @@ namespace ProceduralObjects.Classes
             }
             if (!keyBindingsDictionary.ContainsKey(name))
             {
-                Debug.LogError("[ProceduralObjects] KeyBinding missing : A key binding was missing in the config file !");
-                return null;
+                throw new Exception("[ProceduralObjects] KeyBinding missing : A key binding was missing in the config file");
             }
             return keyBindingsDictionary[name];
         }
@@ -231,6 +237,7 @@ namespace ProceduralObjects.Classes
             {
                 keyBindingsDictionary.Add(kbInfo.m_name, kbInfo);
             }
+            Debug.Log("[ProceduralObjects] Key Bindings loading ended.");
         }
     }
 }

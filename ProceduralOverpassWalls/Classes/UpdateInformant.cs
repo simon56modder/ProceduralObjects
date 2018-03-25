@@ -36,7 +36,8 @@ namespace ProceduralObjects.Classes
             tw.Close();
 
             Changelog = new string[] {
-                "1.3 changelog :\n\n■ You can now save Procedural Objects to externals save files to reuse them or share them later, even through the workshop!\n■ Changed the Main Mod Button to a more fancy and moveable one (it's also automatically hidden with Cinematic Camera)\n■ You can rotate objects by dragging the Right Mouse Button using the Move To tool or when placing them.\n■ Added a Total Procedural objects counter\n■ Issues fixes.",
+                "1.3.1 changelog :\n\n■ Major issue 2018A3 (reported by Sparks44) fixed.",
+                "1.3.0 changelog :\n\n■ You can now save Procedural Objects to externals save files to reuse them or share them later, even through the workshop!\n■ Changed the Main Mod Button to a more fancy and moveable one (it's also automatically hidden with Cinematic Camera)\n■ You can rotate objects by dragging the Right Mouse Button using the Move To tool or when placing them.\n■ Added a Total Procedural objects counter\n■ Issues fixes.",
                 "1.2.2.2 changelog :\n\n■ Texture selection is sorted and easier (still room for improvements)\n■ When copying an object, its height is stored and when it's pasted, hold the Right Mouse Button to snap it to the stored height.",
                 "1.2.2.1 changelog :\n\n■ Linux issue 2018A1 fixed",
                 "1.2.2.0 changelog :\n\n■ All the Mod Keybindings can now be configured !\n■ Code improvements : the mod now runs faster",

@@ -50,6 +50,7 @@ namespace ProceduralObjects
 
         void Start()
         {
+            Debug.Log("[ProceduralObjects] Game start procedure started.");
             UIView view = UIView.GetAView();
             mainButton = view.AddUIComponent(typeof(ProceduralObjectsButton)) as ProceduralObjectsButton;
             mainButton.logic = this;
@@ -72,7 +73,7 @@ namespace ProceduralObjects
             }
             redLabelStyle.normal.textColor = Color.red;
             editingVertexIndex = new List<int>();
-        //  previousToolType = typeof(DefaultTool);
+            Debug.Log("[ProceduralObjects] Game start procedure ended.");
         }
 
         void Update()

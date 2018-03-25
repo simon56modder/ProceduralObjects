@@ -41,7 +41,13 @@ namespace ProceduralObjects.Classes
             if (savedX.value == -1000)
             {
                 UIComponent radioButton = GetUIView().FindUIComponent<UIComponent>("RadioButton");
-                absolutePosition = new Vector2(radioButton.absolutePosition.x - width + 2 * radioButton.width, radioButton.parent.absolutePosition.y + radioButton.height);
+                if (radioButton == null)
+                {
+                    absolutePosition = Vector2.zero;
+                    Debug.LogWarning("[ProceduralObjects] UI Main Button issue : Radio Button reference was not found, setting to zero, zero.");
+                }
+                else
+                    absolutePosition = new Vector2(radioButton.absolutePosition.x - width + 2 * radioButton.width, radioButton.parent.absolutePosition.y + radioButton.height);
             }
             else
             {

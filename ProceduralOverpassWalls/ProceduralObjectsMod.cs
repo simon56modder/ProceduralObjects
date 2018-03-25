@@ -29,7 +29,7 @@ namespace ProceduralObjects
         }
 
 
-        public const string VERSION = "1.3.0";
+        public const string VERSION = "1.3.1";
         public const string DOCUMENTATION_URL = "http://cscreators.referata.com/wiki/Procedural_Objects";
         public const string OTHER_SETTINGS_FILENAME = "ProceduralObjectsSettings";
 
