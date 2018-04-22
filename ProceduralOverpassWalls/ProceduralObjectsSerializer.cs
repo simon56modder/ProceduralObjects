@@ -99,13 +99,13 @@ namespace ProceduralObjects
         public ProceduralObjectContainer(ProceduralObject baseObject)
         {
             id = baseObject.id;
-            scale = baseObject.gameObject.transform.localScale.x;
             basePrefabName = baseObject.basePrefabName;
             objectType = baseObject.baseInfoType;
             renderDistance = baseObject.renderDistance;
-            position = new SerializableVector3(baseObject.gameObject.transform.position);
-            rotation = new SerializableQuaternion(baseObject.gameObject.transform.rotation);
-            vertices = SerializableVector3.ToSerializableArray(baseObject.gameObject.GetComponent<MeshFilter>().mesh.vertices);
+            position = new SerializableVector3(baseObject.m_position);
+            rotation = new SerializableQuaternion(baseObject.m_rotation);
+            scale = 1f;
+            vertices = SerializableVector3.ToSerializableArray(baseObject.m_mesh.vertices);
             hasCustomTexture = !(baseObject.customTexture == null);
             if (hasCustomTexture == true)
                 customTextureName = baseObject.customTexture.name;

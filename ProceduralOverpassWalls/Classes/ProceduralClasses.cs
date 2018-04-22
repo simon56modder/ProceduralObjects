@@ -15,25 +15,25 @@ namespace ProceduralObjects.Classes
             if (container.objectType == "PROP")
             {
                 PropInfo sourceProp = Resources.FindObjectsOfTypeAll<PropInfo>().FirstOrDefault(info => info.name == container.basePrefabName);
-                gameObject = new GameObject("ProceduralObject_" + container.id.ToString());
                 this.id = container.id;
                 this.basePrefabName = container.basePrefabName;
                 this.baseInfoType = "PROP";
                 this.isPloppableAsphalt = (sourceProp.m_mesh.name == "ploppableasphalt-prop");
                 renderDistance = container.renderDistance;
-                gameObject.transform.position = container.position.ToVector3();
                 m_position = container.position.ToVector3();
-                gameObject.transform.rotation = container.rotation.ToQuaternion();
                 m_rotation = container.rotation.ToQuaternion();
-                gameObject.transform.localScale = new Vector3(container.scale, container.scale, container.scale);
-                MeshFilter filterComponent = gameObject.AddComponent<MeshFilter>();
-                filterComponent.mesh = sourceProp.m_mesh.InstantiateMesh();
-                filterComponent.mesh.SetVertices(new List<Vector3>(SerializableVector3.ToStandardVector3Array(container.vertices)));
+              //  gameObject.transform.localScale = new Vector3(container.scale, container.scale, container.scale);
+                this.m_mesh = sourceProp.m_mesh.InstantiateMesh();
                 allVertices = SerializableVector3.ToStandardVector3Array(container.vertices);
-                MeshRenderer rendererComponent = gameObject.AddComponent<MeshRenderer>();
-                rendererComponent.material = sourceProp.m_material;
-                rendererComponent.shadowCastingMode = ShadowCastingMode.On;
-                rendererComponent.receiveShadows = true;
+                if (container.scale != 0)
+                {
+                    for (int i = 0; i < allVertices.Count(); i++)
+                    {
+                        allVertices[i] = new Vector3(allVertices[i].x * container.scale, allVertices[i].y * container.scale, allVertices[i].z * container.scale);
+                    }
+                }
+                m_mesh.SetVertices(new List<Vector3>(allVertices));
+                m_material = GameObject.Instantiate(sourceProp.m_material);
                 if (container.hasCustomTexture && textures != null)
                 {
                     if (!textures.Any(tex => tex.name == container.customTextureName))
@@ -41,34 +41,33 @@ namespace ProceduralObjects.Classes
                     else
                     {
                         var customTex = textures.FirstOrDefault(tex => tex.name == container.customTextureName);
-                        rendererComponent.material.mainTexture = customTex as Texture;
+                        m_material.mainTexture = customTex as Texture;
                         customTexture = customTex;
                     }
                 }
-                this.rendererComponent = rendererComponent;
             }
             else if (container.objectType == "BUILDING")// building
             {
                 BuildingInfo sourceProp = Resources.FindObjectsOfTypeAll<BuildingInfo>().FirstOrDefault(info => info.name == container.basePrefabName);
-                gameObject = new GameObject("ProceduralObject_" + container.id.ToString());
                 this.id = container.id;
                 this.basePrefabName = container.basePrefabName;
                 this.baseInfoType = "BUILDING";
                 this.isPloppableAsphalt = false;
                 renderDistance = container.renderDistance;
-                gameObject.transform.position = container.position.ToVector3();
                 m_position = container.position.ToVector3();
-                gameObject.transform.rotation = container.rotation.ToQuaternion();
                 m_rotation = container.rotation.ToQuaternion();
-                gameObject.transform.localScale = new Vector3(container.scale, container.scale, container.scale);
-                MeshFilter filterComponent = gameObject.AddComponent<MeshFilter>();
-                filterComponent.mesh = sourceProp.m_mesh.InstantiateMesh();
-                filterComponent.mesh.SetVertices(new List<Vector3>(SerializableVector3.ToStandardVector3Array(container.vertices)));
+              //  gameObject.transform.localScale = new Vector3(container.scale, container.scale, container.scale);
+                m_mesh = sourceProp.m_mesh.InstantiateMesh();
                 allVertices = SerializableVector3.ToStandardVector3Array(container.vertices);
-                MeshRenderer rendererComponent = gameObject.AddComponent<MeshRenderer>();
-                rendererComponent.material = sourceProp.m_material;
-                rendererComponent.shadowCastingMode = ShadowCastingMode.On;
-                rendererComponent.receiveShadows = true;
+                if (container.scale != 0)
+                {
+                    for (int i = 0; i < allVertices.Count(); i++)
+                    {
+                        allVertices[i] = new Vector3(allVertices[i].x * container.scale, allVertices[i].y * container.scale, allVertices[i].z * container.scale);
+                    }
+                }
+                m_mesh.SetVertices(new List<Vector3>(allVertices));
+                m_material = GameObject.Instantiate(sourceProp.m_material);
                 if (container.hasCustomTexture && textures != null)
                 {
                     if (!textures.Any(tex => tex.name == container.customTextureName))
@@ -76,11 +75,10 @@ namespace ProceduralObjects.Classes
                     else
                     {
                         var customTex = textures.FirstOrDefault(tex => tex.name == container.customTextureName);
-                        rendererComponent.material.mainTexture = customTex as Texture;
+                        m_material.mainTexture = customTex as Texture;
                         customTexture = customTex;
                     }
                 }
-                this.rendererComponent = rendererComponent;
             }
         }
         public ProceduralObject(CacheProceduralObject sourceCacheObj, int id, Vector3 position)
@@ -88,126 +86,99 @@ namespace ProceduralObjects.Classes
             if (sourceCacheObj.baseInfoType == "PROP")
             {
                 PropInfo sourceProp = Resources.FindObjectsOfTypeAll<PropInfo>().FirstOrDefault(info => info.name == sourceCacheObj.basePrefabName);
-                gameObject = new GameObject("ProceduralObject_" + id.ToString());
                 this.id = id;
                 this.basePrefabName = sourceCacheObj.basePrefabName;
                 this.baseInfoType = "PROP";
                 this.isPloppableAsphalt = (sourceProp.m_mesh.name == "ploppableasphalt-prop");
                 renderDistance = sourceCacheObj.renderDistance;
-                gameObject.transform.position = position;
                 m_position = position;
-                gameObject.transform.rotation = sourceCacheObj.m_rotation;
                 m_rotation = sourceCacheObj.m_rotation;
-                gameObject.transform.localScale = new Vector3(sourceCacheObj.scale, sourceCacheObj.scale, sourceCacheObj.scale);
-                MeshFilter filterComponent = gameObject.AddComponent<MeshFilter>();
-                filterComponent.mesh = sourceProp.m_mesh.InstantiateMesh();
-                filterComponent.mesh.SetVertices(new List<Vector3>(sourceCacheObj.allVertices));
+              //  gameObject.transform.localScale = new Vector3(sourceCacheObj.scale, sourceCacheObj.scale, sourceCacheObj.scale);
+                m_mesh = sourceProp.m_mesh.InstantiateMesh();
                 allVertices = sourceCacheObj.allVertices;
-                MeshRenderer rendererComponent = gameObject.AddComponent<MeshRenderer>();
-                rendererComponent.material = sourceProp.m_material;
-                rendererComponent.shadowCastingMode = ShadowCastingMode.On;
-                rendererComponent.receiveShadows = true;
+                m_mesh.SetVertices(new List<Vector3>(allVertices));
+                m_material = GameObject.Instantiate(sourceProp.m_material);
                 if (sourceCacheObj.customTexture != null)
                 {
-                    rendererComponent.material.mainTexture = sourceCacheObj.customTexture as Texture;
+                    m_material.mainTexture = sourceCacheObj.customTexture as Texture;
                     customTexture = sourceCacheObj.customTexture;
                 }
-                this.rendererComponent = rendererComponent;
             }
             else if (sourceCacheObj.baseInfoType == "BUILDING")// building
             {
                 BuildingInfo sourceProp = Resources.FindObjectsOfTypeAll<BuildingInfo>().FirstOrDefault(info => info.name == sourceCacheObj.basePrefabName);
-                gameObject = new GameObject("ProceduralObject_" + id.ToString());
                 this.id = id;
                 this.basePrefabName = sourceCacheObj.basePrefabName;
                 this.baseInfoType = "BUILDING";
                 this.isPloppableAsphalt = false;
                 renderDistance = sourceCacheObj.renderDistance;
-                gameObject.transform.position = position;
                 m_position = position;
-                gameObject.transform.rotation = sourceCacheObj.m_rotation;
                 m_rotation = sourceCacheObj.m_rotation;
-                gameObject.transform.localScale = new Vector3(sourceCacheObj.scale, sourceCacheObj.scale, sourceCacheObj.scale);
-                MeshFilter filterComponent = gameObject.AddComponent<MeshFilter>();
-                filterComponent.mesh = sourceProp.m_mesh.InstantiateMesh();
-                filterComponent.mesh.SetVertices(new List<Vector3>(sourceCacheObj.allVertices));
+              //  gameObject.transform.localScale = new Vector3(sourceCacheObj.scale, sourceCacheObj.scale, sourceCacheObj.scale);
+                m_mesh = sourceProp.m_mesh.InstantiateMesh();
                 allVertices = sourceCacheObj.allVertices;
-                MeshRenderer rendererComponent = gameObject.AddComponent<MeshRenderer>();
-                rendererComponent.material = sourceProp.m_material;
-                rendererComponent.shadowCastingMode = ShadowCastingMode.On;
-                rendererComponent.receiveShadows = true;
+                m_mesh.SetVertices(new List<Vector3>(allVertices));
+                m_material = GameObject.Instantiate(sourceProp.m_material);
                 if (sourceCacheObj.customTexture != null)
                 {
-                    rendererComponent.material.mainTexture = sourceCacheObj.customTexture as Texture;
+                    m_material.mainTexture = sourceCacheObj.customTexture as Texture;
                     customTexture = sourceCacheObj.customTexture;
                 }
-                this.rendererComponent = rendererComponent;
             }
         }
 
         public void ConstructObject(PropInfo sourceProp, int id, Texture2D customTex = null)
         {
-            gameObject = new GameObject("ProceduralObject_" + id.ToString());
             this.id = id;
             this.basePrefabName = sourceProp.name;
             this.isPloppableAsphalt = (sourceProp.m_mesh.name == "ploppableasphalt-prop");
             this.baseInfoType = "PROP";
-            this.renderDistance = 820;
-            gameObject.transform.position = ToolsModifierControl.cameraController.m_currentPosition;
-            m_position = gameObject.transform.position;
-            m_rotation = gameObject.transform.rotation;
-            MeshFilter filterComponent = gameObject.AddComponent<MeshFilter>();
+            this.renderDistance = ProceduralObjectsMod.PropRenderDistance.value;
+            m_position = ToolsModifierControl.cameraController.m_currentPosition;
+            m_rotation = Quaternion.identity;
             Mesh mesh = sourceProp.m_mesh.InstantiateMesh();
-            filterComponent.mesh = mesh;
+            m_mesh = mesh;
             allVertices = mesh.vertices;
-            MeshRenderer rendererComponent = gameObject.AddComponent<MeshRenderer>();
-            rendererComponent.material = sourceProp.m_material;
-            rendererComponent.shadowCastingMode = ShadowCastingMode.On;
-            rendererComponent.receiveShadows = true;
+            m_material = GameObject.Instantiate(sourceProp.m_material);
             if (customTex != null)
             {
-                rendererComponent.material.mainTexture = customTex as Texture;
+                m_material.mainTexture = customTex as Texture;
                 customTexture = customTex;
             }
-            this.rendererComponent = rendererComponent;
         }
         public void ConstructObject(BuildingInfo sourceBuilding, int id, Texture2D customTex = null)
         {
-            gameObject = new GameObject("ProceduralObject_" + id.ToString());
             this.id = id;
             this.basePrefabName = sourceBuilding.name;
             this.isPloppableAsphalt = false;
             this.baseInfoType = "BUILDING";
-            this.renderDistance = 920;
-            gameObject.transform.position = ToolsModifierControl.cameraController.m_currentPosition;
-            m_position = gameObject.transform.position;
-            m_rotation = gameObject.transform.rotation;
-            MeshFilter filterComponent = gameObject.AddComponent<MeshFilter>();
+            this.renderDistance = ProceduralObjectsMod.BuildingRenderDistance.value;
+            m_position = ToolsModifierControl.cameraController.m_currentPosition;
+            m_rotation = Quaternion.identity;
             Mesh mesh = sourceBuilding.m_mesh.InstantiateMesh();
-            filterComponent.mesh = mesh;
+            m_mesh = mesh;
             allVertices = mesh.vertices;
-            MeshRenderer rendererComponent = gameObject.AddComponent<MeshRenderer>();
-            rendererComponent.material = sourceBuilding.m_material;
-            rendererComponent.shadowCastingMode = ShadowCastingMode.On;
-            rendererComponent.receiveShadows = true;
+            m_material = GameObject.Instantiate(sourceBuilding.m_material);
             if (customTex != null)
             {
-                rendererComponent.material.mainTexture = customTex as Texture;
+                m_material.mainTexture = customTex as Texture;
                 customTexture = customTex;
             }
-            this.rendererComponent = rendererComponent;
         }
 
-        public GameObject gameObject;
-        public MeshRenderer rendererComponent;
+        public Mesh m_mesh;
+        public Material m_material;
         public Vector3 m_position;
         public Quaternion m_rotation;
         public Texture2D customTexture;
         public Vector3[] allVertices;
         public string basePrefabName, baseInfoType;
         public int id;
-        public float renderDistance;
+        public float renderDistance, m_scale;
         public bool isPloppableAsphalt;
+
+        public GameObject tempObj;
+
 
         public bool RequiresUVRecalculation
         {
@@ -224,22 +195,21 @@ namespace ProceduralObjects.Classes
         public CacheProceduralObject(ProceduralObject sourceObj)
         {
             renderDistance = sourceObj.renderDistance;
-            allVertices = sourceObj.gameObject.GetComponent<MeshFilter>().mesh.vertices;
-            scale = sourceObj.gameObject.transform.localScale.x;
+            allVertices = sourceObj.m_mesh.vertices;
             customTexture = sourceObj.customTexture;
-            m_rotation = sourceObj.gameObject.transform.rotation;
+            m_rotation = sourceObj.m_rotation;
             basePrefabName = sourceObj.basePrefabName;
             baseInfoType = sourceObj.baseInfoType;
         }
 
-        public float renderDistance, scale;
+        public float renderDistance;
         public bool isPloppableAsphalt;
         public Quaternion m_rotation;
         public Texture2D customTexture;
         public string basePrefabName, baseInfoType;
         public Vector3[] allVertices;
     }
-
+    
     public class ProceduralInfo
     {
         public ProceduralInfo() { }
@@ -335,7 +305,7 @@ namespace ProceduralObjects.Classes
                 {
                     try
                     {
-                        obj.gameObject.GetComponent<MeshFilter>().mesh.uv = Vertex.RecalculateUVMap(obj, Vertex.CreateVertexList(obj));
+                        obj.m_mesh.uv = Vertex.RecalculateUVMap(obj, Vertex.CreateVertexList(obj));
                     }
                     catch
                     {

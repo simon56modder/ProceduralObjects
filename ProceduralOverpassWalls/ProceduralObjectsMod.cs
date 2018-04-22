@@ -8,6 +8,7 @@ using ColossalFramework.Plugins;
 using UnityEngine;
 using ColossalFramework.PlatformServices;
 using ColossalFramework;
+using ColossalFramework.UI;
 
 using ProceduralObjects.Tools;
 using ProceduralObjects.Classes;
@@ -29,7 +30,7 @@ namespace ProceduralObjects
         }
 
 
-        public const string VERSION = "1.3.1";
+        public const string VERSION = "1.4.2";
         public const string DOCUMENTATION_URL = "http://cscreators.referata.com/wiki/Procedural_Objects";
         public const string OTHER_SETTINGS_FILENAME = "ProceduralObjectsSettings";
 
@@ -116,6 +117,49 @@ namespace ProceduralObjects
                 Debug.Log("[ProceduralObj] Failed to add the settings file :");
                 Debug.LogException(e);
             }
+        }
+
+        // Settings panel
+
+        public static readonly SavedFloat PropRenderDistance = new SavedFloat("propRenderDist", OTHER_SETTINGS_FILENAME, 850f, true);
+        public static readonly SavedFloat BuildingRenderDistance = new SavedFloat("buildingRenderDist", OTHER_SETTINGS_FILENAME, 1000f, true);
+
+        private UISlider propRenderSlider, buildingRenderSlider;
+        private UITextField propRenderLabel, buildingRenderLabel;
+
+        public void OnSettingsUI(UIHelperBase helper)
+        {
+            UIHelperBase group = helper.AddGroup("Procedural Objects");
+
+            propRenderLabel = (UITextField)group.AddTextfield(" ", "Default prop-converted render distance : " + PropRenderDistance.value.ToString(), (t) => { }, (t) => { });
+            propRenderLabel.disabledTextColor = Color.white;
+            propRenderLabel.tooltip = "The default render distance for props converted to Procedural Objects";
+            propRenderLabel.width = 700f;
+            propRenderLabel.Disable();
+
+            propRenderSlider = (UISlider)group.AddSlider(" ", 0f, 16000f, 10f, PropRenderDistance.value, propRenderDistanceChanged);
+            propRenderSlider.width = 700f;
+            propRenderSlider.height = 10f;
+
+            buildingRenderLabel = (UITextField)group.AddTextfield(" ", "Default building-converted render distance : " + BuildingRenderDistance.value.ToString(), (t) => { }, (t) => { });
+            buildingRenderLabel.disabledTextColor = Color.white;
+            buildingRenderLabel.tooltip = "The default render distance for buildings converted to Procedural Objects";
+            buildingRenderLabel.width = 700f;
+            buildingRenderLabel.Disable();
+
+            buildingRenderSlider = (UISlider)group.AddSlider(" ", 0f, 16000f, 10f, BuildingRenderDistance.value, buildingRenderDistanceChanged);
+            buildingRenderSlider.width = 700f;
+            buildingRenderSlider.height = 10f;
+        }
+        private void propRenderDistanceChanged(float value)
+        {
+            PropRenderDistance.value = value;
+            propRenderLabel.text = "Default prop-converted render distance : " + value.ToString();
+        }
+        private void buildingRenderDistanceChanged(float value)
+        {
+            BuildingRenderDistance.value = value;
+            buildingRenderLabel.text = "Default building-converted render distance : " + value.ToString();
         }
     }
 }

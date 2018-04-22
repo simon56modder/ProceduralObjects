@@ -1,42 +1,47 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System;
 using UnityEngine.Rendering;
 using UnityEngine;
 using System.IO;
 
 using ProceduralObjects.Classes;
 using ProceduralObjects.Tools;
+using ProceduralObjects.Localization;
 
 using ColossalFramework.UI;
+using ColossalFramework.Globalization;
 
 namespace ProceduralObjects
 {
     public class ProceduralObjectsLogic : MonoBehaviour
     {
-        public List<ProceduralObject> proceduralObjects;
+        public List<ProceduralObject> proceduralObjects, pObjSelection;
         public ProceduralObject currentlyEditingObject;
         public List<ProceduralInfo> availableProceduralInfos;
         public ProceduralInfo chosenProceduralInfo = null;
 
-        public CacheProceduralObject copiedObject = null;
+        public ClipboardProceduralObjects clipboard = null;
         public float storedHeight = 0f, yOffset = 0f;
 
-        public bool proceduralTool = false, editingVertex = false, movingWholeModel = false, editingWholeModel = false, generalShowUI = true, showExternals = false;
+        public bool proceduralTool = false, editingVertex = false, movingWholeModel = false, placingSelection = false, editingWholeModel = false, generalShowUI = true, showExternals = false;
         public List<int> editingVertexIndex;
         public Rect window = new Rect(155, 100, 400, 400);
         public Rect externalsWindow = new Rect(555, 100, 400, 400);
         public string externalsSaveTextfield = "Enter object name here";
         public Vector2 scrollVertices = Vector2.zero, scrollObjects = Vector2.zero, scrollTextures = Vector2.zero, scrollTextureResources = Vector2.zero, scrollExternals = Vector2.zero;
         public Vertex[] temp_storageVertex;
-     // public System.Type previousToolType;
+        // public System.Type previousToolType;
         public List<Texture2D> basicTextures;
         public AxisEditionState axisState = AxisEditionState.none;
         public Vector3 axisHitPoint = Vector3.zero;
         public LineRenderer xLine, yLine, zLine;
         private RotationWizardData rotWizardData = null;
 
-    //  public Dictionary<Vertex, Vector3> vertexShifting;
+        public Camera renderCamera;
+
+        //  public Dictionary<Vertex, Vector3> vertexShifting;
 
         public GUIStyle redLabelStyle = new GUIStyle();
         public int actionMode = 0;
@@ -51,10 +56,11 @@ namespace ProceduralObjects
         void Start()
         {
             Debug.Log("[ProceduralObjects] Game start procedure started.");
+            pObjSelection = new List<ProceduralObject>();
             UIView view = UIView.GetAView();
             mainButton = view.AddUIComponent(typeof(ProceduralObjectsButton)) as ProceduralObjectsButton;
             mainButton.logic = this;
-
+            renderCamera = Camera.main;
             KeyBindingsManager.Initialize();
             basicTextures = basicTextures.LoadModConfigTextures().OrderBy(tex => tex.name).ToList();
             availableProceduralInfos = ProceduralUtils.CreateProceduralInfosList();
@@ -73,6 +79,9 @@ namespace ProceduralObjects
             }
             redLabelStyle.normal.textColor = Color.red;
             editingVertexIndex = new List<int>();
+            SetupLocalization();
+            externalsSaveTextfield = LocalizationManager.instance.current["enter_name"];
+            LocaleManager.eventLocaleChanged += SetupLocalization;
             Debug.Log("[ProceduralObjects] Game start procedure ended.");
         }
 
@@ -81,7 +90,7 @@ namespace ProceduralObjects
             var currentToolType = ToolsModifierControl.toolController.CurrentTool.GetType();
 
             if ((currentToolType == typeof(PropTool)) || (currentToolType == typeof(BuildingTool)))
-                mainButton.text = "Convert this to PO";
+                mainButton.text = LocalizationManager.instance.current["convert_pobj"];
             else
                 mainButton.text = "Procedural Objects";
 
@@ -99,11 +108,29 @@ namespace ProceduralObjects
             {
                 for (int i = 0; i < proceduralObjects.Count; i++)
                 {
-                    try
+                    var obj = proceduralObjects[i];
+                    if (Vector3.Distance(Camera.main.transform.position, obj.m_position) <= obj.renderDistance)
                     {
-                        proceduralObjects[i].rendererComponent.enabled = (Vector3.Distance(Camera.main.transform.position, proceduralObjects[i].gameObject.transform.position) <= proceduralObjects[i].renderDistance) ? true : false;
+                        try
+                        {
+                            Graphics.DrawMesh(obj.m_mesh, obj.m_position, obj.m_rotation, obj.m_material, 0, renderCamera, 0, null, true, true);
+                          /*  Debug.Log("[PO] Rendering went correctly : " + (obj.m_mesh == null).ToString() + "," +
+                                (obj.m_position).ToString() + "," +
+                                (obj.m_rotation).ToString() + "," +
+                                (obj.m_material == null).ToString() + "," +
+                                (Camera.main == null).ToString()); */
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogError("[ProceduralObjects] Error while rendering object " + obj.id.ToString() + " (" + obj.basePrefabName + " of type " + obj.baseInfoType
+                                + " : " + e.Message + " - Stack Trace : " + e.StackTrace + " Values sent to DrawMesh were : " + (obj.m_mesh == null).ToString() + "," +
+                                (obj.m_position).ToString() + "," +
+                                (obj.m_rotation).ToString() + "," +
+                                (obj.m_material == null).ToString() + "," +
+                                (renderCamera == null).ToString()); 
+                        }
                     }
-                    catch {}
+
                 }
             }
             if (currentToolType == typeof(ProceduralTool))
@@ -111,37 +138,69 @@ namespace ProceduralObjects
                 // PASTE object
                 if (KeyBindingsManager.instance.GetBindingFromName("paste").GetBindingDown())
                 {
-                    if (copiedObject != null)
+                    if (clipboard != null)
                     {
-                        PlaceCacheObject(copiedObject);
+                        if (clipboard.type == ClipboardProceduralObjects.ClipboardType.Single)
+                        {
+                            placingSelection = false;
+                            pObjSelection.Clear();
+                            currentlyEditingObject = PlaceCacheObject(clipboard.single_object, true);
+                        }
+                        else
+                        {
+                            pObjSelection.Clear();
+                            for (int i = 0; i < clipboard.selection_objects.Count; i++)
+                            {
+                                var cache = clipboard.selection_objects.ToList()[i].Key;
+                                ProceduralObject obj = null;
+                                if (i == 0)
+                                {
+                                    obj = PlaceCacheObject(cache, true);
+                                    obj.tempObj = new GameObject();
+                                    obj.tempObj.transform.position = obj.m_position;
+                                    obj.tempObj.transform.rotation = obj.m_rotation;
+                                }
+                                else
+                                {
+                                    obj = PlaceCacheObject(cache, false);
+                                    obj.m_position = currentlyEditingObject.m_position + clipboard.selection_objects[cache];
+                                    obj.tempObj = new GameObject();
+                                    obj.tempObj.transform.position = obj.m_position;
+                                    obj.tempObj.transform.rotation = obj.m_rotation;
+                                    obj.tempObj.transform.SetParent(currentlyEditingObject.tempObj.transform, true);
+                                }
+                            }
+                            placingSelection = true;
+                        }
                     }
                 }
-             /* if (previousToolType != null)
-                {
-                    if (previousToolType != ToolsModifierControl.toolController.CurrentTool.GetType())
-                    {
-                        previousToolType = ToolsModifierControl.toolController.CurrentTool.GetType();
-                        editingVertex = false;
-                        editingVertexIndex.Clear();
-                        editingWholeModel = false;
-                        proceduralTool = false;
-                        showWindow = false;
-                        Gizmos.DestroyGizmo();
-                        xLine = null;
-                        yLine = null;
-                        zLine = null;
-                    }
-                } */
+                /* if (previousToolType != null)
+                   {
+                       if (previousToolType != ToolsModifierControl.toolController.CurrentTool.GetType())
+                       {
+                           previousToolType = ToolsModifierControl.toolController.CurrentTool.GetType();
+                           editingVertex = false;
+                           editingVertexIndex.Clear();
+                           editingWholeModel = false;
+                           proceduralTool = false;
+                           showWindow = false;
+                           Gizmos.DestroyGizmo();
+                           xLine = null;
+                           yLine = null;
+                           zLine = null;
+                       }
+                   } */
             }
             if (proceduralTool)
             {
                 // COPY objects
                 if (KeyBindingsManager.instance.GetBindingFromName("copy").GetBindingDown())
                 {
-                    if (currentlyEditingObject != null)
+                    if (currentlyEditingObject != null && !Gizmos.Exists)
                     {
-                        storedHeight = currentlyEditingObject.gameObject.transform.position.y;
-                        copiedObject = new CacheProceduralObject(currentlyEditingObject);
+                        storedHeight = currentlyEditingObject.m_position.y;
+                        clipboard = new ClipboardProceduralObjects(ClipboardProceduralObjects.ClipboardType.Single);
+                        clipboard.single_object = new CacheProceduralObject(currentlyEditingObject);
                     }
                 }
                 if (KeyBindingsManager.instance.GetBindingFromName("deleteObject").GetBindingDown())
@@ -151,18 +210,51 @@ namespace ProceduralObjects
                 {
                     if (Input.GetMouseButton(0))
                     {
-                        try
+                        if (placingSelection)
                         {
+                            //   Debug.Log("Validated move To with Selection");
+                            pObjSelection.Clear();
+                            ToolHelper.FullySetTool<ProceduralTool>();
+                            editingVertex = false;
+                            editingVertexIndex.Clear();
+                            editingWholeModel = false;
+                            proceduralTool = false;
+                            for (int i = 0; i < proceduralObjects.Count; i++)
+                            {
+                                if (proceduralObjects[i] == currentlyEditingObject)
+                                    continue;
+                                if (proceduralObjects[i].tempObj == null)
+                                    continue;
+                                if (proceduralObjects[i].tempObj.transform.parent = currentlyEditingObject.tempObj.transform)
+                                {
+                                    proceduralObjects[i].tempObj.transform.parent = null;
+                                    UnityEngine.Object.Destroy(proceduralObjects[i].tempObj);
+                                    proceduralObjects[i].tempObj = null;
+                                }
+                            }
+                            UnityEngine.Object.Destroy(currentlyEditingObject.tempObj);
+                            currentlyEditingObject.tempObj = null;
+                            currentlyEditingObject = null;
+                            chosenProceduralInfo = null;
+                            movingWholeModel = false;
+                            placingSelection = false;
+                            showExternals = false;
+                            rotWizardData = null;
+                            yOffset = 0f;
+                        }
+                        else
+                        {
+                            //  Debug.Log("Validated move To without Selection");
                             movingWholeModel = false;
                             editingWholeModel = false;
                             editingVertex = true;
                             showExternals = false;
                             rotWizardData = null;
+                            pObjSelection.Clear();
                             yOffset = 0f;
                             // StoreLineComponents(Gizmos.CreateGizmo(currentlyEditingObject.m_position, true));
                             ToolHelper.FullySetTool<ProceduralTool>();
                         }
-                        catch { movingWholeModel = true; }
                     }
                     else
                     {
@@ -177,11 +269,11 @@ namespace ProceduralObjects
                                 float diff = (rotWizardData.GUIMousePositionX - Input.mousePosition.x);
                                 if (diff < 0)
                                 {
-                                    currentlyEditingObject.gameObject.transform.Rotate(0, (diff * 245f) / Screen.width, 0);
+                                    currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, (diff * 300f) / Screen.width, 0);
                                 }
                                 else
                                 {
-                                    currentlyEditingObject.gameObject.transform.Rotate(0, -(((-diff) * 245f) / Screen.width), 0);
+                                    currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, -(((-diff) * 300f) / Screen.width), 0);
                                 }
                                 rotWizardData.UpdateMouseCoords();
                             }
@@ -194,6 +286,7 @@ namespace ProceduralObjects
                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBinding())
                             yOffset -= Time.deltaTime * 8.7f;
 
+
                         ToolBase.RaycastInput rayInput = new ToolBase.RaycastInput(Camera.main.ScreenPointToRay(Input.mousePosition), Camera.main.farClipPlane);
                         try
                         {
@@ -203,16 +296,28 @@ namespace ProceduralObjects
                                 if (!rayOutput.m_currentEditObject)
                                 {
                                     if (KeyBindingsManager.instance.GetBindingFromName("snapStoredHeight").GetBinding() && storedHeight != 0)
-                                        currentlyEditingObject.gameObject.transform.position = new Vector3(rayOutput.m_hitPos.x, storedHeight, rayOutput.m_hitPos.z);
+                                        currentlyEditingObject.m_position = new Vector3(rayOutput.m_hitPos.x, storedHeight, rayOutput.m_hitPos.z);
                                     else
-                                        currentlyEditingObject.gameObject.transform.position = new Vector3(rayOutput.m_hitPos.x, rayOutput.m_hitPos.y + yOffset, rayOutput.m_hitPos.z);
+                                        currentlyEditingObject.m_position = new Vector3(rayOutput.m_hitPos.x, rayOutput.m_hitPos.y + yOffset, rayOutput.m_hitPos.z);
                                 }
                             }
                         }
                         catch { }
-                        // ToolsModifierControl.cameraController.m_currentPosition + new Vector3(0, -8, 0);
-                        currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
-
+                        if (placingSelection && currentlyEditingObject.tempObj != null)
+                        {
+                            currentlyEditingObject.tempObj.transform.position = currentlyEditingObject.m_position;
+                            currentlyEditingObject.tempObj.transform.rotation = currentlyEditingObject.m_rotation;
+                            for (int i = 0; i < proceduralObjects.Count; i++)
+                            {
+                                if (proceduralObjects[i].tempObj == null)
+                                    continue;
+                                if (proceduralObjects[i].tempObj.transform.parent = currentlyEditingObject.tempObj.transform)
+                                {
+                                    proceduralObjects[i].m_position = proceduralObjects[i].tempObj.transform.position;
+                                    proceduralObjects[i].m_rotation = proceduralObjects[i].tempObj.transform.rotation;
+                                }
+                            }
+                        }
                     }
                 }
                 else
@@ -222,7 +327,7 @@ namespace ProceduralObjects
                     Rect toolsRect = new Rect(objGuiPosition.x + 8, objGuiPosition.y - 30, 110, 85);
                     if (!toolsRect.IsMouseInside())
                     {
-                        if (Input.GetMouseButton(0))
+                        if (Input.GetMouseButtonDown(0))
                         {
                             if (axisState == AxisEditionState.none)
                             {
@@ -232,17 +337,17 @@ namespace ProceduralObjects
                                     if (hit.transform.gameObject.name == "ProceduralAxis_X")
                                     {
                                         axisState = AxisEditionState.X;
-                                        axisHitPoint = Gizmos.AxisHitPoint(hit.point, currentlyEditingObject.gameObject.transform.position);
+                                        axisHitPoint = Gizmos.AxisHitPoint(hit.point, currentlyEditingObject.m_position);
                                     }
                                     else if (hit.transform.gameObject.name == "ProceduralAxis_Y")
                                     {
                                         axisState = AxisEditionState.Y;
-                                        axisHitPoint = Gizmos.AxisHitPoint(hit.point, currentlyEditingObject.gameObject.transform.position);
+                                        axisHitPoint = Gizmos.AxisHitPoint(hit.point, currentlyEditingObject.m_position);
                                     }
                                     else if (hit.transform.gameObject.name == "ProceduralAxis_Z")
                                     {
                                         axisState = AxisEditionState.Z;
-                                        axisHitPoint = Gizmos.AxisHitPoint(hit.point, currentlyEditingObject.gameObject.transform.position);
+                                        axisHitPoint = Gizmos.AxisHitPoint(hit.point, currentlyEditingObject.m_position);
                                     }
                                 }
                             }
@@ -296,26 +401,25 @@ namespace ProceduralObjects
                                     {
                                         // POSITION
                                         case AxisEditionState.X:
-                                            currentlyEditingObject.gameObject.transform.position = new Vector3(Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y,
+                                            currentlyEditingObject.m_position = new Vector3(Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y,
                                                 Vector3.Distance(Camera.main.transform.position, currentlyEditingObject.m_position))).x + axisHitPoint.x,
-                                                currentlyEditingObject.gameObject.transform.position.y,
-                                                currentlyEditingObject.gameObject.transform.position.z);
+                                                currentlyEditingObject.m_position.y,
+                                                currentlyEditingObject.m_position.z);
                                             break;
                                         case AxisEditionState.Y:
-                                            currentlyEditingObject.gameObject.transform.position = new Vector3(currentlyEditingObject.gameObject.transform.position.x,
+                                            currentlyEditingObject.m_position = new Vector3(currentlyEditingObject.m_position.x,
                                                 Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y,
                                                 Vector3.Distance(Camera.main.transform.position, currentlyEditingObject.m_position))).y + axisHitPoint.y,
-                                                currentlyEditingObject.gameObject.transform.position.z);
+                                                currentlyEditingObject.m_position.z);
                                             break;
                                         case AxisEditionState.Z:
-                                            currentlyEditingObject.gameObject.transform.position = new Vector3(currentlyEditingObject.gameObject.transform.position.x,
-                                                currentlyEditingObject.gameObject.transform.position.y,
+                                            currentlyEditingObject.m_position = new Vector3(currentlyEditingObject.m_position.x,
+                                                currentlyEditingObject.m_position.y,
                                                 Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y,
                                                 Vector3.Distance(Camera.main.transform.position, currentlyEditingObject.m_position))).z + axisHitPoint.z);
                                             break;
                                     }
                                 }
-                                currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
                             }
                         }
                         if (KeyBindingsManager.instance.GetBindingFromName("switchActionMode").GetBindingDown())
@@ -324,16 +428,16 @@ namespace ProceduralObjects
                         }
                         GameObject xAxis = GameObject.Find("ProceduralAxis_X");
                         if (xAxis != null)
-                            xAxis.transform.position = currentlyEditingObject.gameObject.transform.position;
+                            xAxis.transform.position = currentlyEditingObject.m_position;
                         GameObject yAxis = GameObject.Find("ProceduralAxis_Y");
                         if (yAxis != null)
-                            yAxis.transform.position = currentlyEditingObject.gameObject.transform.position;
+                            yAxis.transform.position = currentlyEditingObject.m_position;
                         GameObject zAxis = GameObject.Find("ProceduralAxis_Z");
                         if (zAxis != null)
-                            zAxis.transform.position = currentlyEditingObject.gameObject.transform.position;
+                            zAxis.transform.position = currentlyEditingObject.m_position;
                         GameObject centerCollid = GameObject.Find("ProceduralGizmoCenter");
                         if (centerCollid != null)
-                            centerCollid.transform.position = currentlyEditingObject.gameObject.transform.position;
+                            centerCollid.transform.position = currentlyEditingObject.m_position;
 
                         if (xLine != null)
                             Gizmos.UpdateLinePositions(currentlyEditingObject.m_position, xLine, yLine, zLine);
@@ -351,6 +455,7 @@ namespace ProceduralObjects
                                 if (!clickingRegion)
                                 {
                                     topLeftRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
+                                    bottomRightRegion = topLeftRegion;
                                     clickingRegion = true;
                                 }
                                 else
@@ -361,6 +466,10 @@ namespace ProceduralObjects
                                 bottomRightRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
                                 Rect region = CreateRectFromVector2s(topLeftRegion, bottomRightRegion);
                                 clickingRegion = false;
+                                if (!Input.GetKey(KeyCode.LeftControl))
+                                    editingVertexIndex.Clear();
+                                editingVertex = true;
+                                editingWholeModel = false;
                                 foreach (Vertex vertex in temp_storageVertex.Where(v => !v.IsDependent))
                                 {
                                     if (region.Contains(VertexWorldPosition(vertex).WorldToGuiPoint(), true))
@@ -384,7 +493,7 @@ namespace ProceduralObjects
                                    {
                                        if (axisState != AxisEditionState.none)
                                        {
-                                           Vector3 vertexWorldPosition = currentlyEditingObject.gameObject.transform.rotation * (Vector3.Scale(temp_storageVertex[editingVertexIndex[0]].Position, currentlyEditingObject.gameObject.transform.localScale)) + currentlyEditingObject.m_position;
+                                           Vector3 vertexWorldPosition = currentlyEditingObject.m_rotation * (Vector3.Scale(temp_storageVertex[editingVertexIndex[0]].Position, currentlyEditingObject.gameObject.transform.localScale)) + currentlyEditingObject.m_position;
                                            switch (axisState)
                                            {
                                                // POSITION
@@ -421,7 +530,7 @@ namespace ProceduralObjects
                                    }
                                    if (xAxis != null)
                                    {
-                                       xAxis.transform.position = currentlyEditingObject.gameObject.transform.rotation * (Vector3.Scale(temp_storageVertex[editingVertexIndex[0]].Position, currentlyEditingObject.gameObject.transform.localScale)) + currentlyEditingObject.m_position;
+                                       xAxis.transform.position = currentlyEditingObject.m_rotation * (Vector3.Scale(temp_storageVertex[editingVertexIndex[0]].Position, currentlyEditingObject.gameObject.transform.localScale)) + currentlyEditingObject.m_position;
                                        yAxis.transform.position = xAxis.transform.position;
                                        zAxis.transform.position = xAxis.transform.position;
                                    }
@@ -492,33 +601,27 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 9f * Time.deltaTime, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 9f * Time.deltaTime, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, -9f * Time.deltaTime, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, -9f * Time.deltaTime, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 0, 9f * Time.deltaTime);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 0, 9f * Time.deltaTime);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveRight").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 0, -9f * Time.deltaTime);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 0, -9f * Time.deltaTime);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveForward").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(9f * Time.deltaTime, 0, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(9f * Time.deltaTime, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(-9f * Time.deltaTime, 0, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(-9f * Time.deltaTime, 0, 0);
                                         }
                                         break;
                                     case 1:
@@ -526,13 +629,13 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.localScale += (new Vector3(.3f, .3f, .3f) * Time.deltaTime);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.Scale(temp_storageVertex, 1.3f * Time.deltaTime);
+                                            Apply();
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.localScale += (new Vector3(-.3f, -.3f, -.3f) * Time.deltaTime);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.Scale(temp_storageVertex, .7f * Time.deltaTime);
+                                            Apply();
                                         }
                                         break;
                                     case 2:
@@ -540,33 +643,27 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveUp").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(20f * Time.deltaTime, 0, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(20f * Time.deltaTime, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveDown").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(-20f * Time.deltaTime, 0, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(-20f * Time.deltaTime, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveLeft").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 20f * Time.deltaTime, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 20f * Time.deltaTime, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveRight").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, -20f * Time.deltaTime, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, -20f * Time.deltaTime, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveForward").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 0, 20f * Time.deltaTime);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 0, 20f * Time.deltaTime);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveBackward").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 0, -20f * Time.deltaTime);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 0, -20f * Time.deltaTime);
                                         }
                                         break;
                                 }
@@ -628,33 +725,27 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 1.8f * Time.deltaTime, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 1.8f * Time.deltaTime, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, -1.8f * Time.deltaTime, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, -1.8f * Time.deltaTime, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 0, 1.8f * Time.deltaTime);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 0, 1.8f * Time.deltaTime);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveRight").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 0, -1.8f * Time.deltaTime);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 0, -1.8f * Time.deltaTime);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveForward").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(1.8f * Time.deltaTime, 0, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(1.8f * Time.deltaTime, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(-1.8f * Time.deltaTime, 0, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(-1.8f * Time.deltaTime, 0, 0);
                                         }
                                         break;
                                     case 1:
@@ -662,13 +753,13 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.localScale += (new Vector3(.12f, .12f, .12f) * Time.deltaTime);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.Scale(temp_storageVertex, 1.12f * Time.deltaTime);
+                                            Apply();
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.localScale += (new Vector3(-.12f, -.12f, -.12f) * Time.deltaTime);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.Scale(temp_storageVertex, .88f * Time.deltaTime);
+                                            Apply();
                                         }
                                         break;
                                     case 2:
@@ -676,33 +767,27 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveUp").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(10f * Time.deltaTime, 0, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(10f * Time.deltaTime, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveDown").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(-10f * Time.deltaTime, 0, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(-10f * Time.deltaTime, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveLeft").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 10f * Time.deltaTime, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 10f * Time.deltaTime, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveRight").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, -10f * Time.deltaTime, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, -10f * Time.deltaTime, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveForward").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 0, 10f * Time.deltaTime);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 0, 10f * Time.deltaTime);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveBackward").GetBinding())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 0, -10f * Time.deltaTime);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 0, -10f * Time.deltaTime);
                                         }
                                         break;
                                 }
@@ -767,33 +852,27 @@ namespace ProceduralObjects
                                         // position
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 2f, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 2f, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, -2f, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, -2f, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 0, 2f);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 0, 2f);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveRight").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 0, -2f);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 0, -2f);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveForward").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(2f, 0, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(2f, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(-2f, 0, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(-2f, 0, 0);
                                         }
                                         break;
                                     case 1:
@@ -801,13 +880,13 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.localScale += new Vector3(.12f, .12f, .12f);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.Scale(temp_storageVertex, 1.12f);
+                                            Apply();
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.localScale += new Vector3(-0.12f, -0.12f, -0.12f);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.Scale(temp_storageVertex, .88f);
+                                            Apply();
                                         }
                                         break;
                                     case 2:
@@ -815,33 +894,27 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveUp").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(12f, 0, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(12f, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveDown").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(-12f, 0, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(-12f, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveLeft").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 12f, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 12f, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveRight").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, -12f, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, -12f, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveForward").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 0, 12f);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 0, 12f);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveBackward").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 0, -12f);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 0, -12f);
                                         }
                                         break;
                                 }
@@ -903,33 +976,27 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, .6f, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, .6f, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, -0.6f, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, -0.6f, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 0, 0.6f);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 0, 0.6f);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveRight").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0, 0, -0.6f);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0, 0, -0.6f);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveForward").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(0.6f, 0, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(0.6f, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.position += new Vector3(-0.6f, 0, 0);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.m_position += new Vector3(-0.6f, 0, 0);
                                         }
                                         break;
                                     case 1:
@@ -937,13 +1004,13 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.localScale += new Vector3(.06f, .06f, .06f);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.Scale(temp_storageVertex, 1.06f);
+                                            Apply();
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.localScale += new Vector3(-.06f, -.06f, -.06f);
-                                            currentlyEditingObject.m_position = currentlyEditingObject.gameObject.transform.position;
+                                            currentlyEditingObject.Scale(temp_storageVertex, .94f);
+                                            Apply();
                                         }
                                         break;
                                     case 2:
@@ -951,33 +1018,27 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveUp").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(5f, 0, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(5f, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveDown").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(-5f, 0, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(-5f, 0, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveLeft").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 5f, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 5f, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveRight").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, -5f, 0);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, -5f, 0);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveForward").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 0, 5f);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 0, 5f);
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveBackward").GetBindingDown())
                                         {
-                                            currentlyEditingObject.gameObject.transform.Rotate(0, 0, -5f);
-                                            currentlyEditingObject.m_rotation = currentlyEditingObject.gameObject.transform.rotation;
+                                            currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, 0, -5f);
                                         }
                                         break;
                                 }
@@ -1007,17 +1068,103 @@ namespace ProceduralObjects
                 {
                     if (!proceduralTool)
                     {
-                        foreach (ProceduralObject obj in proceduralObjects)
+                        foreach (ProceduralObject obj in proceduralObjects.ToList())
                         {
-                            var objScreenPos = obj.gameObject.transform.position.WorldToGuiPoint();
+                            //  try { Transform _t = obj.gameObject.transform; }
+                            //  catch { continue; }
+
+                            var objScreenPos = obj.m_position.WorldToGuiPoint();
                             if (!window.Contains(objScreenPos))
                             {
+                                if (pObjSelection.Contains(obj))
+                                {
+                                    if (pObjSelection[0] == obj)
+                                    {
+                                        if (pObjSelection.Count == 1)
+                                        {
+                                            #region
+                                            if (GUI.Button(new Rect(objScreenPos + new Vector2(12, -11), new Vector2(130, 22)), LocalizationManager.instance.current["edit"]))
+                                            {
+                                                currentlyEditingObject = obj;
+                                                pObjSelection.Clear();
+                                                temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
+                                                proceduralTool = true;
+                                            }
+                                            if (GUI.Button(new Rect(objScreenPos + new Vector2(12, 12), new Vector2(130, 22)), LocalizationManager.instance.current["delete"]))
+                                            {
+                                                proceduralObjects.Remove(obj);
+                                                //   Object.Destroy(obj.gameObject);
+                                                pObjSelection.Remove(obj);
+                                            }
+                                            if (GUI.Button(new Rect(objScreenPos + new Vector2(12, 35), new Vector2(130, 22)), LocalizationManager.instance.current["copy"]))
+                                            {
+                                                storedHeight = obj.m_position.y;
+                                                clipboard = new ClipboardProceduralObjects(ClipboardProceduralObjects.ClipboardType.Single);
+                                                clipboard.single_object = new CacheProceduralObject(obj);
+                                            }
+                                            if (GUI.Button(new Rect(objScreenPos + new Vector2(12, 58), new Vector2(130, 22)), LocalizationManager.instance.current["move_to"]))
+                                            {
+                                                pObjSelection.Clear();
+                                                currentlyEditingObject = obj;
+                                                placingSelection = false;
+                                                movingWholeModel = true;
+                                                editingWholeModel = true;
+                                                proceduralTool = true;
+                                            }
+                                            #endregion
+                                        }
+                                        else
+                                        {
+                                            #region
+                                            if (GUI.Button(new Rect(objScreenPos + new Vector2(12, -11), new Vector2(130, 22)), LocalizationManager.instance.current["delete_selection"]))
+                                            {
+                                                for (int i = 0; i < pObjSelection.Count; i++)
+                                                {
+                                                    proceduralObjects.Remove(pObjSelection[i]);
+                                                    // Object.Destroy(pObjSelection[i].gameObject);
+                                                }
+                                                pObjSelection.Clear();
+                                            }
+                                            if (GUI.Button(new Rect(objScreenPos + new Vector2(12, 12), new Vector2(130, 22)), LocalizationManager.instance.current["copy_selection"]))
+                                            {
+                                                clipboard = new ClipboardProceduralObjects(ClipboardProceduralObjects.ClipboardType.Selection);
+                                                clipboard.MakeSelectionList(pObjSelection);
+                                                storedHeight = obj.m_position.y;
+                                            }
+                                            #endregion
+                                        }
+                                    }
+                                    GUI.color = Color.red;
+                                }
                                 if (GUI.Button(new Rect(objScreenPos + new Vector2(-11, -11), new Vector2(23, 22)), "<size=20>+</size>"))
                                 {
+                                    if (pObjSelection.Contains(obj))
+                                    {
+                                        if (Input.GetKey(KeyCode.LeftControl))
+                                            pObjSelection.Remove(obj);
+                                        else
+                                        {
+                                            pObjSelection.Clear();
+                                            pObjSelection.Add(obj);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (Input.GetKey(KeyCode.LeftControl))
+                                            pObjSelection.Add(obj);
+                                        else
+                                        {
+                                            pObjSelection.Clear();
+                                            pObjSelection.Add(obj);
+                                        }
+                                    }
+                                    /*
                                     currentlyEditingObject = obj;
                                     temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
                                     proceduralTool = true;
+                                     */
                                 }
+                                GUI.color = Color.white;
                             }
                         }
                     }
@@ -1030,7 +1177,7 @@ namespace ProceduralObjects
                             window = new Rect(winrect.x, winrect.y, winrect.width, 400);
 
                         if (showExternals)
-                            externalsWindow = GUI.Window(1094334745, externalsWindow, DrawExternalsWindow, "Saved Procedural Objects");
+                            externalsWindow = GUI.Window(1094334745, externalsWindow, DrawExternalsWindow, LocalizationManager.instance.current["saved_pobjs"]);
 
                         #region GUI when TOOL is active
                         if (currentlyEditingObject != null)
@@ -1089,28 +1236,29 @@ namespace ProceduralObjects
                             else
                             {
                                 Vector2 objPosition = currentlyEditingObject.m_position.WorldToGuiPoint();
-                                if (GUI.Button(new Rect(objPosition + new Vector2(13, -26), new Vector2(100, 23)), "Move to"))
+                                if (GUI.Button(new Rect(objPosition + new Vector2(13, -26), new Vector2(100, 23)), LocalizationManager.instance.current["move_to"]))
                                 {
                                     movingWholeModel = true;
+                                    placingSelection = false;
                                     Gizmos.DestroyGizmo();
                                     xLine = null;
                                     yLine = null;
                                     zLine = null;
                                 }
-                                if (GUI.Button(new Rect(objPosition + new Vector2(13, 0), new Vector2(100, 23)), "Delete"))
+                                if (GUI.Button(new Rect(objPosition + new Vector2(13, 0), new Vector2(100, 23)), LocalizationManager.instance.current["delete"]))
                                     DeleteObject();
 
                                 string modeText = "<i>";
                                 switch (actionMode)
                                 {
                                     case 0:
-                                        modeText += "Position</i>";
+                                        modeText += LocalizationManager.instance.current["position"] + "</i>";
                                         break;
                                     case 1:
-                                        modeText += "Scale</i>";
+                                        modeText += LocalizationManager.instance.current["scale"] + "</i>";
                                         break;
                                     case 2:
-                                        modeText += "Rotation</i>";
+                                        modeText += LocalizationManager.instance.current["rotation"] + "</i>";
                                         break;
                                 }
                                 Rect modeRect = new Rect(objPosition + new Vector2(13, 26), new Vector2(100, 23));
@@ -1123,7 +1271,7 @@ namespace ProceduralObjects
                         #endregion
                     }
                     else
-                        GUI.Label(new Rect(Input.mousePosition.x + 18, Screen.height - Input.mousePosition.y + 18, 300, 30), "Click to place");
+                        GUI.Label(new Rect(Input.mousePosition.x + 18, Screen.height - Input.mousePosition.y + 18, 300, 30), LocalizationManager.instance.current["click_to_place"]);
                 }
             }
         }
@@ -1140,6 +1288,7 @@ namespace ProceduralObjects
                 proceduralTool = false;
                 currentlyEditingObject = null;
                 chosenProceduralInfo = null;
+                pObjSelection.Clear();
                 ToolHelper.FullySetTool<DefaultTool>();
                 Gizmos.DestroyGizmo();
                 xLine = null;
@@ -1154,67 +1303,102 @@ namespace ProceduralObjects
                 GUI.BeginGroup(new Rect(10, 30, 380, 412));
                 if (editingWholeModel)
                 {
-                    if (movingWholeModel)
+                    /* if (movingWholeModel)
+                       {
+                           GUI.Label(new Rect(0, 0, 300, 30), "<b><size=18>" + LocalizationManager.instance.current["move_to_tool"] + "</size></b>");
+                           GUI.Label(new Rect(0, 30, 380, 250), "<b>" + LocalizationManager.instance.current["controls"] + ":</b>\n" + LocalizationManager.instance.current["LM_click"] + " : " + LocalizationManager.instance.current["confirm_placement"]);
+                       }
+                       else
+                       { */
+                    GUI.Label(new Rect(35, 0, 300, 30), "<b><size=18>" + LocalizationManager.instance.current["general_tool"] + "</size></b>");
+                    GUI.contentColor = Color.green;
+                    GUI.Label(new Rect(0, 0, 23, 23), "<size=18>¤</size>", GUI.skin.button);
+                    GUI.contentColor = Color.white;
+                    GUI.Label(new Rect(0, 30, 380, 330), "<b>" + LocalizationManager.instance.current["controls"] + ":</b>\n" + KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_for_smooth"] + "\n" +
+                        KeyBindingsManager.instance.GetBindingFromName("edition_smallMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_slow_together"] + "\n\n" +
+                        KeyBindingsManager.instance.GetBindingFromName("switchActionMode").m_fullKeys + " : " + LocalizationManager.instance.current["switch_modes"] + "\n" +
+                        KeyBindingsManager.instance.GetBindingFromName("position_moveUp").m_fullKeys + ", " +
+                        KeyBindingsManager.instance.GetBindingFromName("position_moveDown").m_fullKeys + ", " +
+                        KeyBindingsManager.instance.GetBindingFromName("position_moveRight").m_fullKeys + ", " +
+                        KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").m_fullKeys + ", " +
+                        KeyBindingsManager.instance.GetBindingFromName("position_moveForward").m_fullKeys + ", " +
+                        KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").m_fullKeys + " : " + LocalizationManager.instance.current["move_objects_pos"] + "\n" +
+                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveUp").m_fullKeys + ", " +
+                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveDown").m_fullKeys + ", " +
+                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveRight").m_fullKeys + ", " +
+                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveLeft").m_fullKeys + ", " +
+                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveForward").m_fullKeys + ", " +
+                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveBackward").m_fullKeys + " : " + LocalizationManager.instance.current["rotate_objects_rot"] + "\n" +
+                        KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").m_fullKeys + "/" +
+                        KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").m_fullKeys + " : " + LocalizationManager.instance.current["scale_objects"] + "\n" +
+                        "\n" + KeyBindingsManager.instance.GetBindingFromName("switchGeneralToVertexTools").m_fullKeys + " : " + LocalizationManager.instance.current["quick_switch"] + "\n\n<b>" + LocalizationManager.instance.current["buttons"] + " : </b>\n" + LocalizationManager.instance.current["delete_desc"] + "\n" + LocalizationManager.instance.current["move_to_desc"]);
+                    GUI.Label(new Rect(0, 330, 380, 30), LocalizationManager.instance.current["render_distance"] + " : " + currentlyEditingObject.renderDistance.ToString("N").Replace(".00", ""));
+                    currentlyEditingObject.renderDistance = GUI.HorizontalSlider(new Rect(0, 350, 380, 30), Mathf.Floor(currentlyEditingObject.renderDistance), 50f, 16000f);
+
+                    externalsSaveTextfield = GUI.TextField(new Rect(0, 370, 285, 28), externalsSaveTextfield);
+                    if (File.Exists(ProceduralObjectsMod.ExternalsConfigPath + externalsSaveTextfield.ToFileName() + ".pobj"))
                     {
-                        GUI.Label(new Rect(0, 0, 300, 30), "<b><size=18>\"Move To\" tool</size></b>");
-                        GUI.Label(new Rect(0, 30, 380, 250), "<b>Controls:</b>\nLeft Mouse Click : Confirm placement");
+                        GUI.color = Color.red;
+                        GUI.Label(new Rect(290, 370, 90, 28), "X", GUI.skin.button);
+                        GUI.color = Color.white;
                     }
                     else
                     {
-                        GUI.Label(new Rect(35, 0, 300, 30), "<b><size=18>General tool</size></b>");
-                        GUI.contentColor = Color.green;
-                        GUI.Label(new Rect(0, 0, 23, 23), "<size=18>¤</size>", GUI.skin.button);
-                        GUI.contentColor = Color.white;
-                        GUI.Label(new Rect(0, 30, 380, 330), "<b>Controls:</b>\n" + KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").m_fullKeys + " : Hold for smooth movements\n" +
-                            KeyBindingsManager.instance.GetBindingFromName("edition_smallMovements").m_fullKeys + " : Hold for slow movements\n(can be used together)\n\n"+
-                            KeyBindingsManager.instance.GetBindingFromName("switchActionMode").m_fullKeys + " : switch mode (position, scaling, rotation)\n" + 
-                            KeyBindingsManager.instance.GetBindingFromName("position_moveUp").m_fullKeys + ", " +
-                            KeyBindingsManager.instance.GetBindingFromName("position_moveDown").m_fullKeys + ", " +
-                            KeyBindingsManager.instance.GetBindingFromName("position_moveRight").m_fullKeys + ", " +
-                            KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").m_fullKeys + ", " +
-                            KeyBindingsManager.instance.GetBindingFromName("position_moveForward").m_fullKeys + ", " +
-                            KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").m_fullKeys + " : Move the Object in Position mode\n"+
-                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveUp").m_fullKeys + ", " +
-                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveDown").m_fullKeys + ", " +
-                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveRight").m_fullKeys + ", " +
-                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveLeft").m_fullKeys + ", " +
-                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveForward").m_fullKeys + ", " +
-                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveBackward").m_fullKeys + " : Rotate the Object in Rotation mode\n" +
-                            KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").m_fullKeys + "/" +
-                            KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").m_fullKeys + " : Scale the object up/down in Scale mode\n" +
-                            "\n" + KeyBindingsManager.instance.GetBindingFromName("switchGeneralToVertexTools").m_fullKeys + " : Quick switch between General/Vertices tool\n\n<b>Buttons : </b>\nDelete : deletes the object\nMove to : move the object to a new position");
-                        GUI.Label(new Rect(0, 330, 380, 30), "Render Distance : " + currentlyEditingObject.renderDistance.ToString("N").Replace(".00", ""));
-                        currentlyEditingObject.renderDistance = GUI.HorizontalSlider(new Rect(0, 350, 380, 30), Mathf.Floor(currentlyEditingObject.renderDistance), 50f, 10000f);
-
-                        externalsSaveTextfield = GUI.TextField(new Rect(0, 370, 285, 28), externalsSaveTextfield);
-                        if (File.Exists(ProceduralObjectsMod.ExternalsConfigPath + externalsSaveTextfield.ToFileName() + ".pobj"))
+                        if (GUI.Button(new Rect(290, 370, 90, 28), LocalizationManager.instance.current["save"]))
                         {
-                            GUI.color = Color.red;
-                            GUI.Label(new Rect(290, 370, 90, 28), "X", GUI.skin.button);
-                            GUI.color = Color.white;
-                        }
-                        else
-                        {
-                            if (GUI.Button(new Rect(290, 370, 90, 28), "Save"))
-                            {
-                                ExPObjManager.SaveToExternal(externalsSaveTextfield, new CacheProceduralObject(currentlyEditingObject));
-                                externalsSaveTextfield = "Enter object name here";
-                            }
+                            ExPObjManager.SaveToExternal(externalsSaveTextfield, new CacheProceduralObject(currentlyEditingObject));
+                            externalsSaveTextfield = LocalizationManager.instance.current["enter_name"];
                         }
                     }
                     GUI.EndGroup();
+                    if (GUI.Button(new Rect(15, 335, 185, 25), "◄ " + LocalizationManager.instance.current["back"]))
+                    {
+                        showExternals = false;
+                        ToolHelper.FullySetTool<ProceduralTool>();
+                        Gizmos.DestroyGizmo();
+                        xLine = null;
+                        yLine = null;
+                        zLine = null;
+                        editingVertex = false;
+                        editingVertexIndex.Clear();
+                        editingWholeModel = false;
+                        proceduralTool = false;
+                        currentlyEditingObject = null;
+                        chosenProceduralInfo = null;
+                        pObjSelection.Clear();
+                    }
                 }
                 else
                 {
-                    GUI.Label(new Rect(35, 0, 300, 30), "<b><size=18>Vertex customization tool</size></b>");
+                    GUI.Label(new Rect(35, 0, 300, 30), "<b><size=18>" + LocalizationManager.instance.current["vertex_tool"] + "</size></b>");
                     GUI.Label(new Rect(0, 0, 23, 23), "<size=18>+</size>", GUI.skin.button);
-                    GUI.Label(new Rect(0, 30, 380, 330), "<b>Controls:</b>\nShift : Hold for smooth movements\nAlt : Hold for slow movements\n(can be used together)\n\nCtrl : Hold to select multiple vertices at a time\nArrow keys : Move the selected vertices left/right and forwards/backwards\nPageUp/PageDown : Move the selected vertices up/down\nTab : Quick switch between General/Vertices tool");
+                    GUI.Label(new Rect(0, 30, 380, 330), "<b>" + LocalizationManager.instance.current["controls"] + ":</b>\n" + KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_for_smooth"] +
+                        "\n" + KeyBindingsManager.instance.GetBindingFromName("edition_smallMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_slow_together"] + "\n\nCtrl : " + LocalizationManager.instance.current["hold_slow_together"] +
+                        "\n" + LocalizationManager.instance.current["move_vertices"] + "\n" +
+                        KeyBindingsManager.instance.GetBindingFromName("position_moveUp").m_fullKeys + "/" + KeyBindingsManager.instance.GetBindingFromName("position_moveDown").m_fullKeys +
+                        " : " + LocalizationManager.instance.current["move_vertices_updown"] + "\n" +
+                    KeyBindingsManager.instance.GetBindingFromName("switchGeneralToVertexTools").m_fullKeys + " : " + LocalizationManager.instance.current["quick_switch"] +
+                    "\n\n" + KeyBindingsManager.instance.GetBindingFromName("copy").m_fullKeys + " : " + LocalizationManager.instance.current["copy_obj"] + "\n" +
+                    KeyBindingsManager.instance.GetBindingFromName("paste").m_fullKeys + " : " + LocalizationManager.instance.current["paste_obj"]
+                    + "\n" + LocalizationManager.instance.current["delete_desc"] + "\n\n" +
+                    LocalizationManager.instance.current["rmb_marquee_vertices"]);
 
                     GUI.EndGroup();
-                    if (GUI.Button(new Rect(15, 345, 185, 25), "Delete"))
+                    if (GUI.Button(new Rect(15, 335, 185, 25), LocalizationManager.instance.current["delete"]))
                         DeleteObject();
+                    if (GUI.Button(new Rect(15, 370, 120, 25), "◄ " + LocalizationManager.instance.current["back"]))
+                    {
+                        ToolHelper.FullySetTool<ProceduralTool>();
+                        editingVertex = false;
+                        editingVertexIndex.Clear();
+                        editingWholeModel = false;
+                        proceduralTool = false;
+                        currentlyEditingObject = null;
+                        chosenProceduralInfo = null;
+                        pObjSelection.Clear();
+                    }
                 }
-                if (GUI.Button(new Rect(205, 345, 185, 25), (editingWholeModel ? "Vertex Customization" : "General Tool")))
+                if (GUI.Button(new Rect(205, 335, 185, 25), (editingWholeModel ? LocalizationManager.instance.current["vertex_customization"] : LocalizationManager.instance.current["general_tool"])))
                 {
                     if (editingWholeModel)
                     {
@@ -1228,32 +1412,30 @@ namespace ProceduralObjects
                         editingWholeModel = false;
                     }
                     else
-                    {
                         SwitchToMainTool();
-                    }
                 }
             }
             else
             {
                 if (chosenProceduralInfo == null)
                 {
-                    GUI.Label(new Rect(10, 30, 350, 30), "Spawn a new Procedural Object/Click one to edit it");
+                    GUI.Label(new Rect(10, 30, 350, 30), LocalizationManager.instance.current["spawn_new"]);
 
                     if (TextureUtils.LocalTexturesCount == 0)
-                        GUI.Label(new Rect(10, 45, 350, 45), "No custom texture found !\nCan't create basic objects");
+                        GUI.Label(new Rect(10, 45, 350, 45), LocalizationManager.instance.current["no_tex"] + "\n" + LocalizationManager.instance.current["cant_create_basic"]);
                     else
-                        GUI.Label(new Rect(25, 60, 350, 30), "Local Textures : ");
+                        GUI.Label(new Rect(25, 60, 350, 30), LocalizationManager.instance.current["local_tex"] + " : ");
 
-                    if (GUI.Button(new Rect(170, 55, 55, 28), "Refresh"))
+                    if (GUI.Button(new Rect(170, 55, 55, 28), LocalizationManager.instance.current["refresh"]))
                         basicTextures = basicTextures.LoadModConfigTextures();
-                    if (GUI.Button(new Rect(230, 55, 155, 28), "Open Texture Folder"))
+                    if (GUI.Button(new Rect(230, 55, 155, 28), LocalizationManager.instance.current["open_tex"]))
                     {
                         if (Directory.Exists(ProceduralObjectsMod.TextureConfigPath))
                             Application.OpenURL("file://" + ProceduralObjectsMod.TextureConfigPath);
                     }
-                    if (GUI.Button(new Rect(10, 84, 375, 24), "Go to the Documentation Wiki Page"))
+                    if (GUI.Button(new Rect(10, 84, 375, 24), LocalizationManager.instance.current["go_to_wiki"]))
                         Application.OpenURL(ProceduralObjectsMod.DOCUMENTATION_URL);
-                    if (GUI.Button(new Rect(10, 110, 375, 24), "Open Key Bindings Config File (Requires Restart)"))
+                    if (GUI.Button(new Rect(10, 110, 375, 24), LocalizationManager.instance.current["open_kbd_cfg"]))
                     {
                         if (File.Exists(KeyBindingsManager.BindingsConfigPath))
                             Application.OpenURL("file://" + KeyBindingsManager.BindingsConfigPath);
@@ -1261,40 +1443,40 @@ namespace ProceduralObjects
 
                     if (TextureUtils.TextureResources.Count > 0)
                     {
-                        GUI.Label(new Rect(10, 135, 375, 28), "Workshop Texture Packages loaded : " + TextureUtils.TextureResources.Count.ToString());
+                        GUI.Label(new Rect(10, 135, 375, 28), LocalizationManager.instance.current["wk_tex_loaded"] + " : " + TextureUtils.TextureResources.Count.ToString());
                         GUI.Box(new Rect(10, 160, 375, 170), string.Empty);
                         scrollTextureResources = GUI.BeginScrollView(new Rect(10, 160, 375, 170), scrollTextureResources, new Rect(0, 0, 350, TextureUtils.TextureResources.Count * 30));
                         for (int i = 0; i < TextureUtils.TextureResources.Count; i++)
                         {
-                            GUI.Label(new Rect(5, i * 30, 248, 28), TextureUtils.TextureResources[i].HasCustomName ? TextureUtils.TextureResources[i].m_name : "<i>Package with no custom name</i>");
-                            GUI.Label(new Rect(255, i * 30, 99, 28), 
-                                (TextureUtils.TextureResources[i].TexturesCount > 1) ? "(" + TextureUtils.TextureResources[i].TexturesCount + " textures)" : "(" + TextureUtils.TextureResources[i].TexturesCount + " texture)");
+                            GUI.Label(new Rect(5, i * 30, 248, 28), TextureUtils.TextureResources[i].HasCustomName ? TextureUtils.TextureResources[i].m_name : "<i>" + LocalizationManager.instance.current["package_no_custom_name"] + "</i>");
+                            GUI.Label(new Rect(255, i * 30, 99, 28),
+                                (TextureUtils.TextureResources[i].TexturesCount > 1) ? "(" + TextureUtils.TextureResources[i].TexturesCount + " " + LocalizationManager.instance.current["textures"] + ")" : "(" + TextureUtils.TextureResources[i].TexturesCount + " " + LocalizationManager.instance.current["texture"] + ")");
                         }
                         GUI.EndScrollView();
                     }
                     else
-                        GUI.Label(new Rect(10, 130, 375, 28), "No subscribed Workshop Texture Package loaded.");
+                        GUI.Label(new Rect(10, 130, 375, 28), LocalizationManager.instance.current["no_wk_tex_loaded"]);
 
-                    GUI.Label(new Rect(10, 331, 375, 35), basicTextures.Count().ToString() + " textures in total : " + TextureUtils.LocalTexturesCount.ToString() + " local + " + TextureResourceInfo.TotalTextureCount(TextureUtils.TextureResources) + " from the Workshop\n<size=10>Total objects count on the map : " + proceduralObjects.Count.ToString("N").Replace(".00", "") + "</size>");
+                    GUI.Label(new Rect(10, 331, 375, 35), basicTextures.Count().ToString() + " " + LocalizationManager.instance.current["tex_in_total"] + " : " + TextureUtils.LocalTexturesCount.ToString() + " " + LocalizationManager.instance.current["local"] + " + " + TextureResourceInfo.TotalTextureCount(TextureUtils.TextureResources) + " " + LocalizationManager.instance.current["from_wk"] + "\n<size=10>" + LocalizationManager.instance.current["total_obj_count"] + " : " + proceduralObjects.Count.ToString("N").Replace(".00", "") + "</size>");
 
-                    if (GUI.Button(new Rect(10, 365, 375, 28), "Saved Procedural Objects"))
+                    if (GUI.Button(new Rect(10, 365, 375, 28), LocalizationManager.instance.current["saved_pobjs"]))
                         showExternals = true;
                 }
                 else
                 {
                     if (chosenProceduralInfo.infoType == "PROP")
-                        GUI.Label(new Rect(10, 30, 350, 30), "Choose texture to apply to the model \"" + chosenProceduralInfo.propPrefab.GetLocalizedTitle() + "\"");
+                        GUI.Label(new Rect(10, 30, 350, 30), LocalizationManager.instance.current["choose_tex_to_apply"] + " \"" + chosenProceduralInfo.propPrefab.GetLocalizedTitle() + "\"");
                     else if (chosenProceduralInfo.infoType == "BUILDING")
-                        GUI.Label(new Rect(10, 30, 350, 30), "Choose texture to apply to the model \"" + chosenProceduralInfo.buildingPrefab.GetLocalizedTitle() + "\"");                       
+                        GUI.Label(new Rect(10, 30, 350, 30), LocalizationManager.instance.current["choose_tex_to_apply"] + " \"" + chosenProceduralInfo.buildingPrefab.GetLocalizedTitle() + "\"");
                     // Texture selection
                     scrollTextures = GUI.BeginScrollView(new Rect(10, 60, 350, 330), scrollTextures, new Rect(0, 0, 320, 80 * basicTextures.Count() + 65));
-                    GUI.Label(new Rect(10, 0, 300, 28), basicTextures.Count().ToString() + " textures in total : " + TextureUtils.LocalTexturesCount.ToString() + " local + " + TextureResourceInfo.TotalTextureCount(TextureUtils.TextureResources) + " from the Workshop");
-                    if (GUI.Button(new Rect(10, 30, 147.5f, 30), "Open Folder"))
+                    GUI.Label(new Rect(10, 0, 300, 28), basicTextures.Count().ToString() + " " + LocalizationManager.instance.current["tex_in_total"] + " : " + TextureUtils.LocalTexturesCount.ToString() + " " + LocalizationManager.instance.current["local"] + " + " + TextureResourceInfo.TotalTextureCount(TextureUtils.TextureResources) + " " + LocalizationManager.instance.current["from_wk"]);
+                    if (GUI.Button(new Rect(10, 30, 147.5f, 30), LocalizationManager.instance.current["open_folder"]))
                     {
                         if (Directory.Exists(ProceduralObjectsMod.TextureConfigPath))
                             Application.OpenURL("file://" + ProceduralObjectsMod.TextureConfigPath);
                     }
-                    if (GUI.Button(new Rect(162.5f, 30, 147.5f, 30), "Refresh list"))
+                    if (GUI.Button(new Rect(162.5f, 30, 147.5f, 30), LocalizationManager.instance.current["refresh"]))
                         basicTextures = basicTextures.LoadModConfigTextures();
                     for (int i = 0; i < basicTextures.Count(); i++)
                     {
@@ -1314,6 +1496,7 @@ namespace ProceduralObjects
                             ToolHelper.FullySetTool<ProceduralTool>();
                             proceduralTool = true;
                             movingWholeModel = true;
+                            placingSelection = false;
                             editingVertex = false;
                             chosenProceduralInfo = null;
                         }
@@ -1329,12 +1512,12 @@ namespace ProceduralObjects
             GUI.DragWindow(new Rect(0, 0, 350, 30));
             if (GUI.Button(new Rect(356, 3, 30, 30), "X"))
                 showExternals = false;
-            GUI.Label(new Rect(10, 30, 298, 37), "Find your saved procedural objects here. Won't work if an asset is missing.");
-            if (GUI.Button(new Rect(310, 35, 85, 28), "Refresh"))
+            GUI.Label(new Rect(10, 30, 298, 37), LocalizationManager.instance.current["externals_desc"]);
+            if (GUI.Button(new Rect(310, 35, 85, 28), LocalizationManager.instance.current["refresh"]))
                 ExPObjManager.LoadExternals(basicTextures);
             if (ExPObjManager.m_externals.Count == 0)
             {
-                GUI.Box(new Rect(10, 70, 380, 320), "No Procedural Objects saved !\nEdit an object and go to the General Tool to save one");
+                GUI.Box(new Rect(10, 70, 380, 320), LocalizationManager.instance.current["no_externals_warning"]);
             }
             else
             {
@@ -1344,15 +1527,15 @@ namespace ProceduralObjects
                 {
                     GUI.Box(new Rect(5, i * 40 + 2, 343, 36), string.Empty);
                     GUI.Label(new Rect(8, i * 40 + 12, 250, 30), ExPObjManager.m_externals[i].m_name);
-                    if (GUI.Button(new Rect(190, i * 40 + 5, 67, 30), "Place"))
+                    if (GUI.Button(new Rect(190, i * 40 + 5, 67, 30), LocalizationManager.instance.current["place"]))
                     {
-                        PlaceCacheObject(ExPObjManager.m_externals[i].m_object);
+                        PlaceCacheObject(ExPObjManager.m_externals[i].m_object, true);
                     }
                     if (ExPObjManager.m_externals[i].isWorkshop)
                         GUI.Label(new Rect(260, i * 40 + 5, 80, 30), "[<i>Workshop</i>]", GUI.skin.button);
                     else
                     {
-                        if (GUI.Button(new Rect(260, i * 40 + 5, 80, 30), "Delete"))
+                        if (GUI.Button(new Rect(260, i * 40 + 5, 80, 30), LocalizationManager.instance.current["delete"]))
                         {
                             ExPObjManager.DeleteExternal(ExPObjManager.m_externals[i], basicTextures);
                         }
@@ -1366,15 +1549,14 @@ namespace ProceduralObjects
         {
             List<Vector3> posArray = new List<Vector3>(temp_storageVertex.GetPositionsArray());
             // sets mesh renderer vertices
-            MeshFilter meshFilter = currentlyEditingObject.gameObject.GetComponent<MeshFilter>();
-            meshFilter.mesh.SetVertices(posArray);
+            currentlyEditingObject.m_mesh.SetVertices(posArray);
             // sets mesh collider vertices
             //UV map recalculation
             if (currentlyEditingObject.RequiresUVRecalculation)
             {
                 try
                 {
-                    meshFilter.mesh.uv = Vertex.RecalculateUVMap(currentlyEditingObject, temp_storageVertex);
+                    currentlyEditingObject.m_mesh.uv = Vertex.RecalculateUVMap(currentlyEditingObject, temp_storageVertex);
                 }
                 catch
                 {
@@ -1382,7 +1564,7 @@ namespace ProceduralObjects
                 }
             }
             //we used to reconstruct vertex list here, but it caused a lot of lag
-           // temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
+            // temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
         }
         public void StoreLineComponents(GameObject[] gizmos)
         {
@@ -1400,28 +1582,31 @@ namespace ProceduralObjects
             proceduralObjects.Add(v);
             currentlyEditingObject = v;
         }
-        public void PlaceCacheObject(CacheProceduralObject cacheObj)
+        public ProceduralObject PlaceCacheObject(CacheProceduralObject cacheObj, bool setCurrentlyEditing)
         {
             if (cacheObj.basePrefabName == "PROP")
             {
                 if (!Resources.FindObjectsOfTypeAll<PropInfo>().Any(info => info.name == cacheObj.basePrefabName))
-                    return;
+                    return null;
             }
             else if (cacheObj.basePrefabName == "BUILDING")
             {
                 if (!Resources.FindObjectsOfTypeAll<BuildingInfo>().Any(info => info.name == cacheObj.basePrefabName))
-                    return;
+                    return null;
             }
             ToolHelper.FullySetTool<ProceduralTool>();
             ToolsModifierControl.mainToolbar.CloseEverything();
             var obj = new ProceduralObject(cacheObj, proceduralObjects.GetNextUnusedId(), ToolsModifierControl.cameraController.m_currentPosition + new Vector3(0, -8, 0));
             proceduralObjects.Add(obj);
-            currentlyEditingObject = obj;
-            temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
+            if (setCurrentlyEditing)
+                currentlyEditingObject = obj;
+            temp_storageVertex = Vertex.CreateVertexList(obj);
             movingWholeModel = true;
+            placingSelection = false;
             proceduralTool = true;
-            if (currentlyEditingObject.RequiresUVRecalculation)
-                obj.gameObject.GetComponent<MeshFilter>().mesh.uv = Vertex.RecalculateUVMap(obj, temp_storageVertex);
+            if (obj.RequiresUVRecalculation)
+                obj.m_mesh.uv = Vertex.RecalculateUVMap(obj, temp_storageVertex);
+            return obj;
         }
         public void SwitchToMainTool()
         {
@@ -1439,13 +1624,13 @@ namespace ProceduralObjects
                    vertexShifting = CreateVertexShiftingDictionary(temp_storageVertex, editingVertexIndex, false, false);
                    GameObject xAxis = GameObject.Find("ProceduralAxis_X");
                    if (xAxis != null)
-                       xAxis.transform.position = currentlyEditingObject.gameObject.transform.position;
+                       xAxis.transform.position = currentlyEditingObject.m_position;
                    GameObject yAxis = GameObject.Find("ProceduralAxis_Y");
                    if (yAxis != null)
-                       yAxis.transform.position = currentlyEditingObject.gameObject.transform.position;
+                       yAxis.transform.position = currentlyEditingObject.m_position;
                    GameObject zAxis = GameObject.Find("ProceduralAxis_Z");
                    if (zAxis != null)
-                       zAxis.transform.position = currentlyEditingObject.gameObject.transform.position;
+                       zAxis.transform.position = currentlyEditingObject.m_position;
                    xLine = GameObject.Find("ProceduralAxis_X").GetComponent<LineRenderer>();
                    yLine = GameObject.Find("ProceduralAxis_Y").GetComponent<LineRenderer>();
                    zLine = GameObject.Find("ProceduralAxis_Z").GetComponent<LineRenderer>();
@@ -1516,6 +1701,16 @@ namespace ProceduralObjects
                 ProceduralInfo info = availableProceduralInfos.Where(pInf => pInf.propPrefab != null).FirstOrDefault(pInf => pInf.propPrefab == ((PropTool)tool).m_prefab);
                 if (info.isBasicShape && basicTextures.Count > 0)
                 {
+                    editingVertex = false;
+                    editingVertexIndex.Clear();
+                    editingWholeModel = false;
+                    proceduralTool = false;
+                    currentlyEditingObject = null;
+                    ToolHelper.FullySetTool<DefaultTool>();
+                    Gizmos.DestroyGizmo();
+                    xLine = null;
+                    yLine = null;
+                    zLine = null;
                     chosenProceduralInfo = info;
                     ToolHelper.FullySetTool<ProceduralTool>();
                 }
@@ -1535,6 +1730,7 @@ namespace ProceduralObjects
                     ToolHelper.FullySetTool<ProceduralTool>();
                     proceduralTool = true;
                     movingWholeModel = true;
+                    placingSelection = false;
                     editingVertex = false;
                 }
             }
@@ -1562,6 +1758,7 @@ namespace ProceduralObjects
                     ToolHelper.FullySetTool<ProceduralTool>();
                     proceduralTool = true;
                     movingWholeModel = true;
+                    placingSelection = false;
                     editingVertex = false;
                 }
             }
@@ -1569,10 +1766,9 @@ namespace ProceduralObjects
 
         public Vector3 VertexWorldPosition(Vertex vertex)
         {
-
             if (currentlyEditingObject.isPloppableAsphalt)
-                return currentlyEditingObject.gameObject.transform.rotation * (Vector3.Scale(vertex.Position.PloppableAsphaltPosition(), currentlyEditingObject.gameObject.transform.localScale)) + currentlyEditingObject.m_position;
-            return currentlyEditingObject.gameObject.transform.rotation * (Vector3.Scale(vertex.Position, currentlyEditingObject.gameObject.transform.localScale)) + currentlyEditingObject.m_position;
+                return currentlyEditingObject.m_rotation * vertex.Position.PloppableAsphaltPosition() + currentlyEditingObject.m_position;
+            return currentlyEditingObject.m_rotation * vertex.Position + currentlyEditingObject.m_position;
         }
         public void DeleteObject()
         {
@@ -1581,8 +1777,9 @@ namespace ProceduralObjects
             editingWholeModel = false;
             proceduralTool = false;
             movingWholeModel = false;
+            placingSelection = false;
             proceduralObjects.Remove(currentlyEditingObject);
-            Object.Destroy(currentlyEditingObject.gameObject);
+            //  Object.Destroy(currentlyEditingObject.gameObject);
             currentlyEditingObject = null;
             Gizmos.DestroyGizmo();
             xLine = null;
@@ -1593,41 +1790,46 @@ namespace ProceduralObjects
         {
             return new Rect(topLeftCorner, new Vector2(bottomRightCorner.x - topLeftRegion.x, bottomRightCorner.y - topLeftRegion.y));
         }
-       /* public Dictionary<Vertex, Vector3> CreateVertexShiftingDictionary(Vertex[] vertices, List<int> selectedVertices, bool createGizmo, bool removePreviousGizmo)
-        {
-            var dictionary = new Dictionary<Vertex, Vector3>();
-            if (selectedVertices.Count == 0)
-            {
-                if (removePreviousGizmo)
-                {
-                    Gizmos.DestroyGizmo();
-                    xLine = null;
-                    yLine = null;
-                    zLine = null;
-                }
-                return dictionary;
-            }
-            Vertex sourceVertex = vertices.First(v => v.Index == selectedVertices[0]);
-            Vector3 sourcePosition = sourceVertex.Position;
-            foreach (Vertex v in vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-            {
-                if (v != sourceVertex)
-                    dictionary[v] = v.Position - sourcePosition;
-            }
 
-            if (removePreviousGizmo)
-            {
-                Gizmos.DestroyGizmo();
-                xLine = null;
-                yLine = null;
-                zLine = null;
-            }
-            if (createGizmo)
-            {
-                StoreLineComponents(Gizmos.CreateGizmo(sourcePosition + currentlyEditingObject.m_position, true);
-            }
-            return dictionary;
-        } */
+        private void SetupLocalization()
+        {
+            LocalizationManager.CreateManager();
+        }
+        /* public Dictionary<Vertex, Vector3> CreateVertexShiftingDictionary(Vertex[] vertices, List<int> selectedVertices, bool createGizmo, bool removePreviousGizmo)
+         {
+             var dictionary = new Dictionary<Vertex, Vector3>();
+             if (selectedVertices.Count == 0)
+             {
+                 if (removePreviousGizmo)
+                 {
+                     Gizmos.DestroyGizmo();
+                     xLine = null;
+                     yLine = null;
+                     zLine = null;
+                 }
+                 return dictionary;
+             }
+             Vertex sourceVertex = vertices.First(v => v.Index == selectedVertices[0]);
+             Vector3 sourcePosition = sourceVertex.Position;
+             foreach (Vertex v in vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+             {
+                 if (v != sourceVertex)
+                     dictionary[v] = v.Position - sourcePosition;
+             }
+
+             if (removePreviousGizmo)
+             {
+                 Gizmos.DestroyGizmo();
+                 xLine = null;
+                 yLine = null;
+                 zLine = null;
+             }
+             if (createGizmo)
+             {
+                 StoreLineComponents(Gizmos.CreateGizmo(sourcePosition + currentlyEditingObject.m_position, true);
+             }
+             return dictionary;
+         } */
     }
     public enum AxisEditionState
     {

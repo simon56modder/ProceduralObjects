@@ -16,14 +16,14 @@ namespace ProceduralObjects.Classes
         public static Vertex[] CreateVertexList(ProceduralObject source)
         {
             var list = new List<Vertex>();
-            var sourceVertices = source.gameObject.GetComponent<MeshFilter>().mesh.vertices;
-            var dependencyData = source.gameObject.GetComponent<MeshRenderer>().material.name;
+            var sourceVertices = source.m_mesh.vertices;
+            var dependencyData = source.m_material.name;
             bool loadDependencyData = false;
             if (dependencyData.Contains("[ProceduralObj]"))
             {
                 dependencyData = dependencyData.Replace("[ProceduralObj]", "");
                 loadDependencyData = true;
-                Debug.Log("data found for object " + source.basePrefabName + " : " + dependencyData);
+               // Debug.Log("data found for object " + source.basePrefabName + " : " + dependencyData);
             }
             for (int i = 0; i < sourceVertices.Count(); i++)
             {
@@ -174,10 +174,24 @@ namespace ProceduralObjects.Classes
         }
         public static Vector3 WorldToLocalVertexPosition(this Vector3 worldCoord, ProceduralObject obj)
         {
-            Vector3 v = Vector3.zero;
-            v = Vector3.Scale((worldCoord - obj.m_position), new Vector3(1 / obj.gameObject.transform.localScale.x, 1 / obj.gameObject.transform.localScale.y, 1 / obj.gameObject.transform.localScale.z));
-            return v;
+            return (worldCoord - obj.m_position);
             // Vector3 vertexWorldPosition = currentlyEditingObject.gameObject.transform.rotation * (Vector3.Scale(temp_storageVertex[editingVertexIndex[0]].Position, currentlyEditingObject.gameObject.transform.localScale)) + currentlyEditingObject.m_position;
+        }
+        public static Quaternion Rotate(this Quaternion rot, float x, float y, float z)
+        {
+            var gObj = new GameObject("temp_obj");
+            gObj.transform.rotation = rot;
+            gObj.transform.Rotate(x, y, z);
+            var newRot = gObj.transform.rotation;
+            UnityEngine.Object.Destroy(gObj);
+            return newRot;
+        }
+        public static void Scale(this ProceduralObject obj, Vertex[] vertices, float scaleFactor)
+        {
+            foreach (Vertex v in vertices)
+            {
+                v.Position = new Vector3(v.Position.x * scaleFactor, v.Position.y * scaleFactor, v.Position.z * scaleFactor);
+            }
         }
         public static Vector3 PloppableAsphaltPosition(this Vector3 position)
         {

@@ -28,7 +28,7 @@ namespace ProceduralObjects.Classes
             tw.WriteLine("baseInfoType = " + pobj.baseInfoType);
             tw.WriteLine("basePrefabName = " + pobj.basePrefabName);
             tw.WriteLine("isPloppableAsphalt = " + pobj.isPloppableAsphalt.ToString());
-            tw.WriteLine("scale = " + pobj.scale.ToString());
+          //  tw.WriteLine("scale = " + pobj.scale.ToString());
             tw.WriteLine("customTexture = " + ((pobj.customTexture == null) ? "null" : pobj.customTexture.name));
             tw.WriteLine("renderDistance = " + pobj.renderDistance.ToString());
             tw.WriteLine("rotation = " + pobj.m_rotation.ToString());
@@ -128,8 +128,8 @@ namespace ProceduralObjects.Classes
                         obj.basePrefabName = lines[i].Replace("basePrefabName = ", "");
                     else if (lines[i].Contains("renderDistance = "))
                         obj.renderDistance = float.Parse(lines[i].Replace("renderDistance = ", ""));
-                    else if (lines[i].Contains("scale = "))
-                        obj.scale = float.Parse(lines[i].Replace("scale = ", ""));
+                 //   else if (lines[i].Contains("scale = "))
+                 //       obj.scale = float.Parse(lines[i].Replace("scale = ", ""));
                     else if (lines[i].Contains("isPloppableAsphalt = "))
                         obj.isPloppableAsphalt = bool.Parse(lines[i].Replace("isPloppableAsphalt = ", ""));
                     else if (lines[i].Contains("rotation = "))

@@ -122,7 +122,7 @@ namespace ProceduralObjects
         {
             var data = new RotationWizardData();
             data.initialMousePosition = Input.mousePosition;
-            data.initialRotation = obj.gameObject.transform.rotation;
+            data.initialRotation = obj.m_rotation;
             data._initMousePosXGUI = data.initialMousePosition.x;
             return data;
         }

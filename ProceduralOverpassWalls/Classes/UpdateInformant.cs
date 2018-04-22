@@ -6,6 +6,8 @@ using System.IO;
 using ColossalFramework.IO;
 using UnityEngine;
 
+using ProceduralObjects.Localization;
+
 namespace ProceduralObjects.Classes
 {
     public class UpdateInformant : MonoBehaviour
@@ -36,6 +38,10 @@ namespace ProceduralObjects.Classes
             tw.Close();
 
             Changelog = new string[] {
+                "1.4.2 changelog :\n\n■ Render distances default values can be tweaked in the game settings.\n■ Fully translated the controls indications, other minor translations fixes\n■ Fixed the following issues : marquee selection problem, window/gizmo click-through, translation formatting, vertices showing when they shouldn't",
+                "1.4.1-2 changelog :\n\n■ Subsequent issues to a main bug fixed.",
+                "1.4.1 changelog :\n\n■ Major issue fix : Now compatible again with Dynamic Resolution",
+                "1.4.0 changelog :\n\n■ Group Selection ! Allows to copy/paste, delete or move entire objects selections.\n■ Completely redone the rendering system\n■ Translations now available !",
                 "1.3.1 changelog :\n\n■ Major issue 2018A3 (reported by Sparks44) fixed.",
                 "1.3.0 changelog :\n\n■ You can now save Procedural Objects to externals save files to reuse them or share them later, even through the workshop!\n■ Changed the Main Mod Button to a more fancy and moveable one (it's also automatically hidden with Cinematic Camera)\n■ You can rotate objects by dragging the Right Mouse Button using the Move To tool or when placing them.\n■ Added a Total Procedural objects counter\n■ Issues fixes.",
                 "1.2.2.2 changelog :\n\n■ Texture selection is sorted and easier (still room for improvements)\n■ When copying an object, its height is stored and when it's pasted, hold the Right Mouse Button to snap it to the stored height.",
@@ -49,24 +55,27 @@ namespace ProceduralObjects.Classes
         {
             if (AllowedToShow)
             {
-                uiRect = GUI.Window(this.GetInstanceID(), uiRect, DrawUpdateUI, "Procedural Objects - Installed version : " + ProceduralObjectsMod.VERSION);
+                if (LocalizationManager.instance == null)
+                    return;
+                if (LocalizationManager.instance.current == null)
+                    return;
+                uiRect = GUI.Window(this.GetInstanceID(), uiRect, DrawUpdateUI, "Procedural Objects - " + LocalizationManager.instance.current["installed_version"] + " : " + ProceduralObjectsMod.VERSION);
             }
         }
         void DrawUpdateUI(int id)
         {
             GUI.DragWindow(new Rect(0, 0, 600, 36));
 
-            GUI.Label(new Rect(10, 40, 580, 260), "Version "
-                + Changelog[currentShowingChangelogIndex]);
+            GUI.Label(new Rect(10, 40, 580, 260), LocalizationManager.instance.current["version"] + " " + Changelog[currentShowingChangelogIndex]);
 
             if (currentShowingChangelogIndex != 0)
             {
-                if (GUI.Button(new Rect(125, 310, 85, 30), "Next Version"))
+                if (GUI.Button(new Rect(125, 310, 85, 30), LocalizationManager.instance.current["next_version"]))
                     currentShowingChangelogIndex -= 1;
             }
             if (currentShowingChangelogIndex != (Changelog.Count() - 1))
             {
-                if (GUI.Button(new Rect(5, 310, 120, 30), "Previous Version"))
+                if (GUI.Button(new Rect(5, 310, 120, 30), LocalizationManager.instance.current["prev_version"]))
                     currentShowingChangelogIndex += 1;
             }
 

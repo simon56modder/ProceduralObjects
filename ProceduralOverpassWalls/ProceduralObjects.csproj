@@ -57,6 +57,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\ClipboardProceduralObjects.cs" />
     <Compile Include="Classes\ExternalProceduralObjectsManager.cs" />
     <Compile Include="Classes\KeyBindings.cs" />
     <Compile Include="Classes\ProceduralClasses.cs" />
@@ -66,6 +67,8 @@
     <Compile Include="Classes\UpdateInformant.cs" />
     <Compile Include="Classes\VertexClass.cs" />
     <Compile Include="AssetHelper\ProceduralEditorHelper.cs" />
+    <Compile Include="Localization\Localization.cs" />
+    <Compile Include="Localization\LocalizationManager.cs" />
     <Compile Include="ProceduralTool\Gizmos.cs" />
     <Compile Include="ProceduralObjectsLogic.cs" />
     <Compile Include="ProceduralObjectsMod.cs" />
