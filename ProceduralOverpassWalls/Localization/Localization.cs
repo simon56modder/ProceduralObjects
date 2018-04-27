@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using ProceduralObjects.Classes;
 
 namespace ProceduralObjects.Localization
 {
@@ -49,6 +50,18 @@ namespace ProceduralObjects.Localization
             {
                 keys[key] = value;
             }
+        }
+
+        public string visibilityString(ProceduralObjectVisibility visib)
+        {
+            switch (visib)
+            {
+                case ProceduralObjectVisibility.DayOnly:
+                    return this["visibility_dayOnly"];
+                case ProceduralObjectVisibility.NightOnly:
+                    return this["visibility_nightOnly"];
+            }
+            return this["visibility_always"];
         }
     }
 }

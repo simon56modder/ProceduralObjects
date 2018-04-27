@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using ProceduralObjects.Classes;
+using System.Collections.Generic;
 
 namespace ProceduralObjects
 {
@@ -125,6 +126,52 @@ namespace ProceduralObjects
             data.initialRotation = obj.m_rotation;
             data._initMousePosXGUI = data.initialMousePosition.x;
             return data;
+        }
+    }
+
+    public class VerticesWizardData
+    {
+        public VerticesWizardData()
+        {
+            secClicked = 0f;
+            enableMovement = false;
+            relativePositions = new Dictionary<Vertex, Vector3>();
+        }
+
+        private float secClicked;
+        public bool enableMovement;
+        public Dictionary<Vertex, Vector3> relativePositions;
+        public Vector3 originHitPoint;
+
+        public void IncrementStep()
+        {
+            if (!enableMovement)
+            {
+                if (secClicked >= .5f)
+                    enableMovement = true;
+                secClicked += Time.deltaTime;
+            }
+        }
+        public void Store(Vector3 hitPoint, Vertex[] selectedVertices, ProceduralObject obj)
+        {
+            originHitPoint = hitPoint;
+            relativePositions = new Dictionary<Vertex, Vector3>();
+            foreach (var vertex in selectedVertices)
+            {
+                relativePositions[vertex] = vertex.Position - hitPoint;
+            }
+        }
+        public void ApplyToNewPosition(Vector3 newHitPoint, ProceduralObject obj)
+        {
+            if (relativePositions == null)
+                return;
+            if (relativePositions.Count == 0)
+                return;
+            foreach (KeyValuePair<Vertex, Vector3> kvp in relativePositions)
+            {
+                var newpos = VertexUtils.RotatePointAroundPivot(newHitPoint, originHitPoint, Quaternion.Inverse(obj.m_rotation)) + kvp.Value;
+                kvp.Key.Position = new Vector3(newpos.x, kvp.Key.Position.y, newpos.z);
+            }
         }
     }
 }

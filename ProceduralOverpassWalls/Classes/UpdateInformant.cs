@@ -38,6 +38,7 @@ namespace ProceduralObjects.Classes
             tw.Close();
 
             Changelog = new string[] {
+                "1.4.3 and 1.4.3-2 changelog :\n\n■ Objects selection improved : the objects are now highlighted when hovering the object button.\n■ Vertices can now me moved with the Left Mouse button.\n■ Added \"Show : Always/Day time only/Night time only\" parameter in the General tool.\n■ Ploppable Asphalt converted to Procedural Objects now have the proper color set in the mod settings.\n■ Fixed Ploppable Grass and Cliff vertices positions",
                 "1.4.2 changelog :\n\n■ Render distances default values can be tweaked in the game settings.\n■ Fully translated the controls indications, other minor translations fixes\n■ Fixed the following issues : marquee selection problem, window/gizmo click-through, translation formatting, vertices showing when they shouldn't",
                 "1.4.1-2 changelog :\n\n■ Subsequent issues to a main bug fixed.",
                 "1.4.1 changelog :\n\n■ Major issue fix : Now compatible again with Dynamic Resolution",
@@ -48,7 +49,7 @@ namespace ProceduralObjects.Classes
                 "1.2.2.1 changelog :\n\n■ Linux issue 2018A1 fixed",
                 "1.2.2.0 changelog :\n\n■ All the Mod Keybindings can now be configured !\n■ Code improvements : the mod now runs faster",
                 "1.2.1.1 changelog :\n\n■ Texture Packs can now have names\n■ Minor GUI Improvements",
-                "1.2.1.0 changelog :\n\n■ Texture Packs ! Textures can now be shared via the workshop, more information in the mod Steam description soon.\n■The textures list can now be reloaded directly from the texture selection menu.\n■Fixed the 'click through' issue with the 'Move To' button\n■'Tab' shortcut enhanced\n■Bug fixes as always."
+                "1.2.1.0 changelog :\n\n■ Texture Packs ! Textures can now be shared via the workshop, more information in the mod Steam description soon.\n■ The textures list can now be reloaded directly from the texture selection menu.\n■ Fixed the 'click through' issue with the 'Move To' button\n■ 'Tab' shortcut enhanced\n■ Bug fixes as always."
             };
         }
         void OnGUI()

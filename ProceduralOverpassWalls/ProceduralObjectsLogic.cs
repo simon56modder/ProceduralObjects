@@ -12,6 +12,7 @@ using ProceduralObjects.Localization;
 
 using ColossalFramework.UI;
 using ColossalFramework.Globalization;
+using ColossalFramework;
 
 namespace ProceduralObjects
 {
@@ -38,6 +39,8 @@ namespace ProceduralObjects
         public Vector3 axisHitPoint = Vector3.zero;
         public LineRenderer xLine, yLine, zLine;
         private RotationWizardData rotWizardData = null;
+        private VerticesWizardData vertWizardData = null;
+        private ProceduralObject SingleHoveredObj = null;
 
         public Camera renderCamera;
 
@@ -53,6 +56,8 @@ namespace ProceduralObjects
         ExternalProceduralObjectsManager ExPObjManager;
         ProceduralObjectsButton mainButton;
 
+        private Material spriteMat;
+
         void Start()
         {
             Debug.Log("[ProceduralObjects] Game start procedure started.");
@@ -67,6 +72,8 @@ namespace ProceduralObjects
             Debug.Log("[ProceduralObjects] Found " + availableProceduralInfos.Count.ToString() + " procedural infos.");
             ExPObjManager = new ExternalProceduralObjectsManager();
             ExPObjManager.LoadExternals(basicTextures);
+            spriteMat = new Material(Shader.Find("Sprites/Default"));
+            spriteMat.color = new Color(1f, 0, 0, .35f);
 
             if (ProceduralObjectsMod.tempContainerData != null)
             {
@@ -80,7 +87,6 @@ namespace ProceduralObjects
             redLabelStyle.normal.textColor = Color.red;
             editingVertexIndex = new List<int>();
             SetupLocalization();
-            externalsSaveTextfield = LocalizationManager.instance.current["enter_name"];
             LocaleManager.eventLocaleChanged += SetupLocalization;
             Debug.Log("[ProceduralObjects] Game start procedure ended.");
         }
@@ -113,12 +119,12 @@ namespace ProceduralObjects
                     {
                         try
                         {
-                            Graphics.DrawMesh(obj.m_mesh, obj.m_position, obj.m_rotation, obj.m_material, 0, renderCamera, 0, null, true, true);
-                          /*  Debug.Log("[PO] Rendering went correctly : " + (obj.m_mesh == null).ToString() + "," +
-                                (obj.m_position).ToString() + "," +
-                                (obj.m_rotation).ToString() + "," +
-                                (obj.m_material == null).ToString() + "," +
-                                (Camera.main == null).ToString()); */
+                            if ((obj.m_visibility == ProceduralObjectVisibility.Always)
+                                || (obj.m_visibility == ProceduralObjectVisibility.NightOnly && Singleton<SimulationManager>.instance.m_isNightTime)
+                                || (obj.m_visibility == ProceduralObjectVisibility.DayOnly && !Singleton<SimulationManager>.instance.m_isNightTime))
+                                        Graphics.DrawMesh(obj.m_mesh, obj.m_position, obj.m_rotation, obj.m_material, 0, renderCamera, 0, null, true, true);
+                            if (SingleHoveredObj == obj)
+                                Graphics.DrawMesh(obj.m_mesh, obj.m_position, obj.m_rotation, spriteMat, 0, renderCamera, 0, null, true, true);
                         }
                         catch (Exception e)
                         {
@@ -210,51 +216,7 @@ namespace ProceduralObjects
                 {
                     if (Input.GetMouseButton(0))
                     {
-                        if (placingSelection)
-                        {
-                            //   Debug.Log("Validated move To with Selection");
-                            pObjSelection.Clear();
-                            ToolHelper.FullySetTool<ProceduralTool>();
-                            editingVertex = false;
-                            editingVertexIndex.Clear();
-                            editingWholeModel = false;
-                            proceduralTool = false;
-                            for (int i = 0; i < proceduralObjects.Count; i++)
-                            {
-                                if (proceduralObjects[i] == currentlyEditingObject)
-                                    continue;
-                                if (proceduralObjects[i].tempObj == null)
-                                    continue;
-                                if (proceduralObjects[i].tempObj.transform.parent = currentlyEditingObject.tempObj.transform)
-                                {
-                                    proceduralObjects[i].tempObj.transform.parent = null;
-                                    UnityEngine.Object.Destroy(proceduralObjects[i].tempObj);
-                                    proceduralObjects[i].tempObj = null;
-                                }
-                            }
-                            UnityEngine.Object.Destroy(currentlyEditingObject.tempObj);
-                            currentlyEditingObject.tempObj = null;
-                            currentlyEditingObject = null;
-                            chosenProceduralInfo = null;
-                            movingWholeModel = false;
-                            placingSelection = false;
-                            showExternals = false;
-                            rotWizardData = null;
-                            yOffset = 0f;
-                        }
-                        else
-                        {
-                            //  Debug.Log("Validated move To without Selection");
-                            movingWholeModel = false;
-                            editingWholeModel = false;
-                            editingVertex = true;
-                            showExternals = false;
-                            rotWizardData = null;
-                            pObjSelection.Clear();
-                            yOffset = 0f;
-                            // StoreLineComponents(Gizmos.CreateGizmo(currentlyEditingObject.m_position, true));
-                            ToolHelper.FullySetTool<ProceduralTool>();
-                        }
+                        ConfirmMovingWhole();
                     }
                     else
                     {
@@ -450,7 +412,44 @@ namespace ProceduralObjects
 
                         if (currentlyEditingObject != null)
                         {
-                            if (Input.GetMouseButton(1))
+                            if (Input.GetMouseButton(0))
+                            {
+                                if (editingVertexIndex.Count > 0)
+                                {
+                                    if (vertWizardData == null)
+                                    {
+                                        ToolBase.RaycastInput rayInput = new ToolBase.RaycastInput(Camera.main.ScreenPointToRay(Input.mousePosition), Camera.main.farClipPlane);
+                                        ToolBase.RaycastOutput rayOutput;
+                                        if (ProceduralObjRayCast.TerrainRaycast(rayInput, out rayOutput))
+                                        {
+                                            vertWizardData = new VerticesWizardData();
+                                            vertWizardData.Store(rayOutput.m_hitPos, temp_storageVertex.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))).ToArray(),
+                                                currentlyEditingObject);
+                                        }
+                                        //foreach (Vertex v in temp_storageVertex.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        // { }
+                                    }
+                                    else
+                                    {
+                                        vertWizardData.IncrementStep();
+                                        if (vertWizardData.enableMovement)
+                                        {
+                                            ToolBase.RaycastInput rayInput = new ToolBase.RaycastInput(Camera.main.ScreenPointToRay(Input.mousePosition), Camera.main.farClipPlane);
+                                            ToolBase.RaycastOutput rayOutput;
+                                            if (ProceduralObjRayCast.TerrainRaycast(rayInput, out rayOutput))
+                                            {
+                                                vertWizardData.ApplyToNewPosition(rayOutput.m_hitPos, currentlyEditingObject);
+                                                Apply();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            else if (Input.GetMouseButtonUp(0))
+                            {
+                                vertWizardData = null;
+                            }
+                            else if (Input.GetMouseButton(1))
                             {
                                 if (!clickingRegion)
                                 {
@@ -1068,6 +1067,7 @@ namespace ProceduralObjects
                 {
                     if (!proceduralTool)
                     {
+                        ProceduralObject hoveredObj = null;
                         foreach (ProceduralObject obj in proceduralObjects.ToList())
                         {
                             //  try { Transform _t = obj.gameObject.transform; }
@@ -1136,28 +1136,31 @@ namespace ProceduralObjects
                                     }
                                     GUI.color = Color.red;
                                 }
+                                if (new Rect(objScreenPos + new Vector2(-15, -15), new Vector2(31, 30)).IsMouseInside())
+                                    hoveredObj = obj;
                                 if (GUI.Button(new Rect(objScreenPos + new Vector2(-11, -11), new Vector2(23, 22)), "<size=20>+</size>"))
                                 {
-                                    if (pObjSelection.Contains(obj))
+                                    if (Input.GetKey(KeyCode.LeftControl))
                                     {
-                                        if (Input.GetKey(KeyCode.LeftControl))
+                                        if (pObjSelection.Contains(obj))
                                             pObjSelection.Remove(obj);
                                         else
-                                        {
-                                            pObjSelection.Clear();
                                             pObjSelection.Add(obj);
-                                        }
                                     }
                                     else
                                     {
-                                        if (Input.GetKey(KeyCode.LeftControl))
-                                            pObjSelection.Add(obj);
+                                        if (pObjSelection.Count == 1)
+                                        {
+                                            pObjSelection.Clear();
+                                        }
                                         else
                                         {
                                             pObjSelection.Clear();
                                             pObjSelection.Add(obj);
                                         }
+
                                     }
+
                                     /*
                                     currentlyEditingObject = obj;
                                     temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
@@ -1167,12 +1170,13 @@ namespace ProceduralObjects
                                 GUI.color = Color.white;
                             }
                         }
+                        SingleHoveredObj = hoveredObj;
                     }
                     if (!movingWholeModel)
                     {
                         var winrect = GUI.Window(1094334744, window, DrawUIWindow, "Procedural Objects v" + ProceduralObjectsMod.VERSION);
                         if (proceduralTool && editingWholeModel && !movingWholeModel)
-                            window = new Rect(winrect.x, winrect.y, winrect.width, 435);
+                            window = new Rect(winrect.x, winrect.y, winrect.width, 463);
                         else
                             window = new Rect(winrect.x, winrect.y, winrect.width, 400);
 
@@ -1193,6 +1197,8 @@ namespace ProceduralObjects
                                     {
                                         if (!vertex.IsDependent)
                                         {
+                                            if (currentlyEditingObject.m_mesh.name == "ploppablecliffgrass" && vertex.Index >= currentlyEditingObject.allVertices.Count() - 2)
+                                                continue;
                                             if ((editingVertex && !editingVertexIndex.Contains(vertex.Index)) || !editingVertex)
                                             {
                                                 if (GUI.Button(new Rect(VertexWorldPosition(vertex).WorldToGuiPoint() + new Vector2(-11, -11), new Vector2(23, 22)), "<size=20>+</size>"))
@@ -1288,6 +1294,7 @@ namespace ProceduralObjects
                 proceduralTool = false;
                 currentlyEditingObject = null;
                 chosenProceduralInfo = null;
+                vertWizardData = null;
                 pObjSelection.Clear();
                 ToolHelper.FullySetTool<DefaultTool>();
                 Gizmos.DestroyGizmo();
@@ -1300,7 +1307,7 @@ namespace ProceduralObjects
 
             if (proceduralTool)
             {
-                GUI.BeginGroup(new Rect(10, 30, 380, 412));
+                GUI.BeginGroup(new Rect(10, 30, 380, 442));
                 if (editingWholeModel)
                 {
                     /* if (movingWholeModel)
@@ -1350,8 +1357,7 @@ namespace ProceduralObjects
                             externalsSaveTextfield = LocalizationManager.instance.current["enter_name"];
                         }
                     }
-                    GUI.EndGroup();
-                    if (GUI.Button(new Rect(15, 335, 185, 25), "◄ " + LocalizationManager.instance.current["back"]))
+                    if (GUI.Button(new Rect(0, 400, 120, 28), "◄ " + LocalizationManager.instance.current["back"]))
                     {
                         showExternals = false;
                         ToolHelper.FullySetTool<ProceduralTool>();
@@ -1367,6 +1373,16 @@ namespace ProceduralObjects
                         chosenProceduralInfo = null;
                         pObjSelection.Clear();
                     }
+                    GUI.EndGroup();
+                    if (GUI.Button(new Rect(15, 335, 185, 25), LocalizationManager.instance.current.visibilityString(currentlyEditingObject.m_visibility)))
+                    {
+                        if (currentlyEditingObject.m_visibility == ProceduralObjectVisibility.Always)
+                            currentlyEditingObject.m_visibility = ProceduralObjectVisibility.DayOnly;
+                        else if (currentlyEditingObject.m_visibility == ProceduralObjectVisibility.DayOnly)
+                            currentlyEditingObject.m_visibility = ProceduralObjectVisibility.NightOnly;
+                        else if (currentlyEditingObject.m_visibility == ProceduralObjectVisibility.NightOnly)
+                            currentlyEditingObject.m_visibility = ProceduralObjectVisibility.Always;
+                    }
                 }
                 else
                 {
@@ -1378,10 +1394,11 @@ namespace ProceduralObjects
                         KeyBindingsManager.instance.GetBindingFromName("position_moveUp").m_fullKeys + "/" + KeyBindingsManager.instance.GetBindingFromName("position_moveDown").m_fullKeys +
                         " : " + LocalizationManager.instance.current["move_vertices_updown"] + "\n" +
                     KeyBindingsManager.instance.GetBindingFromName("switchGeneralToVertexTools").m_fullKeys + " : " + LocalizationManager.instance.current["quick_switch"] +
-                    "\n\n" + KeyBindingsManager.instance.GetBindingFromName("copy").m_fullKeys + " : " + LocalizationManager.instance.current["copy_obj"] + "\n" +
+                    "\n" + KeyBindingsManager.instance.GetBindingFromName("copy").m_fullKeys + " : " + LocalizationManager.instance.current["copy_obj"] + "\n" +
                     KeyBindingsManager.instance.GetBindingFromName("paste").m_fullKeys + " : " + LocalizationManager.instance.current["paste_obj"]
                     + "\n" + LocalizationManager.instance.current["delete_desc"] + "\n\n" +
-                    LocalizationManager.instance.current["rmb_marquee_vertices"]);
+                    LocalizationManager.instance.current["rmb_marquee_vertices"] + "\n" +
+                    LocalizationManager.instance.current["lmb_drag_vertices"]);
 
                     GUI.EndGroup();
                     if (GUI.Button(new Rect(15, 335, 185, 25), LocalizationManager.instance.current["delete"]))
@@ -1419,14 +1436,14 @@ namespace ProceduralObjects
             {
                 if (chosenProceduralInfo == null)
                 {
-                    GUI.Label(new Rect(10, 30, 350, 30), LocalizationManager.instance.current["spawn_new"]);
+                    GUI.Label(new Rect(5, 26, 350, 38), LocalizationManager.instance.current["spawn_new"]);
 
                     if (TextureUtils.LocalTexturesCount == 0)
                         GUI.Label(new Rect(10, 45, 350, 45), LocalizationManager.instance.current["no_tex"] + "\n" + LocalizationManager.instance.current["cant_create_basic"]);
                     else
-                        GUI.Label(new Rect(25, 60, 350, 30), LocalizationManager.instance.current["local_tex"] + " : ");
+                        GUI.Label(new Rect(10, 60, 350, 30), LocalizationManager.instance.current["local_tex"] + " : ");
 
-                    if (GUI.Button(new Rect(170, 55, 55, 28), LocalizationManager.instance.current["refresh"]))
+                    if (GUI.Button(new Rect(150, 55, 75, 28), LocalizationManager.instance.current["refresh"]))
                         basicTextures = basicTextures.LoadModConfigTextures();
                     if (GUI.Button(new Rect(230, 55, 155, 28), LocalizationManager.instance.current["open_tex"]))
                     {
@@ -1770,6 +1787,54 @@ namespace ProceduralObjects
                 return currentlyEditingObject.m_rotation * vertex.Position.PloppableAsphaltPosition() + currentlyEditingObject.m_position;
             return currentlyEditingObject.m_rotation * vertex.Position + currentlyEditingObject.m_position;
         }
+        private void ConfirmMovingWhole()
+        {
+            if (placingSelection)
+            {
+                //   Debug.Log("Validated move To with Selection");
+                pObjSelection.Clear();
+                ToolHelper.FullySetTool<ProceduralTool>();
+                editingVertex = false;
+                editingVertexIndex.Clear();
+                editingWholeModel = false;
+                proceduralTool = false;
+                for (int i = 0; i < proceduralObjects.Count; i++)
+                {
+                    if (proceduralObjects[i] == currentlyEditingObject)
+                        continue;
+                    if (proceduralObjects[i].tempObj == null)
+                        continue;
+                    if (proceduralObjects[i].tempObj.transform.parent = currentlyEditingObject.tempObj.transform)
+                    {
+                        proceduralObjects[i].tempObj.transform.parent = null;
+                        UnityEngine.Object.Destroy(proceduralObjects[i].tempObj);
+                        proceduralObjects[i].tempObj = null;
+                    }
+                }
+                UnityEngine.Object.Destroy(currentlyEditingObject.tempObj);
+                currentlyEditingObject.tempObj = null;
+                currentlyEditingObject = null;
+                chosenProceduralInfo = null;
+                movingWholeModel = false;
+                placingSelection = false;
+                showExternals = false;
+                rotWizardData = null;
+                yOffset = 0f;
+            }
+            else
+            {
+                //  Debug.Log("Validated move To without Selection");
+                movingWholeModel = false;
+                editingWholeModel = false;
+                editingVertex = true;
+                showExternals = false;
+                rotWizardData = null;
+                pObjSelection.Clear();
+                yOffset = 0f;
+                // StoreLineComponents(Gizmos.CreateGizmo(currentlyEditingObject.m_position, true));
+                ToolHelper.FullySetTool<ProceduralTool>();
+            }
+        }
         public void DeleteObject()
         {
             editingVertex = false;
@@ -1794,6 +1859,7 @@ namespace ProceduralObjects
         private void SetupLocalization()
         {
             LocalizationManager.CreateManager();
+            externalsSaveTextfield = LocalizationManager.instance.current["enter_name"];
         }
         /* public Dictionary<Vertex, Vector3> CreateVertexShiftingDictionary(Vertex[] vertices, List<int> selectedVertices, bool createGizmo, bool removePreviousGizmo)
          {

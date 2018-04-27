@@ -27,7 +27,7 @@ namespace ProceduralObjects
         }
         public static void LoadDependencies(List<Vertex> vertices, string dataString)
         {
-            var groups = dataString.Replace("dependencyGroups", "").Replace("(Instance)", "").Split(new string[] { "group" }, StringSplitOptions.RemoveEmptyEntries);
+            var groups = dataString.Replace("dependencyGroups", "").Replace("(Instance)", "").Replace("(Clone)", "").Split(new string[] { "group" }, StringSplitOptions.RemoveEmptyEntries);
             foreach (string group in groups)
             {
                 var verticesString = group.Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);

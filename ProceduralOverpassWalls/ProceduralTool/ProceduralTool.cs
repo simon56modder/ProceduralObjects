@@ -7,7 +7,7 @@ namespace ProceduralObjects.Tools
 {
     public class ProceduralTool : ToolBase
     {
-        // basically Empty ATM, all the related code is located in //ProceduralObjectsLogic.cs
+        // basically Empty ATM, all the related code is located in /ProceduralObjectsLogic.cs
     }
     public static class ToolHelper
     {

@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml;
 using System.Text;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Rendering;
+using ColossalFramework.IO;
 
 namespace ProceduralObjects.Classes
 {
@@ -18,7 +21,7 @@ namespace ProceduralObjects.Classes
                 this.id = container.id;
                 this.basePrefabName = container.basePrefabName;
                 this.baseInfoType = "PROP";
-                this.isPloppableAsphalt = (sourceProp.m_mesh.name == "ploppableasphalt-prop");
+                this.isPloppableAsphalt = sourceProp.IsPloppableAsphalt();
                 renderDistance = container.renderDistance;
                 m_position = container.position.ToVector3();
                 m_rotation = container.rotation.ToQuaternion();
@@ -34,6 +37,8 @@ namespace ProceduralObjects.Classes
                 }
                 m_mesh.SetVertices(new List<Vector3>(allVertices));
                 m_material = GameObject.Instantiate(sourceProp.m_material);
+                if (sourceProp.m_mesh.name == "ploppableasphalt-prop" || sourceProp.m_mesh.name == "ploppableasphalt-decal")
+                    m_material.ApplyPloppableColor();
                 if (container.hasCustomTexture && textures != null)
                 {
                     if (!textures.Any(tex => tex.name == container.customTextureName))
@@ -67,6 +72,8 @@ namespace ProceduralObjects.Classes
                     }
                 }
                 m_mesh.SetVertices(new List<Vector3>(allVertices));
+                m_mesh.colors = new Color[] { };
+                m_mesh.colors32 = new Color32[] { };
                 m_material = GameObject.Instantiate(sourceProp.m_material);
                 if (container.hasCustomTexture && textures != null)
                 {
@@ -80,6 +87,7 @@ namespace ProceduralObjects.Classes
                     }
                 }
             }
+            m_visibility = container.visibility;
         }
         public ProceduralObject(CacheProceduralObject sourceCacheObj, int id, Vector3 position)
         {
@@ -89,7 +97,7 @@ namespace ProceduralObjects.Classes
                 this.id = id;
                 this.basePrefabName = sourceCacheObj.basePrefabName;
                 this.baseInfoType = "PROP";
-                this.isPloppableAsphalt = (sourceProp.m_mesh.name == "ploppableasphalt-prop");
+                this.isPloppableAsphalt = sourceProp.IsPloppableAsphalt();
                 renderDistance = sourceCacheObj.renderDistance;
                 m_position = position;
                 m_rotation = sourceCacheObj.m_rotation;
@@ -98,6 +106,8 @@ namespace ProceduralObjects.Classes
                 allVertices = sourceCacheObj.allVertices;
                 m_mesh.SetVertices(new List<Vector3>(allVertices));
                 m_material = GameObject.Instantiate(sourceProp.m_material);
+                if (sourceProp.m_mesh.name == "ploppableasphalt-prop" || sourceProp.m_mesh.name == "ploppableasphalt-decal")
+                    m_material.ApplyPloppableColor();
                 if (sourceCacheObj.customTexture != null)
                 {
                     m_material.mainTexture = sourceCacheObj.customTexture as Texture;
@@ -118,6 +128,8 @@ namespace ProceduralObjects.Classes
                 m_mesh = sourceProp.m_mesh.InstantiateMesh();
                 allVertices = sourceCacheObj.allVertices;
                 m_mesh.SetVertices(new List<Vector3>(allVertices));
+                m_mesh.colors = new Color[] { };
+                m_mesh.colors32 = new Color32[] { };
                 m_material = GameObject.Instantiate(sourceProp.m_material);
                 if (sourceCacheObj.customTexture != null)
                 {
@@ -125,13 +137,14 @@ namespace ProceduralObjects.Classes
                     customTexture = sourceCacheObj.customTexture;
                 }
             }
+            m_visibility = sourceCacheObj.visibility;
         }
 
         public void ConstructObject(PropInfo sourceProp, int id, Texture2D customTex = null)
         {
             this.id = id;
             this.basePrefabName = sourceProp.name;
-            this.isPloppableAsphalt = (sourceProp.m_mesh.name == "ploppableasphalt-prop");
+            this.isPloppableAsphalt = sourceProp.IsPloppableAsphalt();
             this.baseInfoType = "PROP";
             this.renderDistance = ProceduralObjectsMod.PropRenderDistance.value;
             m_position = ToolsModifierControl.cameraController.m_currentPosition;
@@ -140,6 +153,9 @@ namespace ProceduralObjects.Classes
             m_mesh = mesh;
             allVertices = mesh.vertices;
             m_material = GameObject.Instantiate(sourceProp.m_material);
+            if (sourceProp.m_mesh.name == "ploppableasphalt-prop" || sourceProp.m_mesh.name == "ploppableasphalt-decal")
+                m_material.ApplyPloppableColor();
+            m_visibility = ProceduralObjectVisibility.Always;
             if (customTex != null)
             {
                 m_material.mainTexture = customTex as Texture;
@@ -155,10 +171,12 @@ namespace ProceduralObjects.Classes
             this.renderDistance = ProceduralObjectsMod.BuildingRenderDistance.value;
             m_position = ToolsModifierControl.cameraController.m_currentPosition;
             m_rotation = Quaternion.identity;
-            Mesh mesh = sourceBuilding.m_mesh.InstantiateMesh();
-            m_mesh = mesh;
-            allVertices = mesh.vertices;
+            m_mesh = sourceBuilding.m_mesh.InstantiateMesh();
+            m_mesh.colors = new Color[] { };
+            m_mesh.colors32 = new Color32[] { };
+            allVertices = m_mesh.vertices;
             m_material = GameObject.Instantiate(sourceBuilding.m_material);
+            m_visibility = ProceduralObjectVisibility.Always;
             if (customTex != null)
             {
                 m_material.mainTexture = customTex as Texture;
@@ -176,6 +194,7 @@ namespace ProceduralObjects.Classes
         public int id;
         public float renderDistance, m_scale;
         public bool isPloppableAsphalt;
+        public ProceduralObjectVisibility m_visibility;
 
         public GameObject tempObj;
 
@@ -187,6 +206,14 @@ namespace ProceduralObjects.Classes
                 return (this.basePrefabName.Contains("NativeCube_Procedural") || this.basePrefabName.Contains("NativeSquare_Procedural"));
             }
         }
+
+    }
+
+    public enum ProceduralObjectVisibility
+    {
+        Always,
+        NightOnly,
+        DayOnly
     }
 
     public class CacheProceduralObject
@@ -200,6 +227,7 @@ namespace ProceduralObjects.Classes
             m_rotation = sourceObj.m_rotation;
             basePrefabName = sourceObj.basePrefabName;
             baseInfoType = sourceObj.baseInfoType;
+            visibility = sourceObj.m_visibility;
         }
 
         public float renderDistance;
@@ -208,6 +236,7 @@ namespace ProceduralObjects.Classes
         public Texture2D customTexture;
         public string basePrefabName, baseInfoType;
         public Vector3[] allVertices;
+        public ProceduralObjectVisibility visibility;
     }
     
     public class ProceduralInfo
@@ -365,6 +394,51 @@ namespace ProceduralObjects.Classes
                 Debug.LogError("[ProceduralObjects] Fatal Loading exception : couldn't find all assets and make them procedural objects !");
             }
             return new List<ProceduralInfo>();
+        }
+        public static bool IsPloppableAsphalt(this PropInfo sourceProp)
+        {
+            return (sourceProp.m_mesh.name == "ploppableasphalt-prop") ||
+                (sourceProp.m_mesh.name == "ploppablecliffgrass") ||
+                (sourceProp.m_mesh.name == "ploppablegravel");
+        }
+        public static Color GetPloppableAsphaltCfg()
+        {
+            string path = Path.Combine(DataLocation.localApplicationData, "PloppableAsphalt.xml");
+            if (!File.Exists(path))
+                return new Color(.5f, .5f, .5f, 1f);
+
+            string r = "", g = "", b = "";
+            using (XmlReader reader = XmlReader.Create(path))
+            {
+                while (reader.Read())
+                {
+                    if (reader.IsStartElement())
+                    {
+                        switch (reader.Name)
+                        {
+                            case "r":
+                                r = reader.ReadString();
+                                break;
+                            case "g":
+                                g = reader.ReadString();
+                                break;
+                            case "b":
+                                b = reader.ReadString();
+                                break;
+                        }
+                    }
+                }
+            }
+            return new Color(int.Parse(r) / 255f, int.Parse(g) / 255f, int.Parse(b) / 255f, 1f);
+        }
+        public static void ApplyPloppableColor(this Material mat)
+        {
+            var color = GetPloppableAsphaltCfg();
+            mat.SetColor("_ColorV0", color);
+            mat.SetColor("_ColorV1", color);
+            mat.SetColor("_ColorV2", color);
+            mat.SetColor("_ColorV3", color);
+            mat.color = color;
         }
     }
 

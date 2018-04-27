@@ -94,6 +94,7 @@ namespace ProceduralObjects
         public SerializableVector3 position;
         public SerializableQuaternion rotation;
         public SerializableVector3[] vertices;
+        public ProceduralObjectVisibility visibility;
 
         public ProceduralObjectContainer() { }
         public ProceduralObjectContainer(ProceduralObject baseObject)
@@ -107,6 +108,7 @@ namespace ProceduralObjects
             scale = 1f;
             vertices = SerializableVector3.ToSerializableArray(baseObject.m_mesh.vertices);
             hasCustomTexture = !(baseObject.customTexture == null);
+            visibility = baseObject.m_visibility;
             if (hasCustomTexture == true)
                 customTextureName = baseObject.customTexture.name;
             else

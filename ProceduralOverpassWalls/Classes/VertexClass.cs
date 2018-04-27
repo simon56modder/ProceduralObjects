@@ -218,5 +218,13 @@ namespace ProceduralObjects.Classes
                 float.Parse(str[1]),
                 float.Parse(str[2]));
         }
+        public static Vector3 RotatePointAroundPivot(Vector3 point, Vector3 pivot, Vector3 angles)
+        {
+            return Quaternion.Euler(angles) * (point - pivot) + pivot;
+        }
+        public static Vector3 RotatePointAroundPivot(Vector3 point, Vector3 pivot, Quaternion rotation)
+        {
+            return rotation * (point - pivot) + pivot;
+        }
     }
 }
