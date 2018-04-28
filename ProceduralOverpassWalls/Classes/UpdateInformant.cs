@@ -38,6 +38,7 @@ namespace ProceduralObjects.Classes
             tw.Close();
 
             Changelog = new string[] {
+                "1.4.4 changelog :\n\n■ Entire selections of objects can now be saved and shared by clicking \"Export Selection\" button, they later can be found in the \"Saved Procedural Objects\" window\n■ Spanish translation now available, thanks Armesto !\n■ Saved Procedural Objects can now be renamed\n■ External textures names fixed",
                 "1.4.3 and 1.4.3-2 changelog :\n\n■ Objects selection improved : the objects are now highlighted when hovering the object button.\n■ Vertices can now me moved with the Left Mouse button.\n■ Added \"Show : Always/Day time only/Night time only\" parameter in the General tool.\n■ Ploppable Asphalt converted to Procedural Objects now have the proper color set in the mod settings.\n■ Fixed Ploppable Grass and Cliff vertices positions",
                 "1.4.2 changelog :\n\n■ Render distances default values can be tweaked in the game settings.\n■ Fully translated the controls indications, other minor translations fixes\n■ Fixed the following issues : marquee selection problem, window/gizmo click-through, translation formatting, vertices showing when they shouldn't",
                 "1.4.1-2 changelog :\n\n■ Subsequent issues to a main bug fixed.",

@@ -56,6 +56,9 @@ namespace ProceduralObjects
         ExternalProceduralObjectsManager ExPObjManager;
         ProceduralObjectsButton mainButton;
 
+        private int renamingExternal = -1;
+        private string renamingExternalString = "";
+
         private Material spriteMat;
 
         void Start()
@@ -144,41 +147,7 @@ namespace ProceduralObjects
                 // PASTE object
                 if (KeyBindingsManager.instance.GetBindingFromName("paste").GetBindingDown())
                 {
-                    if (clipboard != null)
-                    {
-                        if (clipboard.type == ClipboardProceduralObjects.ClipboardType.Single)
-                        {
-                            placingSelection = false;
-                            pObjSelection.Clear();
-                            currentlyEditingObject = PlaceCacheObject(clipboard.single_object, true);
-                        }
-                        else
-                        {
-                            pObjSelection.Clear();
-                            for (int i = 0; i < clipboard.selection_objects.Count; i++)
-                            {
-                                var cache = clipboard.selection_objects.ToList()[i].Key;
-                                ProceduralObject obj = null;
-                                if (i == 0)
-                                {
-                                    obj = PlaceCacheObject(cache, true);
-                                    obj.tempObj = new GameObject();
-                                    obj.tempObj.transform.position = obj.m_position;
-                                    obj.tempObj.transform.rotation = obj.m_rotation;
-                                }
-                                else
-                                {
-                                    obj = PlaceCacheObject(cache, false);
-                                    obj.m_position = currentlyEditingObject.m_position + clipboard.selection_objects[cache];
-                                    obj.tempObj = new GameObject();
-                                    obj.tempObj.transform.position = obj.m_position;
-                                    obj.tempObj.transform.rotation = obj.m_rotation;
-                                    obj.tempObj.transform.SetParent(currentlyEditingObject.tempObj.transform, true);
-                                }
-                            }
-                            placingSelection = true;
-                        }
-                    }
+                    Paste(clipboard);
                 }
                 /* if (previousToolType != null)
                    {
@@ -1076,6 +1045,8 @@ namespace ProceduralObjects
                             var objScreenPos = obj.m_position.WorldToGuiPoint();
                             if (!window.Contains(objScreenPos))
                             {
+                                if (new Rect(objScreenPos + new Vector2(-15, -15), new Vector2(31, 30)).IsMouseInside())
+                                    hoveredObj = obj;
                                 if (pObjSelection.Contains(obj))
                                 {
                                     if (pObjSelection[0] == obj)
@@ -1089,18 +1060,21 @@ namespace ProceduralObjects
                                                 pObjSelection.Clear();
                                                 temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
                                                 proceduralTool = true;
+                                                hoveredObj = null;
                                             }
                                             if (GUI.Button(new Rect(objScreenPos + new Vector2(12, 12), new Vector2(130, 22)), LocalizationManager.instance.current["delete"]))
                                             {
                                                 proceduralObjects.Remove(obj);
                                                 //   Object.Destroy(obj.gameObject);
                                                 pObjSelection.Remove(obj);
+                                                hoveredObj = null;
                                             }
                                             if (GUI.Button(new Rect(objScreenPos + new Vector2(12, 35), new Vector2(130, 22)), LocalizationManager.instance.current["copy"]))
                                             {
                                                 storedHeight = obj.m_position.y;
                                                 clipboard = new ClipboardProceduralObjects(ClipboardProceduralObjects.ClipboardType.Single);
                                                 clipboard.single_object = new CacheProceduralObject(obj);
+                                                hoveredObj = null;
                                             }
                                             if (GUI.Button(new Rect(objScreenPos + new Vector2(12, 58), new Vector2(130, 22)), LocalizationManager.instance.current["move_to"]))
                                             {
@@ -1110,6 +1084,7 @@ namespace ProceduralObjects
                                                 movingWholeModel = true;
                                                 editingWholeModel = true;
                                                 proceduralTool = true;
+                                                hoveredObj = null;
                                             }
                                             #endregion
                                         }
@@ -1131,13 +1106,18 @@ namespace ProceduralObjects
                                                 clipboard.MakeSelectionList(pObjSelection);
                                                 storedHeight = obj.m_position.y;
                                             }
+
+                                            if (GUI.Button(new Rect(objScreenPos + new Vector2(12, 35), new Vector2(130, 22)), LocalizationManager.instance.current["export_selection"]))
+                                            {
+                                                var selection = new ClipboardProceduralObjects(ClipboardProceduralObjects.ClipboardType.Selection);
+                                                selection.MakeSelectionList(pObjSelection);
+                                                selection.ExportSelection("Selection " + DateTime.Now.ToString("F"), ExPObjManager);
+                                            }
                                             #endregion
                                         }
                                     }
                                     GUI.color = Color.red;
                                 }
-                                if (new Rect(objScreenPos + new Vector2(-15, -15), new Vector2(31, 30)).IsMouseInside())
-                                    hoveredObj = obj;
                                 if (GUI.Button(new Rect(objScreenPos + new Vector2(-11, -11), new Vector2(23, 22)), "<size=20>+</size>"))
                                 {
                                     if (Input.GetKey(KeyCode.LeftControl))
@@ -1287,7 +1267,7 @@ namespace ProceduralObjects
             GUI.DragWindow(new Rect(0, 0, 350, 30));
             if (GUI.Button(new Rect(356, 3, 30, 30), "X"))
             {
-                showExternals = false;
+                CloseExternalsWindow();
                 editingVertex = false;
                 editingVertexIndex.Clear();
                 editingWholeModel = false;
@@ -1359,7 +1339,7 @@ namespace ProceduralObjects
                     }
                     if (GUI.Button(new Rect(0, 400, 120, 28), "◄ " + LocalizationManager.instance.current["back"]))
                     {
-                        showExternals = false;
+                        CloseExternalsWindow();
                         ToolHelper.FullySetTool<ProceduralTool>();
                         Gizmos.DestroyGizmo();
                         xLine = null;
@@ -1477,7 +1457,12 @@ namespace ProceduralObjects
                     GUI.Label(new Rect(10, 331, 375, 35), basicTextures.Count().ToString() + " " + LocalizationManager.instance.current["tex_in_total"] + " : " + TextureUtils.LocalTexturesCount.ToString() + " " + LocalizationManager.instance.current["local"] + " + " + TextureResourceInfo.TotalTextureCount(TextureUtils.TextureResources) + " " + LocalizationManager.instance.current["from_wk"] + "\n<size=10>" + LocalizationManager.instance.current["total_obj_count"] + " : " + proceduralObjects.Count.ToString("N").Replace(".00", "") + "</size>");
 
                     if (GUI.Button(new Rect(10, 365, 375, 28), LocalizationManager.instance.current["saved_pobjs"]))
+                    {
+                        renamingExternalString = "";
+                        renamingExternal = -1;
+                        ExPObjManager.LoadExternals(basicTextures);
                         showExternals = true;
+                    }
                 }
                 else
                 {
@@ -1518,7 +1503,8 @@ namespace ProceduralObjects
                             chosenProceduralInfo = null;
                         }
                         GUI.Label(new Rect(15, i * 80 + 65, 85, 74), basicTextures[i]);
-                        GUI.Label(new Rect(105, i * 80 + 72, 190, 52), basicTextures[i].name.Replace(ProceduralObjectsMod.TextureConfigPath, ""));
+                        int pos = basicTextures[i].name.LastIndexOf(ProceduralObjectsMod.IsLinux ? "/" : @"\") + 1;
+                        GUI.Label(new Rect(105, i * 80 + 72, 190, 52), basicTextures[i].name.Substring(pos, basicTextures[i].name.Length - pos).Replace(".png", ""));
                     }
                     GUI.EndScrollView();
                 }
@@ -1528,10 +1514,13 @@ namespace ProceduralObjects
         {
             GUI.DragWindow(new Rect(0, 0, 350, 30));
             if (GUI.Button(new Rect(356, 3, 30, 30), "X"))
-                showExternals = false;
+                CloseExternalsWindow();
             GUI.Label(new Rect(10, 30, 298, 37), LocalizationManager.instance.current["externals_desc"]);
-            if (GUI.Button(new Rect(310, 35, 85, 28), LocalizationManager.instance.current["refresh"]))
-                ExPObjManager.LoadExternals(basicTextures);
+            if (renamingExternal == -1)
+            {
+                if (GUI.Button(new Rect(310, 35, 85, 28), LocalizationManager.instance.current["refresh"]))
+                    ExPObjManager.LoadExternals(basicTextures);
+            }
             if (ExPObjManager.m_externals.Count == 0)
             {
                 GUI.Box(new Rect(10, 70, 380, 320), LocalizationManager.instance.current["no_externals_warning"]);
@@ -1539,22 +1528,56 @@ namespace ProceduralObjects
             else
             {
                 GUI.Box(new Rect(10, 70, 380, 320), string.Empty);
-                GUI.BeginScrollView(new Rect(10, 70, 380, 320), scrollExternals, new Rect(0, 0, 350, 40 * ExPObjManager.m_externals.Count + 5));
+                scrollExternals = GUI.BeginScrollView(new Rect(10, 70, 380, 320), scrollExternals, new Rect(0, 0, 350, 40 * ExPObjManager.m_externals.Count + 5));
                 for (int i = 0; i < ExPObjManager.m_externals.Count; i++)
                 {
-                    GUI.Box(new Rect(5, i * 40 + 2, 343, 36), string.Empty);
-                    GUI.Label(new Rect(8, i * 40 + 12, 250, 30), ExPObjManager.m_externals[i].m_name);
-                    if (GUI.Button(new Rect(190, i * 40 + 5, 67, 30), LocalizationManager.instance.current["place"]))
+                    GUI.Box(new Rect(5, i * 40 + 2, 344, 36), string.Empty);
+                    if (renamingExternal == i)
                     {
-                        PlaceCacheObject(ExPObjManager.m_externals[i].m_object, true);
+                        renamingExternalString = GUI.TextField(new Rect(8, i * 40 + 6, 249, 36), renamingExternalString);
                     }
-                    if (ExPObjManager.m_externals[i].isWorkshop)
-                        GUI.Label(new Rect(260, i * 40 + 5, 80, 30), "[<i>Workshop</i>]", GUI.skin.button);
                     else
                     {
-                        if (GUI.Button(new Rect(260, i * 40 + 5, 80, 30), LocalizationManager.instance.current["delete"]))
+                        GUI.Label(new Rect(8, i * 40 + 6, 180, 36), ExPObjManager.m_externals[i].m_name);
+                        if (GUI.Button(new Rect(190, i * 40 + 5, 67, 30), LocalizationManager.instance.current["place"]))
                         {
-                            ExPObjManager.DeleteExternal(ExPObjManager.m_externals[i], basicTextures);
+                            if (ExPObjManager.m_externals[i].m_externalType == ClipboardProceduralObjects.ClipboardType.Single)
+                            {
+                                PlaceCacheObject(ExPObjManager.m_externals[i].m_object, true);
+                            }
+                            else
+                            {
+                                Paste(ExPObjManager.m_externals[i].m_selection);
+                            }
+                        }
+                    }
+                    if (ExPObjManager.m_externals[i].isWorkshop)
+                        GUI.Label(new Rect(258, i * 40 + 5, 67, 30), "[<i>Workshop</i>]", GUI.skin.button);
+                    else
+                    {
+                        if (GUI.Button(new Rect(258, i * 40 + 5, 64, 30), LocalizationManager.instance.current[(renamingExternal == i) ? "ok" : "rename"]))
+                        {
+                            if (renamingExternal == -1)
+                            {
+                                renamingExternalString = ExPObjManager.m_externals[i].m_name;
+                                renamingExternal = i;
+                            }
+                            else if (renamingExternal == i)
+                            {
+                                ExPObjManager.RenameExternal(ExPObjManager.m_externals[i], renamingExternalString);
+                                renamingExternal = -1;
+                                renamingExternalString = "";
+                            }
+                            // ExPObjManager.DeleteExternal(ExPObjManager.m_externals[i], basicTextures);
+                        }
+                        if (renamingExternal != i)
+                        {
+                            GUI.color = Color.red;
+                            if (GUI.Button(new Rect(324, i * 40 + 5, 25, 30), "X"))
+                            {
+                                ExPObjManager.DeleteExternal(ExPObjManager.m_externals[i], basicTextures);
+                            }
+                            GUI.color = Color.white;
                         }
                     }
                 }
@@ -1690,7 +1713,7 @@ namespace ProceduralObjects
             }
             else
             {
-                showExternals = false;
+                CloseExternalsWindow();
                 editingVertex = false;
                 editingVertexIndex.Clear();
                 editingWholeModel = false;
@@ -1705,9 +1728,16 @@ namespace ProceduralObjects
                 zLine = null;
             }
         }
-        private void ConvertToProcedural(ToolBase tool)
+        private void CloseExternalsWindow()
         {
             showExternals = false;
+            renamingExternal = -1;
+            renamingExternalString = "";
+        }
+
+        private void ConvertToProcedural(ToolBase tool)
+        {
+            CloseExternalsWindow();
             if (availableProceduralInfos == null)
                 availableProceduralInfos = ProceduralUtils.CreateProceduralInfosList();
             if (availableProceduralInfos.Count == 0)
@@ -1780,7 +1810,44 @@ namespace ProceduralObjects
                 }
             }
         }
-
+        private void Paste(ClipboardProceduralObjects clipboard)
+        {
+            if (clipboard != null)
+            {
+                if (clipboard.type == ClipboardProceduralObjects.ClipboardType.Single)
+                {
+                    placingSelection = false;
+                    pObjSelection.Clear();
+                    currentlyEditingObject = PlaceCacheObject(clipboard.single_object, true);
+                }
+                else
+                {
+                    pObjSelection.Clear();
+                    for (int i = 0; i < clipboard.selection_objects.Count; i++)
+                    {
+                        var cache = clipboard.selection_objects.ToList()[i].Key;
+                        ProceduralObject obj = null;
+                        if (i == 0)
+                        {
+                            obj = PlaceCacheObject(cache, true);
+                            obj.tempObj = new GameObject();
+                            obj.tempObj.transform.position = obj.m_position;
+                            obj.tempObj.transform.rotation = obj.m_rotation;
+                        }
+                        else
+                        {
+                            obj = PlaceCacheObject(cache, false);
+                            obj.m_position = currentlyEditingObject.m_position + clipboard.selection_objects[cache];
+                            obj.tempObj = new GameObject();
+                            obj.tempObj.transform.position = obj.m_position;
+                            obj.tempObj.transform.rotation = obj.m_rotation;
+                            obj.tempObj.transform.SetParent(currentlyEditingObject.tempObj.transform, true);
+                        }
+                    }
+                    placingSelection = true;
+                }
+            }
+        }
         public Vector3 VertexWorldPosition(Vertex vertex)
         {
             if (currentlyEditingObject.isPloppableAsphalt)
@@ -1817,7 +1884,7 @@ namespace ProceduralObjects
                 chosenProceduralInfo = null;
                 movingWholeModel = false;
                 placingSelection = false;
-                showExternals = false;
+                CloseExternalsWindow();
                 rotWizardData = null;
                 yOffset = 0f;
             }
@@ -1827,7 +1894,7 @@ namespace ProceduralObjects
                 movingWholeModel = false;
                 editingWholeModel = false;
                 editingVertex = true;
-                showExternals = false;
+                CloseExternalsWindow();
                 rotWizardData = null;
                 pObjSelection.Clear();
                 yOffset = 0f;

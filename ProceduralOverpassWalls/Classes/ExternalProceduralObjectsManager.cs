@@ -68,7 +68,28 @@ namespace ProceduralObjects.Classes
             if (m_externals.Contains(info))
                 m_externals.Remove(info);
         }
-
+        public void RenameExternal(ExternalInfo info, string newName)
+        {
+            if (info.isWorkshop)
+            {
+                Debug.LogWarning("[Procedural Objects] Failed to rename an ExternalInfo instance because it came from the workshop");
+                return;
+            }
+            if (!File.Exists(info.m_filePath))
+            {
+                Debug.LogError("[Procedural Objects] Failed to rename an ExternalInfo instance because it was moved from its original directory");
+                return;
+            }
+            var lines = File.ReadAllLines(info.m_filePath);
+            for (int i = 0; i < lines.Count(); i++)
+            {
+                if (lines[i].Contains("name = "))
+                    lines[i] = "name = " + newName;
+            }
+            File.Delete(info.m_filePath);
+            File.WriteAllLines(info.m_filePath, lines);
+            info.m_name = newName;
+        }
         public void LoadExternals(List<Texture2D> availableTextures)
         {
             m_externals = new List<ExternalInfo>();
@@ -89,7 +110,7 @@ namespace ProceduralObjects.Classes
             {
                 if (!File.Exists(path))
                     continue;
-                LoadSingleExternal(path, availableTextures, false);
+                LoadOneExternal(path, availableTextures, false);
             }
 
             // workshop externals
@@ -105,59 +126,127 @@ namespace ProceduralObjects.Classes
                     {
                         if (!File.Exists(file))
                             continue;
-                        LoadSingleExternal(file, availableTextures, true);
+                        LoadOneExternal(file, availableTextures, true);
                     }
                 }
             }
 
         }
-        private void LoadSingleExternal(string path, List<Texture2D> availableTextures, bool fromWorkshop)
+        private void LoadOneExternal(string path, List<Texture2D> availableTextures, bool fromWorkshop)
         {
             try
             {
                 var lines = File.ReadAllLines(path);
-                CacheProceduralObject obj = new CacheProceduralObject();
-                string name = "";
-                for (int i = 0; i < lines.Count(); i++)
+
+                if (lines.Any(line => line.Contains("externaltype = selection")))
                 {
-                    if (lines[i].Contains("name = "))
-                        name = lines[i].Replace("name = ", "");
-                    else if (lines[i].Contains("baseInfoType = "))
-                        obj.baseInfoType = lines[i].Replace("baseInfoType = ", "");
-                    else if (lines[i].Contains("basePrefabName = "))
-                        obj.basePrefabName = lines[i].Replace("basePrefabName = ", "");
-                    else if (lines[i].Contains("renderDistance = "))
-                        obj.renderDistance = float.Parse(lines[i].Replace("renderDistance = ", ""));
-                 //   else if (lines[i].Contains("scale = "))
-                 //       obj.scale = float.Parse(lines[i].Replace("scale = ", ""));
-                    else if (lines[i].Contains("isPloppableAsphalt = "))
-                        obj.isPloppableAsphalt = bool.Parse(lines[i].Replace("isPloppableAsphalt = ", ""));
-                    else if (lines[i].Contains("rotation = "))
-                        obj.m_rotation = VertexUtils.ParseQuaternion(lines[i].Replace("rotation = ", ""));
-                    else if (lines[i].Contains("customTexture = "))
-                    {
-                        if (lines[i].Replace("customTexture = ", "") == "null")
-                            obj.customTexture = null;
-                        else if (!availableTextures.Any(tex => tex.name == lines[i].Replace("customTexture = ", "")))
-                            Debug.LogError("[ProceduralObjects] A saved object was found with a texture that doesn't exist anymore with the name " + lines[i].Replace("customTexture = ", "") + ", therefore loading the default object texture");
-                        else
-                            obj.customTexture = availableTextures.FirstOrDefault(tex => tex.name == lines[i].Replace("customTexture = ", ""));
-                    }
-                    else if (lines[i].Contains("VERTICES "))
-                        obj.allVertices = new Vector3[int.Parse(lines[i].Replace("VERTICES ", ""))];
-                    else if (lines[i].Contains("vertex"))
-                    {
-                        string[] split = lines[i].Replace("vertex ", "").Split(new string[] { " = " }, StringSplitOptions.RemoveEmptyEntries);
-                        obj.allVertices[int.Parse(split[0])] = VertexUtils.ParseVector3(split[1]);
-                    }
+                    LoadSelectionExternal(lines, path, availableTextures, fromWorkshop);
                 }
-                ExternalInfo info = new ExternalInfo(name, path, obj, fromWorkshop);
-                m_externals.Add(info);
+                else
+                {
+                    CacheProceduralObject obj = new CacheProceduralObject();
+                    string name = "";
+                    for (int i = 0; i < lines.Count(); i++)
+                    {
+                        if (lines[i].Contains("name = "))
+                            name = lines[i].Replace("name = ", "").Trim();
+                        else if (lines[i].Contains("baseInfoType = "))
+                            obj.baseInfoType = lines[i].Replace("baseInfoType = ", "");
+                        else if (lines[i].Contains("basePrefabName = "))
+                            obj.basePrefabName = lines[i].Replace("basePrefabName = ", "");
+                        else if (lines[i].Contains("renderDistance = "))
+                            obj.renderDistance = float.Parse(lines[i].Replace("renderDistance = ", ""));
+                        //   else if (lines[i].Contains("scale = "))
+                        //       obj.scale = float.Parse(lines[i].Replace("scale = ", ""));
+                        else if (lines[i].Contains("isPloppableAsphalt = "))
+                            obj.isPloppableAsphalt = bool.Parse(lines[i].Replace("isPloppableAsphalt = ", ""));
+                        else if (lines[i].Contains("rotation = "))
+                            obj.m_rotation = VertexUtils.ParseQuaternion(lines[i].Replace("rotation = ", ""));
+                        else if (lines[i].Contains("customTexture = "))
+                        {
+                            if (lines[i].Replace("customTexture = ", "") == "null")
+                                obj.customTexture = null;
+                            else if (!availableTextures.Any(tex => tex.name == lines[i].Replace("customTexture = ", "")))
+                                Debug.LogError("[ProceduralObjects] A saved object was found with a texture that doesn't exist anymore with the name " + lines[i].Replace("customTexture = ", "") + ", therefore loading the default object texture");
+                            else
+                                obj.customTexture = availableTextures.FirstOrDefault(tex => tex.name == lines[i].Replace("customTexture = ", ""));
+                        }
+                        else if (lines[i].Contains("VERTICES "))
+                            obj.allVertices = new Vector3[int.Parse(lines[i].Replace("VERTICES ", ""))];
+                        else if (lines[i].Contains("vertex"))
+                        {
+                            string[] split = lines[i].Replace("vertex ", "").Split(new string[] { " = " }, StringSplitOptions.RemoveEmptyEntries);
+                            obj.allVertices[int.Parse(split[0])] = VertexUtils.ParseVector3(split[1]);
+                        }
+                    }
+                    ExternalInfo info = new ExternalInfo(name, path, obj, fromWorkshop);
+                    m_externals.Add(info);
+                }
             }
             catch
             {
                 Debug.LogError("[ProceduralObjects] Couldn't load an External Procedural Object : Invalid, corrupted or edited file at path : " + path);
             } 
+        }
+
+        private void LoadSelectionExternal(string[] fileLines, string path, List<Texture2D> availableTextures, bool fromWorkshop)
+        {
+            Dictionary<CacheProceduralObject, Vector3> objects = new Dictionary<CacheProceduralObject, Vector3>();
+
+            CacheProceduralObject obj = null;
+            Vector3 relativePos = Vector3.zero;
+
+            string name = "";
+            for (int i = 0; i < fileLines.Count(); i++)
+            {
+                if (fileLines[i].Contains("name = "))
+                    name = fileLines[i].Replace("name = ", "").Trim();
+                else if (fileLines[i].Contains("{"))
+                {
+                    obj = new CacheProceduralObject();
+                    relativePos = Vector3.zero;
+                }
+                else if (fileLines[i].Contains("}"))
+                {
+                    objects[obj] = relativePos;
+                    obj = null;
+                    relativePos = Vector3.zero;
+                }
+                else if (fileLines[i].Contains("baseInfoType = "))
+                    obj.baseInfoType = fileLines[i].Replace("baseInfoType = ", "");
+                else if (fileLines[i].Contains("basePrefabName = "))
+                    obj.basePrefabName = fileLines[i].Replace("basePrefabName = ", "");
+                else if (fileLines[i].Contains("relativePosition = "))
+                    relativePos = fileLines[i].Replace("relativePosition = ", "").ParseVector3();
+                else if (fileLines[i].Contains("renderDistance = "))
+                    obj.renderDistance = float.Parse(fileLines[i].Replace("renderDistance = ", ""));
+                //   else if (lines[i].Contains("scale = "))
+                //       obj.scale = float.Parse(lines[i].Replace("scale = ", ""));
+                else if (fileLines[i].Contains("isPloppableAsphalt = "))
+                    obj.isPloppableAsphalt = bool.Parse(fileLines[i].Replace("isPloppableAsphalt = ", ""));
+                else if (fileLines[i].Contains("rotation = "))
+                    obj.m_rotation = VertexUtils.ParseQuaternion(fileLines[i].Replace("rotation = ", ""));
+                else if (fileLines[i].Contains("customTexture = "))
+                {
+                    if (fileLines[i].Replace("customTexture = ", "") == "null")
+                        obj.customTexture = null;
+                    else if (!availableTextures.Any(tex => tex.name == fileLines[i].Replace("customTexture = ", "")))
+                        Debug.LogError("[ProceduralObjects] A saved object was found with a texture that doesn't exist anymore with the name " + fileLines[i].Replace("customTexture = ", "") + ", therefore loading the default object texture");
+                    else
+                        obj.customTexture = availableTextures.FirstOrDefault(tex => tex.name == fileLines[i].Replace("customTexture = ", ""));
+                }
+                else if (fileLines[i].Contains("VERTICES "))
+                    obj.allVertices = new Vector3[int.Parse(fileLines[i].Replace("VERTICES ", ""))];
+                else if (fileLines[i].Contains("vertex"))
+                {
+                    string[] split = fileLines[i].Replace("vertex ", "").Split(new string[] { " = " }, StringSplitOptions.RemoveEmptyEntries);
+                    obj.allVertices[int.Parse(split[0])] = VertexUtils.ParseVector3(split[1]);
+                }
+            }
+            ClipboardProceduralObjects selec = new ClipboardProceduralObjects(ClipboardProceduralObjects.ClipboardType.Selection);
+            selec.selection_objects = objects;
+            ExternalInfo info = new ExternalInfo(name, path, selec, fromWorkshop);
+            m_externals.Add(info);
         }
     }
     public class ExternalInfo
@@ -169,10 +258,23 @@ namespace ProceduralObjects.Classes
             m_object = pObj;
             this.m_filePath = path;
             this.isWorkshop = isWorkshop;
+            this.m_selection = null;
+            this.m_externalType = ClipboardProceduralObjects.ClipboardType.Single;
+        }
+        public ExternalInfo(string name, string path, ClipboardProceduralObjects selection, bool isWorkshop)
+        {
+            m_name = name;
+            m_object = null;
+            this.m_filePath = path;
+            this.isWorkshop = isWorkshop;
+            this.m_selection = selection;
+            this.m_externalType = ClipboardProceduralObjects.ClipboardType.Selection;
         }
 
         public string m_name, m_filePath;
         public CacheProceduralObject m_object;
+        public ClipboardProceduralObjects m_selection;
+        public ClipboardProceduralObjects.ClipboardType m_externalType;
         public bool isWorkshop;
     }
 }

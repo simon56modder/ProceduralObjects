@@ -21,7 +21,7 @@ namespace ProceduralObjects
         {
             get
             {
-                return "Procedural Objects mod";
+                return "Procedural Objects v" + VERSION;
             }
         }
         public string Description
@@ -30,7 +30,7 @@ namespace ProceduralObjects
         }
 
 
-        public const string VERSION = "1.4.3-2";
+        public const string VERSION = "1.4.4";
         public const string DOCUMENTATION_URL = "http://cscreators.referata.com/wiki/Procedural_Objects";
         public const string OTHER_SETTINGS_FILENAME = "ProceduralObjectsSettings";
 
@@ -114,7 +114,7 @@ namespace ProceduralObjects
             }
             catch (Exception e)
             {
-                Debug.Log("[ProceduralObj] Failed to add the settings file :");
+                Debug.LogError("[ProceduralObj] Failed to add the settings file :");
                 Debug.LogException(e);
             }
         }
