@@ -21,7 +21,7 @@ namespace ProceduralObjects
         {
             get
             {
-                return "Procedural Objects v" + VERSION;
+                return "Procedural Objects " + VERSION;
             }
         }
         public string Description
@@ -30,7 +30,7 @@ namespace ProceduralObjects
         }
 
 
-        public const string VERSION = "1.4.4";
+        public const string VERSION = "1.5";
         public const string DOCUMENTATION_URL = "http://cscreators.referata.com/wiki/Procedural_Objects";
         public const string OTHER_SETTINGS_FILENAME = "ProceduralObjectsSettings";
 
@@ -62,6 +62,7 @@ namespace ProceduralObjects
         }
         public static GameObject gameLogicObject, editorHelperObject;
         public static ProceduralObjectContainer[] tempContainerData = null;
+        public static Texture2D[] Icons = null;
 
         public override void OnLevelLoaded(LoadMode mode)
         {
@@ -75,6 +76,8 @@ namespace ProceduralObjects
             {
                 if (gameLogicObject == null)
                 {
+                    if (Icons == null)
+                        Icons = new Texture2D[] { TextureUtils.LoadTextureFromAssembly("duplicate"), TextureUtils.LoadTextureFromAssembly("maximize"), TextureUtils.LoadTextureFromAssembly("minimize") };
                     gameLogicObject = new GameObject("Logic_ProceduralObjects");
                     gameLogicObject.AddComponent<ProceduralObjectsLogic>();
                     gameLogicObject.AddComponent<UpdateInformant>();

@@ -16,6 +16,10 @@ namespace ProceduralObjects.Classes
         {
             return new Quaternion(source.x, source.y, source.z, source.w);
         }
+        public static Color ToColor(this SerializableQuaternion source)
+        {
+            return new Color(source.x, source.y, source.z, source.w);
+        }
         public static string ToFileName(this string s)
         {
             return s.Replace(" ", "_").Replace(@"\", "").Replace("/", "").Replace("|", "").Replace("<", "").Replace(">", "").Replace("*", "").Replace(":", "").Replace("?", "").Replace("\"", "");

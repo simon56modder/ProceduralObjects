@@ -59,6 +59,7 @@
   <ItemGroup>
     <Compile Include="Classes\ClipboardProceduralObjects.cs" />
     <Compile Include="Classes\ExternalProceduralObjectsManager.cs" />
+    <Compile Include="Classes\GUIUtils.cs" />
     <Compile Include="Classes\KeyBindings.cs" />
     <Compile Include="Classes\ProceduralClasses.cs" />
     <Compile Include="Classes\SerializationUtils.cs" />
@@ -69,6 +70,11 @@
     <Compile Include="AssetHelper\ProceduralEditorHelper.cs" />
     <Compile Include="Localization\Localization.cs" />
     <Compile Include="Localization\LocalizationManager.cs" />
+    <Compile Include="ProceduralText\FontManager.cs" />
+    <Compile Include="ProceduralText\TextCustomizationManager.cs" />
+    <Compile Include="ProceduralText\TextParameters.cs" />
+    <Compile Include="ProceduralText\TextureFont.cs" />
+    <Compile Include="ProceduralText\TextureScale.cs" />
     <Compile Include="ProceduralTool\Gizmos.cs" />
     <Compile Include="ProceduralObjectsLogic.cs" />
     <Compile Include="ProceduralObjectsMod.cs" />
@@ -77,6 +83,12 @@
     <Compile Include="ProceduralTool\ProceduralTool.cs" />
     <Compile Include="ProceduralTool\ToolMan.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\duplicate.png" />
+    <EmbeddedResource Include="Icons\maximize.png" />
+    <EmbeddedResource Include="Icons\minimize.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

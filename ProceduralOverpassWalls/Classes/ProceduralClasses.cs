@@ -8,6 +8,8 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using ColossalFramework.IO;
 
+using ProceduralObjects.ProceduralText;
+
 namespace ProceduralObjects.Classes
 {
     public class ProceduralObject
@@ -88,6 +90,25 @@ namespace ProceduralObjects.Classes
                 }
             }
             m_visibility = container.visibility;
+            if (container.textParam != null)
+            {
+                m_textParameters = TextParameters.Clone(container.textParam, true);
+                for (int i = 0; i < m_textParameters.Count(); i++)
+                {
+                    if (m_textParameters[i].serializableColor != null)
+                        m_textParameters[i].m_fontColor = m_textParameters[i].serializableColor.ToColor();
+                    else
+                        m_textParameters[i].m_fontColor = Color.white;
+                }
+              //  m_textParameters.SetFonts();
+                var originalTex = new Texture2D(m_material.mainTexture.width, m_material.mainTexture.height, TextureFormat.RGBA32, false);
+                originalTex.SetPixels(((Texture2D)m_material.mainTexture).GetPixels());
+                originalTex.Apply();
+                m_material.mainTexture = m_textParameters.ApplyParameters(originalTex);
+            }
+            else
+                m_textParameters = null;
+            disableRecalculation = container.disableRecalculation;
         }
         public ProceduralObject(CacheProceduralObject sourceCacheObj, int id, Vector3 position)
         {
@@ -108,15 +129,10 @@ namespace ProceduralObjects.Classes
                 m_material = GameObject.Instantiate(sourceProp.m_material);
                 if (sourceProp.m_mesh.name == "ploppableasphalt-prop" || sourceProp.m_mesh.name == "ploppableasphalt-decal")
                     m_material.ApplyPloppableColor();
-                if (sourceCacheObj.customTexture != null)
-                {
-                    m_material.mainTexture = sourceCacheObj.customTexture as Texture;
-                    customTexture = sourceCacheObj.customTexture;
-                }
             }
             else if (sourceCacheObj.baseInfoType == "BUILDING")// building
             {
-                BuildingInfo sourceProp = Resources.FindObjectsOfTypeAll<BuildingInfo>().FirstOrDefault(info => info.name == sourceCacheObj.basePrefabName);
+                BuildingInfo sourceBuilding = Resources.FindObjectsOfTypeAll<BuildingInfo>().FirstOrDefault(info => info.name == sourceCacheObj.basePrefabName);
                 this.id = id;
                 this.basePrefabName = sourceCacheObj.basePrefabName;
                 this.baseInfoType = "BUILDING";
@@ -125,19 +141,31 @@ namespace ProceduralObjects.Classes
                 m_position = position;
                 m_rotation = sourceCacheObj.m_rotation;
               //  gameObject.transform.localScale = new Vector3(sourceCacheObj.scale, sourceCacheObj.scale, sourceCacheObj.scale);
-                m_mesh = sourceProp.m_mesh.InstantiateMesh();
+                m_mesh = sourceBuilding.m_mesh.InstantiateMesh();
                 allVertices = sourceCacheObj.allVertices;
                 m_mesh.SetVertices(new List<Vector3>(allVertices));
                 m_mesh.colors = new Color[] { };
                 m_mesh.colors32 = new Color32[] { };
-                m_material = GameObject.Instantiate(sourceProp.m_material);
-                if (sourceCacheObj.customTexture != null)
-                {
-                    m_material.mainTexture = sourceCacheObj.customTexture as Texture;
-                    customTexture = sourceCacheObj.customTexture;
-                }
+                m_material = GameObject.Instantiate(sourceBuilding.m_material);
+            }
+            if (sourceCacheObj.customTexture != null)
+            {
+                m_material.mainTexture = sourceCacheObj.customTexture as Texture;
+                customTexture = sourceCacheObj.customTexture;
             }
             m_visibility = sourceCacheObj.visibility;
+            if (sourceCacheObj.textParam != null)
+            {
+                m_textParameters = TextParameters.Clone(sourceCacheObj.textParam, false);
+             //   m_textParameters.SetFonts();
+                var originalTex = new Texture2D(m_material.mainTexture.width, m_material.mainTexture.height, TextureFormat.RGBA32, false);
+                originalTex.SetPixels(((Texture2D)m_material.mainTexture).GetPixels());
+                originalTex.Apply();
+                m_material.mainTexture = m_textParameters.ApplyParameters(originalTex);
+            }
+            else
+                m_textParameters = null;
+            disableRecalculation = sourceCacheObj.disableRecalculation;
         }
 
         public void ConstructObject(PropInfo sourceProp, int id, Texture2D customTex = null)
@@ -160,6 +188,7 @@ namespace ProceduralObjects.Classes
             {
                 m_material.mainTexture = customTex as Texture;
                 customTexture = customTex;
+                disableRecalculation = false;
             }
         }
         public void ConstructObject(BuildingInfo sourceBuilding, int id, Texture2D customTex = null)
@@ -181,6 +210,7 @@ namespace ProceduralObjects.Classes
             {
                 m_material.mainTexture = customTex as Texture;
                 customTexture = customTex;
+                disableRecalculation = false;
             }
         }
 
@@ -193,17 +223,18 @@ namespace ProceduralObjects.Classes
         public string basePrefabName, baseInfoType;
         public int id;
         public float renderDistance, m_scale;
-        public bool isPloppableAsphalt;
+        public bool isPloppableAsphalt, disableRecalculation;
         public ProceduralObjectVisibility m_visibility;
+        public TextParameters m_textParameters;
 
         public GameObject tempObj;
-
 
         public bool RequiresUVRecalculation
         {
             get 
             {
-                return (this.basePrefabName.Contains("NativeCube_Procedural") || this.basePrefabName.Contains("NativeSquare_Procedural"));
+                return (this.basePrefabName == "1094334744.Cube_Data" || this.basePrefabName == "1094334744.Square_Data"
+                     || this.basePrefabName == "NativeCube_Procedural.Cube_Data" || this.basePrefabName == "NativeSquare_Procedural.Square_Data");
             }
         }
 
@@ -228,15 +259,18 @@ namespace ProceduralObjects.Classes
             basePrefabName = sourceObj.basePrefabName;
             baseInfoType = sourceObj.baseInfoType;
             visibility = sourceObj.m_visibility;
+            textParam = TextParameters.Clone(sourceObj.m_textParameters, false);
+            disableRecalculation = sourceObj.disableRecalculation;
         }
 
         public float renderDistance;
-        public bool isPloppableAsphalt;
+        public bool isPloppableAsphalt, disableRecalculation;
         public Quaternion m_rotation;
         public Texture2D customTexture;
         public string basePrefabName, baseInfoType;
         public Vector3[] allVertices;
         public ProceduralObjectVisibility visibility;
+        public TextParameters textParam;
     }
     
     public class ProceduralInfo
@@ -330,7 +364,7 @@ namespace ProceduralObjects.Classes
             foreach (var c in containerArray)
             {
                 var obj = new ProceduralObject(c, logic.basicTextures); 
-                if (obj.RequiresUVRecalculation)
+                if (obj.RequiresUVRecalculation && !obj.disableRecalculation)
                 {
                     try
                     {
@@ -381,6 +415,15 @@ namespace ProceduralObjects.Classes
                 list.Add(new ProceduralInfo(info, info.GetLocalizedDescription().ToLower().Contains("basic")));
             }
             return list.ToArray();
+        }
+        public static Texture GetOriginalTexture(ProceduralObject obj)
+        {
+            if (obj.customTexture)
+                return obj.customTexture as Texture; 
+            if (obj.baseInfoType == "PROP")
+                return Resources.FindObjectsOfTypeAll<PropInfo>().FirstOrDefault(prop => prop.name == obj.basePrefabName).m_material.mainTexture;
+            else
+                return Resources.FindObjectsOfTypeAll<BuildingInfo>().FirstOrDefault(building => building.name == obj.basePrefabName).m_material.mainTexture;
         }
         public static List<ProceduralInfo> CreateProceduralInfosList()
         {

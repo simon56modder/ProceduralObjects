@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Reflection;
 using System.IO;
 using ColossalFramework.IO;
 using ColossalFramework.PlatformServices;
@@ -98,6 +98,29 @@ namespace ProceduralObjects.Classes
                     tex.name = filePath;
             }
             return tex;
+        }
+
+        public static Texture2D LoadTextureFromAssembly(string filename)
+        {
+            Stream manifestResourceStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("ProceduralObjects.Icons." + filename + ".png");
+
+            byte[] array = new byte[manifestResourceStream.Length];
+            manifestResourceStream.Read(array, 0, array.Length);
+
+            Texture2D texture2D = new Texture2D(2, 2, TextureFormat.ARGB32, false);
+            texture2D.LoadImage(array);
+
+            return texture2D;
+        }
+
+        public static Color ParseColor(this string s)
+        {
+            string[] str = s.Replace("RGBA", "").Replace("(", "").Replace(")", "").Split(new string[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
+            if (str.Length == 3)
+                return new Color(float.Parse(str[0]), float.Parse(str[1]), float.Parse(str[2]));
+            if (str.Length == 4)
+                return new Color(float.Parse(str[0]), float.Parse(str[1]), float.Parse(str[2]), float.Parse(str[3]));
+            return Color.white;
         }
     }
     public class TextureResourceInfo

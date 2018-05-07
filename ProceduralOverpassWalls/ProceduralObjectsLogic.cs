@@ -9,6 +9,7 @@ using System.IO;
 using ProceduralObjects.Classes;
 using ProceduralObjects.Tools;
 using ProceduralObjects.Localization;
+using ProceduralObjects.ProceduralText;
 
 using ColossalFramework.UI;
 using ColossalFramework.Globalization;
@@ -43,6 +44,7 @@ namespace ProceduralObjects
         private ProceduralObject SingleHoveredObj = null;
 
         public Camera renderCamera;
+        private Material spriteMat;
 
         //  public Dictionary<Vertex, Vector3> vertexShifting;
 
@@ -59,7 +61,8 @@ namespace ProceduralObjects
         private int renamingExternal = -1;
         private string renamingExternalString = "";
 
-        private Material spriteMat;
+        private FontManager fontManager;
+        private TextCustomizationManager textManager;
 
         void Start()
         {
@@ -73,11 +76,13 @@ namespace ProceduralObjects
             basicTextures = basicTextures.LoadModConfigTextures().OrderBy(tex => tex.name).ToList();
             availableProceduralInfos = ProceduralUtils.CreateProceduralInfosList();
             Debug.Log("[ProceduralObjects] Found " + availableProceduralInfos.Count.ToString() + " procedural infos.");
+            fontManager = new FontManager(); // loads fonts
+            FontManager.instance = fontManager;
+            textManager = new TextCustomizationManager(fontManager);
             ExPObjManager = new ExternalProceduralObjectsManager();
-            ExPObjManager.LoadExternals(basicTextures);
+            ExPObjManager.LoadExternals(basicTextures, fontManager);
             spriteMat = new Material(Shader.Find("Sprites/Default"));
-            spriteMat.color = new Color(1f, 0, 0, .35f);
-
+            spriteMat.color = new Color(1f, 0, 0, .32f);
             if (ProceduralObjectsMod.tempContainerData != null)
             {
                 this.LoadContainerData(ProceduralObjectsMod.tempContainerData);
@@ -149,25 +154,13 @@ namespace ProceduralObjects
                 {
                     Paste(clipboard);
                 }
-                /* if (previousToolType != null)
-                   {
-                       if (previousToolType != ToolsModifierControl.toolController.CurrentTool.GetType())
-                       {
-                           previousToolType = ToolsModifierControl.toolController.CurrentTool.GetType();
-                           editingVertex = false;
-                           editingVertexIndex.Clear();
-                           editingWholeModel = false;
-                           proceduralTool = false;
-                           showWindow = false;
-                           Gizmos.DestroyGizmo();
-                           xLine = null;
-                           yLine = null;
-                           zLine = null;
-                       }
-                   } */
+                if (!proceduralTool && chosenProceduralInfo != null)
+                    GUIUtils.SetMouseScrolling(!(new Rect(window.x + 10, window.y + 60, 350, 330).IsMouseInside()));
             }
             if (proceduralTool)
             {
+                textManager.Update();
+
                 // COPY objects
                 if (KeyBindingsManager.instance.GetBindingFromName("copy").GetBindingDown())
                 {
@@ -200,11 +193,11 @@ namespace ProceduralObjects
                                 float diff = (rotWizardData.GUIMousePositionX - Input.mousePosition.x);
                                 if (diff < 0)
                                 {
-                                    currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, (diff * 300f) / Screen.width, 0);
+                                    currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, (diff * 360f) / Screen.width, 0);
                                 }
                                 else
                                 {
-                                    currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, -(((-diff) * 300f) / Screen.width), 0);
+                                    currentlyEditingObject.m_rotation = currentlyEditingObject.m_rotation.Rotate(0, -(((-diff) * 360f) / Screen.width), 0);
                                 }
                                 rotWizardData.UpdateMouseCoords();
                             }
@@ -256,7 +249,7 @@ namespace ProceduralObjects
 
                     Vector2 objGuiPosition = currentlyEditingObject.m_position.WorldToGuiPoint();
                     Rect toolsRect = new Rect(objGuiPosition.x + 8, objGuiPosition.y - 30, 110, 85);
-                    if (!toolsRect.IsMouseInside())
+                    if (!toolsRect.IsMouseInside() && (!textManager.showWindow || (textManager.showWindow && !textManager.windowRect.IsMouseInside())))
                     {
                         if (Input.GetMouseButtonDown(0))
                         {
@@ -385,30 +378,37 @@ namespace ProceduralObjects
                             {
                                 if (editingVertexIndex.Count > 0)
                                 {
-                                    if (vertWizardData == null)
+                                    if (textManager.windowRect.IsMouseInside() && textManager.showWindow)
                                     {
-                                        ToolBase.RaycastInput rayInput = new ToolBase.RaycastInput(Camera.main.ScreenPointToRay(Input.mousePosition), Camera.main.farClipPlane);
-                                        ToolBase.RaycastOutput rayOutput;
-                                        if (ProceduralObjRayCast.TerrainRaycast(rayInput, out rayOutput))
-                                        {
-                                            vertWizardData = new VerticesWizardData();
-                                            vertWizardData.Store(rayOutput.m_hitPos, temp_storageVertex.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))).ToArray(),
-                                                currentlyEditingObject);
-                                        }
-                                        //foreach (Vertex v in temp_storageVertex.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        // { }
+                                        editingVertexIndex.Clear();
                                     }
                                     else
                                     {
-                                        vertWizardData.IncrementStep();
-                                        if (vertWizardData.enableMovement)
+                                        if (vertWizardData == null)
                                         {
                                             ToolBase.RaycastInput rayInput = new ToolBase.RaycastInput(Camera.main.ScreenPointToRay(Input.mousePosition), Camera.main.farClipPlane);
                                             ToolBase.RaycastOutput rayOutput;
                                             if (ProceduralObjRayCast.TerrainRaycast(rayInput, out rayOutput))
                                             {
-                                                vertWizardData.ApplyToNewPosition(rayOutput.m_hitPos, currentlyEditingObject);
-                                                Apply();
+                                                vertWizardData = new VerticesWizardData();
+                                                vertWizardData.Store(rayOutput.m_hitPos, temp_storageVertex.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))).ToArray(),
+                                                    currentlyEditingObject);
+                                            }
+                                            //foreach (Vertex v in temp_storageVertex.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                            // { }
+                                        }
+                                        else
+                                        {
+                                            vertWizardData.IncrementStep();
+                                            if (vertWizardData.enableMovement)
+                                            {
+                                                ToolBase.RaycastInput rayInput = new ToolBase.RaycastInput(Camera.main.ScreenPointToRay(Input.mousePosition), Camera.main.farClipPlane);
+                                                ToolBase.RaycastOutput rayOutput;
+                                                if (ProceduralObjRayCast.TerrainRaycast(rayInput, out rayOutput))
+                                                {
+                                                    vertWizardData.ApplyToNewPosition(rayOutput.m_hitPos, currentlyEditingObject);
+                                                    Apply();
+                                                }
                                             }
                                         }
                                     }
@@ -597,12 +597,12 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").GetBinding())
                                         {
-                                            currentlyEditingObject.Scale(temp_storageVertex, 1.3f * Time.deltaTime);
+                                            currentlyEditingObject.Scale(temp_storageVertex, 1 + (.3f * Time.deltaTime));
                                             Apply();
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").GetBinding())
                                         {
-                                            currentlyEditingObject.Scale(temp_storageVertex, .7f * Time.deltaTime);
+                                            currentlyEditingObject.Scale(temp_storageVertex, 1 - (.3f * Time.deltaTime));
                                             Apply();
                                         }
                                         break;
@@ -721,12 +721,12 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").GetBinding())
                                         {
-                                            currentlyEditingObject.Scale(temp_storageVertex, 1.12f * Time.deltaTime);
+                                            currentlyEditingObject.Scale(temp_storageVertex, 1 + (.12f * Time.deltaTime));
                                             Apply();
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").GetBinding())
                                         {
-                                            currentlyEditingObject.Scale(temp_storageVertex, .88f * Time.deltaTime);
+                                            currentlyEditingObject.Scale(temp_storageVertex, 1 - (.12f * Time.deltaTime));
                                             Apply();
                                         }
                                         break;
@@ -1154,7 +1154,7 @@ namespace ProceduralObjects
                     }
                     if (!movingWholeModel)
                     {
-                        var winrect = GUI.Window(1094334744, window, DrawUIWindow, "Procedural Objects v" + ProceduralObjectsMod.VERSION);
+                        var winrect = GUIUtils.ClampRectToScreen(GUI.Window(1094334744, window, DrawUIWindow, "Procedural Objects v" + ProceduralObjectsMod.VERSION));
                         if (proceduralTool && editingWholeModel && !movingWholeModel)
                             window = new Rect(winrect.x, winrect.y, winrect.width, 463);
                         else
@@ -1163,6 +1163,8 @@ namespace ProceduralObjects
                         if (showExternals)
                             externalsWindow = GUI.Window(1094334745, externalsWindow, DrawExternalsWindow, LocalizationManager.instance.current["saved_pobjs"]);
 
+                        textManager.DrawWindow();
+
                         #region GUI when TOOL is active
                         if (currentlyEditingObject != null)
                         {
@@ -1170,50 +1172,55 @@ namespace ProceduralObjects
                             {
                                 if (clickingRegion)
                                     GUI.Box(CreateRectFromVector2s(topLeftRegion, bottomRightRegion), "");
-
-                                foreach (Vertex vertex in temp_storageVertex)
+                                bool vertWizardAllows = vertWizardData == null;
+                                if (!vertWizardAllows)
+                                    vertWizardAllows = !vertWizardData.enableMovement;
+                                if (vertWizardAllows && !KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").GetBinding())
                                 {
-                                    if (vertex != null)
+                                    foreach (Vertex vertex in temp_storageVertex)
                                     {
-                                        if (!vertex.IsDependent)
+                                        if (vertex != null)
                                         {
-                                            if (currentlyEditingObject.m_mesh.name == "ploppablecliffgrass" && vertex.Index >= currentlyEditingObject.allVertices.Count() - 2)
-                                                continue;
-                                            if ((editingVertex && !editingVertexIndex.Contains(vertex.Index)) || !editingVertex)
+                                            if (!vertex.IsDependent)
                                             {
-                                                if (GUI.Button(new Rect(VertexWorldPosition(vertex).WorldToGuiPoint() + new Vector2(-11, -11), new Vector2(23, 22)), "<size=20>+</size>"))
+                                                if (currentlyEditingObject.m_mesh.name == "ploppablecliffgrass" && vertex.Index >= currentlyEditingObject.allVertices.Count() - 2)
+                                                    continue;
+                                                if ((editingVertex && !editingVertexIndex.Contains(vertex.Index)) || !editingVertex)
                                                 {
-                                                    editingVertex = true;
-                                                    editingWholeModel = false;
-                                                    if (editingVertexIndex.Count == 0 || Input.GetKey(KeyCode.LeftControl))
-                                                        editingVertexIndex.Add(vertex.Index);
-                                                    else
+                                                    if (GUI.Button(new Rect(VertexWorldPosition(vertex).WorldToGuiPoint() + new Vector2(-11, -11), new Vector2(23, 22)), "<size=20>+</size>"))
                                                     {
-                                                        editingVertexIndex.Clear();
-                                                        editingVertexIndex.Add(vertex.Index);
-                                                    }
-                                                    Gizmos.DestroyGizmo();
-                                                    xLine = null;
-                                                    yLine = null;
-                                                    zLine = null;
-                                                    /*  if (Gizmos.Exists)
-                                                            vertexShifting = CreateVertexShiftingDictionary(temp_storageVertex, editingVertexIndex, false, false);
+                                                        editingVertex = true;
+                                                        editingWholeModel = false;
+                                                        if (editingVertexIndex.Count == 0 || Input.GetKey(KeyCode.LeftControl))
+                                                            editingVertexIndex.Add(vertex.Index);
                                                         else
-                                                            vertexShifting = CreateVertexShiftingDictionary(temp_storageVertex, editingVertexIndex, true, true); */
+                                                        {
+                                                            editingVertexIndex.Clear();
+                                                            editingVertexIndex.Add(vertex.Index);
+                                                        }
+                                                        Gizmos.DestroyGizmo();
+                                                        xLine = null;
+                                                        yLine = null;
+                                                        zLine = null;
+                                                        /*  if (Gizmos.Exists)
+                                                                vertexShifting = CreateVertexShiftingDictionary(temp_storageVertex, editingVertexIndex, false, false);
+                                                            else
+                                                                vertexShifting = CreateVertexShiftingDictionary(temp_storageVertex, editingVertexIndex, true, true); */
+                                                    }
                                                 }
-                                            }
-                                            else
-                                            {
-                                                GUI.contentColor = Color.red;
-                                                if (GUI.Button(new Rect(VertexWorldPosition(vertex).WorldToGuiPoint() + new Vector2(-11, -11), new Vector2(23, 22)), "<size=20><b>x</b></size>"))
+                                                else
                                                 {
-                                                    editingVertexIndex.Remove(vertex.Index);
-                                                    if (editingVertexIndex.Count == 0)
-                                                        editingVertex = false;
-                                                    //  vertexShifting = CreateVertexShiftingDictionary(temp_storageVertex, editingVertexIndex, true, true);
-                                                }
-                                                GUI.contentColor = Color.white;
+                                                    GUI.contentColor = Color.red;
+                                                    if (GUI.Button(new Rect(VertexWorldPosition(vertex).WorldToGuiPoint() + new Vector2(-11, -11), new Vector2(23, 22)), "<size=20><b>x</b></size>"))
+                                                    {
+                                                        editingVertexIndex.Remove(vertex.Index);
+                                                        if (editingVertexIndex.Count == 0)
+                                                            editingVertex = false;
+                                                        //  vertexShifting = CreateVertexShiftingDictionary(temp_storageVertex, editingVertexIndex, true, true);
+                                                    }
+                                                    GUI.contentColor = Color.white;
 
+                                                }
                                             }
                                         }
                                     }
@@ -1287,129 +1294,153 @@ namespace ProceduralObjects
 
             if (proceduralTool)
             {
-                GUI.BeginGroup(new Rect(10, 30, 380, 442));
-                if (editingWholeModel)
+                if (currentlyEditingObject != null)
                 {
-                    /* if (movingWholeModel)
-                       {
-                           GUI.Label(new Rect(0, 0, 300, 30), "<b><size=18>" + LocalizationManager.instance.current["move_to_tool"] + "</size></b>");
-                           GUI.Label(new Rect(0, 30, 380, 250), "<b>" + LocalizationManager.instance.current["controls"] + ":</b>\n" + LocalizationManager.instance.current["LM_click"] + " : " + LocalizationManager.instance.current["confirm_placement"]);
-                       }
-                       else
-                       { */
-                    GUI.Label(new Rect(35, 0, 300, 30), "<b><size=18>" + LocalizationManager.instance.current["general_tool"] + "</size></b>");
-                    GUI.contentColor = Color.green;
-                    GUI.Label(new Rect(0, 0, 23, 23), "<size=18>¤</size>", GUI.skin.button);
-                    GUI.contentColor = Color.white;
-                    GUI.Label(new Rect(0, 30, 380, 330), "<b>" + LocalizationManager.instance.current["controls"] + ":</b>\n" + KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_for_smooth"] + "\n" +
-                        KeyBindingsManager.instance.GetBindingFromName("edition_smallMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_slow_together"] + "\n\n" +
-                        KeyBindingsManager.instance.GetBindingFromName("switchActionMode").m_fullKeys + " : " + LocalizationManager.instance.current["switch_modes"] + "\n" +
-                        KeyBindingsManager.instance.GetBindingFromName("position_moveUp").m_fullKeys + ", " +
-                        KeyBindingsManager.instance.GetBindingFromName("position_moveDown").m_fullKeys + ", " +
-                        KeyBindingsManager.instance.GetBindingFromName("position_moveRight").m_fullKeys + ", " +
-                        KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").m_fullKeys + ", " +
-                        KeyBindingsManager.instance.GetBindingFromName("position_moveForward").m_fullKeys + ", " +
-                        KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").m_fullKeys + " : " + LocalizationManager.instance.current["move_objects_pos"] + "\n" +
-                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveUp").m_fullKeys + ", " +
-                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveDown").m_fullKeys + ", " +
-                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveRight").m_fullKeys + ", " +
-                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveLeft").m_fullKeys + ", " +
-                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveForward").m_fullKeys + ", " +
-                        KeyBindingsManager.instance.GetBindingFromName("rotation_moveBackward").m_fullKeys + " : " + LocalizationManager.instance.current["rotate_objects_rot"] + "\n" +
-                        KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").m_fullKeys + "/" +
-                        KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").m_fullKeys + " : " + LocalizationManager.instance.current["scale_objects"] + "\n" +
-                        "\n" + KeyBindingsManager.instance.GetBindingFromName("switchGeneralToVertexTools").m_fullKeys + " : " + LocalizationManager.instance.current["quick_switch"] + "\n\n<b>" + LocalizationManager.instance.current["buttons"] + " : </b>\n" + LocalizationManager.instance.current["delete_desc"] + "\n" + LocalizationManager.instance.current["move_to_desc"]);
-                    GUI.Label(new Rect(0, 330, 380, 30), LocalizationManager.instance.current["render_distance"] + " : " + currentlyEditingObject.renderDistance.ToString("N").Replace(".00", ""));
-                    currentlyEditingObject.renderDistance = GUI.HorizontalSlider(new Rect(0, 350, 380, 30), Mathf.Floor(currentlyEditingObject.renderDistance), 50f, 16000f);
-
-                    externalsSaveTextfield = GUI.TextField(new Rect(0, 370, 285, 28), externalsSaveTextfield);
-                    if (File.Exists(ProceduralObjectsMod.ExternalsConfigPath + externalsSaveTextfield.ToFileName() + ".pobj"))
-                    {
-                        GUI.color = Color.red;
-                        GUI.Label(new Rect(290, 370, 90, 28), "X", GUI.skin.button);
-                        GUI.color = Color.white;
-                    }
-                    else
-                    {
-                        if (GUI.Button(new Rect(290, 370, 90, 28), LocalizationManager.instance.current["save"]))
-                        {
-                            ExPObjManager.SaveToExternal(externalsSaveTextfield, new CacheProceduralObject(currentlyEditingObject));
-                            externalsSaveTextfield = LocalizationManager.instance.current["enter_name"];
-                        }
-                    }
-                    if (GUI.Button(new Rect(0, 400, 120, 28), "◄ " + LocalizationManager.instance.current["back"]))
-                    {
-                        CloseExternalsWindow();
-                        ToolHelper.FullySetTool<ProceduralTool>();
-                        Gizmos.DestroyGizmo();
-                        xLine = null;
-                        yLine = null;
-                        zLine = null;
-                        editingVertex = false;
-                        editingVertexIndex.Clear();
-                        editingWholeModel = false;
-                        proceduralTool = false;
-                        currentlyEditingObject = null;
-                        chosenProceduralInfo = null;
-                        pObjSelection.Clear();
-                    }
-                    GUI.EndGroup();
-                    if (GUI.Button(new Rect(15, 335, 185, 25), LocalizationManager.instance.current.visibilityString(currentlyEditingObject.m_visibility)))
-                    {
-                        if (currentlyEditingObject.m_visibility == ProceduralObjectVisibility.Always)
-                            currentlyEditingObject.m_visibility = ProceduralObjectVisibility.DayOnly;
-                        else if (currentlyEditingObject.m_visibility == ProceduralObjectVisibility.DayOnly)
-                            currentlyEditingObject.m_visibility = ProceduralObjectVisibility.NightOnly;
-                        else if (currentlyEditingObject.m_visibility == ProceduralObjectVisibility.NightOnly)
-                            currentlyEditingObject.m_visibility = ProceduralObjectVisibility.Always;
-                    }
-                }
-                else
-                {
-                    GUI.Label(new Rect(35, 0, 300, 30), "<b><size=18>" + LocalizationManager.instance.current["vertex_tool"] + "</size></b>");
-                    GUI.Label(new Rect(0, 0, 23, 23), "<size=18>+</size>", GUI.skin.button);
-                    GUI.Label(new Rect(0, 30, 380, 330), "<b>" + LocalizationManager.instance.current["controls"] + ":</b>\n" + KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_for_smooth"] +
-                        "\n" + KeyBindingsManager.instance.GetBindingFromName("edition_smallMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_slow_together"] + "\n\nCtrl : " + LocalizationManager.instance.current["hold_slow_together"] +
-                        "\n" + LocalizationManager.instance.current["move_vertices"] + "\n" +
-                        KeyBindingsManager.instance.GetBindingFromName("position_moveUp").m_fullKeys + "/" + KeyBindingsManager.instance.GetBindingFromName("position_moveDown").m_fullKeys +
-                        " : " + LocalizationManager.instance.current["move_vertices_updown"] + "\n" +
-                    KeyBindingsManager.instance.GetBindingFromName("switchGeneralToVertexTools").m_fullKeys + " : " + LocalizationManager.instance.current["quick_switch"] +
-                    "\n" + KeyBindingsManager.instance.GetBindingFromName("copy").m_fullKeys + " : " + LocalizationManager.instance.current["copy_obj"] + "\n" +
-                    KeyBindingsManager.instance.GetBindingFromName("paste").m_fullKeys + " : " + LocalizationManager.instance.current["paste_obj"]
-                    + "\n" + LocalizationManager.instance.current["delete_desc"] + "\n\n" +
-                    LocalizationManager.instance.current["rmb_marquee_vertices"] + "\n" +
-                    LocalizationManager.instance.current["lmb_drag_vertices"]);
-
-                    GUI.EndGroup();
-                    if (GUI.Button(new Rect(15, 335, 185, 25), LocalizationManager.instance.current["delete"]))
-                        DeleteObject();
-                    if (GUI.Button(new Rect(15, 370, 120, 25), "◄ " + LocalizationManager.instance.current["back"]))
-                    {
-                        ToolHelper.FullySetTool<ProceduralTool>();
-                        editingVertex = false;
-                        editingVertexIndex.Clear();
-                        editingWholeModel = false;
-                        proceduralTool = false;
-                        currentlyEditingObject = null;
-                        chosenProceduralInfo = null;
-                        pObjSelection.Clear();
-                    }
-                }
-                if (GUI.Button(new Rect(205, 335, 185, 25), (editingWholeModel ? LocalizationManager.instance.current["vertex_customization"] : LocalizationManager.instance.current["general_tool"])))
-                {
+                    GUI.BeginGroup(new Rect(10, 30, 380, 442));
                     if (editingWholeModel)
                     {
-                        if (Gizmos.Exists)
+                        // GENERAL TOOL
+                        GUI.Label(new Rect(35, 0, 300, 30), "<b><size=18>" + LocalizationManager.instance.current["general_tool"] + "</size></b>");
+                        GUI.contentColor = Color.green;
+                        GUI.Label(new Rect(0, 0, 23, 23), "<size=18>¤</size>", GUI.skin.button);
+                        GUI.contentColor = Color.white;
+                        GUI.Label(new Rect(0, 30, 380, 330), "<b>" + LocalizationManager.instance.current["controls"] + ":</b>\n" + KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_for_smooth"] + "\n" +
+                            KeyBindingsManager.instance.GetBindingFromName("edition_smallMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_slow_together"] + "\n\n" +
+                            KeyBindingsManager.instance.GetBindingFromName("switchActionMode").m_fullKeys + " : " + LocalizationManager.instance.current["switch_modes"] + "\n" +
+                            KeyBindingsManager.instance.GetBindingFromName("position_moveUp").m_fullKeys + ", " +
+                            KeyBindingsManager.instance.GetBindingFromName("position_moveDown").m_fullKeys + ", " +
+                            KeyBindingsManager.instance.GetBindingFromName("position_moveRight").m_fullKeys + ", " +
+                            KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").m_fullKeys + ", " +
+                            KeyBindingsManager.instance.GetBindingFromName("position_moveForward").m_fullKeys + ", " +
+                            KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").m_fullKeys + " : " + LocalizationManager.instance.current["move_objects_pos"] + "\n" +
+                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveUp").m_fullKeys + ", " +
+                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveDown").m_fullKeys + ", " +
+                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveRight").m_fullKeys + ", " +
+                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveLeft").m_fullKeys + ", " +
+                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveForward").m_fullKeys + ", " +
+                            KeyBindingsManager.instance.GetBindingFromName("rotation_moveBackward").m_fullKeys + " : " + LocalizationManager.instance.current["rotate_objects_rot"] + "\n" +
+                            KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").m_fullKeys + "/" +
+                            KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").m_fullKeys + " : " + LocalizationManager.instance.current["scale_objects"] + "\n" +
+                            "\n" + KeyBindingsManager.instance.GetBindingFromName("switchGeneralToVertexTools").m_fullKeys + " : " + LocalizationManager.instance.current["quick_switch"] + "\n\n<b>" + LocalizationManager.instance.current["buttons"] + " : </b>\n" + LocalizationManager.instance.current["delete_desc"] + "\n" + LocalizationManager.instance.current["move_to_desc"]);
+                        GUI.Label(new Rect(0, 330, 380, 30), LocalizationManager.instance.current["render_distance"] + " : " + currentlyEditingObject.renderDistance.ToString("N").Replace(".00", ""));
+                        currentlyEditingObject.renderDistance = GUI.HorizontalSlider(new Rect(0, 350, 380, 30), Mathf.Floor(currentlyEditingObject.renderDistance), 50f, 16000f);
+
+                        externalsSaveTextfield = GUI.TextField(new Rect(0, 368, 285, 28), externalsSaveTextfield);
+                        if (File.Exists(ProceduralObjectsMod.ExternalsConfigPath + externalsSaveTextfield.ToFileName() + ".pobj"))
                         {
+                            GUI.color = Color.red;
+                            GUI.Label(new Rect(290, 368, 90, 28), "X", GUI.skin.button);
+                            GUI.color = Color.white;
+                        }
+                        else
+                        {
+                            if (GUI.Button(new Rect(290, 368, 90, 28), LocalizationManager.instance.current["save"]))
+                            {
+                                ExPObjManager.SaveToExternal(externalsSaveTextfield, new CacheProceduralObject(currentlyEditingObject));
+                                externalsSaveTextfield = LocalizationManager.instance.current["enter_name"];
+                            }
+                        }
+                        if (currentlyEditingObject.RequiresUVRecalculation)
+                        {
+                            if (GUI.Button(new Rect(125, 400, 255, 28), LocalizationManager.instance.current["tex_uv_mode"] + " : " + LocalizationManager.instance.current[(currentlyEditingObject.disableRecalculation ? "uv_stretch" : "uv_repeat")]))
+                            {
+                                if (currentlyEditingObject.disableRecalculation)
+                                {
+                                    currentlyEditingObject.disableRecalculation = false;
+                                    currentlyEditingObject.m_mesh.uv = Vertex.RecalculateUVMap(currentlyEditingObject, temp_storageVertex);
+                                }
+                                else
+                                {
+                                    currentlyEditingObject.disableRecalculation = true;
+                                    currentlyEditingObject.m_mesh.uv = Vertex.DefaultUVMap(currentlyEditingObject);
+                                }
+                            }
+                        }
+                        if (GUI.Button(new Rect(0, 400, 120, 28), "◄ " + LocalizationManager.instance.current["back"]))
+                        {
+                            textManager.CloseWindow();
+                            CloseExternalsWindow();
+                            ToolHelper.FullySetTool<ProceduralTool>();
                             Gizmos.DestroyGizmo();
                             xLine = null;
                             yLine = null;
                             zLine = null;
+                            editingVertex = false;
+                            editingVertexIndex.Clear();
+                            editingWholeModel = false;
+                            proceduralTool = false;
+                            chosenProceduralInfo = null;
+                            pObjSelection.Clear();
+                            currentlyEditingObject = null;
                         }
-                        editingWholeModel = false;
+                        else
+                        {
+                            GUI.EndGroup();
+                            if (GUI.Button(new Rect(15, 335, 185, 25), LocalizationManager.instance.current.visibilityString(currentlyEditingObject.m_visibility)))
+                            {
+                                if (currentlyEditingObject.m_visibility == ProceduralObjectVisibility.Always)
+                                    currentlyEditingObject.m_visibility = ProceduralObjectVisibility.DayOnly;
+                                else if (currentlyEditingObject.m_visibility == ProceduralObjectVisibility.DayOnly)
+                                    currentlyEditingObject.m_visibility = ProceduralObjectVisibility.NightOnly;
+                                else if (currentlyEditingObject.m_visibility == ProceduralObjectVisibility.NightOnly)
+                                    currentlyEditingObject.m_visibility = ProceduralObjectVisibility.Always;
+                            }
+                        }
                     }
                     else
-                        SwitchToMainTool();
+                    {
+                        // CUSTOMIZATION TOOL
+                        GUI.Label(new Rect(35, 0, 300, 30), "<b><size=18>" + LocalizationManager.instance.current["vertex_tool"] + "</size></b>");
+                        GUI.Label(new Rect(0, 0, 23, 23), "<size=18>+</size>", GUI.skin.button);
+                        GUI.Label(new Rect(0, 30, 380, 330), "<b>" + LocalizationManager.instance.current["controls"] + ":</b>\n" + KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_for_smooth"] +
+                            "\n" + KeyBindingsManager.instance.GetBindingFromName("edition_smallMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_slow_together"] + "\n\nCtrl : " + LocalizationManager.instance.current["hold_slow_together"] +
+                            "\n" + LocalizationManager.instance.current["move_vertices"] + "\n" +
+                            KeyBindingsManager.instance.GetBindingFromName("position_moveUp").m_fullKeys + "/" + KeyBindingsManager.instance.GetBindingFromName("position_moveDown").m_fullKeys +
+                            " : " + LocalizationManager.instance.current["move_vertices_updown"] + "\n" +
+                        KeyBindingsManager.instance.GetBindingFromName("switchGeneralToVertexTools").m_fullKeys + " : " + LocalizationManager.instance.current["quick_switch"] +
+                        "\n" + KeyBindingsManager.instance.GetBindingFromName("copy").m_fullKeys + " : " + LocalizationManager.instance.current["copy_obj"] + "\n" +
+                        KeyBindingsManager.instance.GetBindingFromName("paste").m_fullKeys + " : " + LocalizationManager.instance.current["paste_obj"]
+                        + "\n" + LocalizationManager.instance.current["delete_desc"] + "\n\n" +
+                        LocalizationManager.instance.current["rmb_marquee_vertices"] + "\n" +
+                        LocalizationManager.instance.current["lmb_drag_vertices"]);
+
+                        GUI.EndGroup();
+                        if (TextParameters.CanHaveTextParameters(currentlyEditingObject))
+                        {
+                            if (GUI.Button(new Rect(205, 363, 185, 25), LocalizationManager.instance.current["text_customization"]))
+                                textManager.Edit(currentlyEditingObject, new Vector2(window.x + window.width, window.y));
+                        }
+                        if (GUI.Button(new Rect(15, 335, 185, 25), LocalizationManager.instance.current["delete"]))
+                            DeleteObject();
+                        if (GUI.Button(new Rect(15, 363, 185, 25), "◄ " + LocalizationManager.instance.current["back"]))
+                        {
+                            textManager.CloseWindow();
+                            ToolHelper.FullySetTool<ProceduralTool>();
+                            editingVertex = false;
+                            editingVertexIndex.Clear();
+                            editingWholeModel = false;
+                            proceduralTool = false;
+                            chosenProceduralInfo = null;
+                            pObjSelection.Clear();
+                            currentlyEditingObject = null;
+                        }
+                    }
+                    if (GUI.Button(new Rect(205, 335, 185, 25), (editingWholeModel ? LocalizationManager.instance.current["vertex_customization"] : LocalizationManager.instance.current["general_tool"])))
+                    {
+                        if (editingWholeModel)
+                        {
+                            if (Gizmos.Exists)
+                            {
+                                Gizmos.DestroyGizmo();
+                                xLine = null;
+                                yLine = null;
+                                zLine = null;
+                            }
+                            editingWholeModel = false;
+                        }
+                        else
+                            SwitchToMainTool();
+                    }
                 }
             }
             else
@@ -1460,7 +1491,7 @@ namespace ProceduralObjects
                     {
                         renamingExternalString = "";
                         renamingExternal = -1;
-                        ExPObjManager.LoadExternals(basicTextures);
+                        ExPObjManager.LoadExternals(basicTextures, textManager.fontManager);
                         showExternals = true;
                     }
                 }
@@ -1471,7 +1502,7 @@ namespace ProceduralObjects
                     else if (chosenProceduralInfo.infoType == "BUILDING")
                         GUI.Label(new Rect(10, 30, 350, 30), LocalizationManager.instance.current["choose_tex_to_apply"] + " \"" + chosenProceduralInfo.buildingPrefab.GetLocalizedTitle() + "\"");
                     // Texture selection
-                    scrollTextures = GUI.BeginScrollView(new Rect(10, 60, 350, 330), scrollTextures, new Rect(0, 0, 320, 80 * basicTextures.Count() + 65));
+                    scrollTextures = GUI.BeginScrollView(new Rect(10, 60, 350, 330), scrollTextures, new Rect(0, 0, 320, 80 * basicTextures.Count() + 142));
                     GUI.Label(new Rect(10, 0, 300, 28), basicTextures.Count().ToString() + " " + LocalizationManager.instance.current["tex_in_total"] + " : " + TextureUtils.LocalTexturesCount.ToString() + " " + LocalizationManager.instance.current["local"] + " + " + TextureResourceInfo.TotalTextureCount(TextureUtils.TextureResources) + " " + LocalizationManager.instance.current["from_wk"]);
                     if (GUI.Button(new Rect(10, 30, 147.5f, 30), LocalizationManager.instance.current["open_folder"]))
                     {
@@ -1480,9 +1511,29 @@ namespace ProceduralObjects
                     }
                     if (GUI.Button(new Rect(162.5f, 30, 147.5f, 30), LocalizationManager.instance.current["refresh"]))
                         basicTextures = basicTextures.LoadModConfigTextures();
+                    if (GUI.Button(new Rect(10, 61, 300, 79), LocalizationManager.instance.current["none_defaulttex"]))
+                    {
+                        editingVertex = false;
+                        editingVertexIndex.Clear();
+                        editingWholeModel = false;
+                        proceduralTool = false;
+                        ToolHelper.FullySetTool<DefaultTool>();
+                        Gizmos.DestroyGizmo();
+                        xLine = null;
+                        yLine = null;
+                        zLine = null;
+                        SpawnObject(chosenProceduralInfo);
+                        temp_storageVertex = Vertex.CreateVertexList(currentlyEditingObject);
+                        ToolHelper.FullySetTool<ProceduralTool>();
+                        proceduralTool = true;
+                        movingWholeModel = true;
+                        placingSelection = false;
+                        editingVertex = false;
+                        chosenProceduralInfo = null;
+                    }
                     for (int i = 0; i < basicTextures.Count(); i++)
                     {
-                        if (GUI.Button(new Rect(10, i * 80 + 62, 300, 79), string.Empty))
+                        if (GUI.Button(new Rect(10, i * 80 + 142, 300, 79), string.Empty))
                         {
                             editingVertex = false;
                             editingVertexIndex.Clear();
@@ -1502,9 +1553,9 @@ namespace ProceduralObjects
                             editingVertex = false;
                             chosenProceduralInfo = null;
                         }
-                        GUI.Label(new Rect(15, i * 80 + 65, 85, 74), basicTextures[i]);
+                        GUI.Label(new Rect(15, i * 80 + 145, 85, 74), basicTextures[i]);
                         int pos = basicTextures[i].name.LastIndexOf(ProceduralObjectsMod.IsLinux ? "/" : @"\") + 1;
-                        GUI.Label(new Rect(105, i * 80 + 72, 190, 52), basicTextures[i].name.Substring(pos, basicTextures[i].name.Length - pos).Replace(".png", ""));
+                        GUI.Label(new Rect(105, i * 80 + 152, 190, 52), basicTextures[i].name.Substring(pos, basicTextures[i].name.Length - pos).Replace(".png", ""));
                     }
                     GUI.EndScrollView();
                 }
@@ -1519,7 +1570,7 @@ namespace ProceduralObjects
             if (renamingExternal == -1)
             {
                 if (GUI.Button(new Rect(310, 35, 85, 28), LocalizationManager.instance.current["refresh"]))
-                    ExPObjManager.LoadExternals(basicTextures);
+                    ExPObjManager.LoadExternals(basicTextures, textManager.fontManager);
             }
             if (ExPObjManager.m_externals.Count == 0)
             {
@@ -1575,7 +1626,7 @@ namespace ProceduralObjects
                             GUI.color = Color.red;
                             if (GUI.Button(new Rect(324, i * 40 + 5, 25, 30), "X"))
                             {
-                                ExPObjManager.DeleteExternal(ExPObjManager.m_externals[i], basicTextures);
+                                ExPObjManager.DeleteExternal(ExPObjManager.m_externals[i], basicTextures, textManager.fontManager);
                             }
                             GUI.color = Color.white;
                         }
@@ -1592,7 +1643,7 @@ namespace ProceduralObjects
             currentlyEditingObject.m_mesh.SetVertices(posArray);
             // sets mesh collider vertices
             //UV map recalculation
-            if (currentlyEditingObject.RequiresUVRecalculation)
+            if (currentlyEditingObject.RequiresUVRecalculation && !currentlyEditingObject.disableRecalculation)
             {
                 try
                 {
@@ -1644,7 +1695,7 @@ namespace ProceduralObjects
             movingWholeModel = true;
             placingSelection = false;
             proceduralTool = true;
-            if (obj.RequiresUVRecalculation)
+            if (obj.RequiresUVRecalculation && !obj.disableRecalculation)
                 obj.m_mesh.uv = Vertex.RecalculateUVMap(obj, temp_storageVertex);
             return obj;
         }
@@ -1702,6 +1753,20 @@ namespace ProceduralObjects
         {
             var currentToolType = ToolsModifierControl.toolController.CurrentTool.GetType();
 
+            textManager.CloseWindow();
+            CloseExternalsWindow();
+            editingVertex = false;
+            editingVertexIndex.Clear();
+            editingWholeModel = false;
+            proceduralTool = false;
+            currentlyEditingObject = null;
+            chosenProceduralInfo = null;
+            rotWizardData = null;
+            Gizmos.DestroyGizmo();
+            xLine = null;
+            yLine = null;
+            zLine = null;
+
             if ((currentToolType == typeof(PropTool)) || (currentToolType == typeof(BuildingTool)))
             {
                 ConvertToProcedural(ToolsModifierControl.toolController.CurrentTool);
@@ -1713,19 +1778,7 @@ namespace ProceduralObjects
             }
             else
             {
-                CloseExternalsWindow();
-                editingVertex = false;
-                editingVertexIndex.Clear();
-                editingWholeModel = false;
-                proceduralTool = false;
-                currentlyEditingObject = null;
-                chosenProceduralInfo = null;
-                rotWizardData = null;
                 ToolHelper.FullySetTool<DefaultTool>();
-                Gizmos.DestroyGizmo();
-                xLine = null;
-                yLine = null;
-                zLine = null;
             }
         }
         private void CloseExternalsWindow()
@@ -1910,6 +1963,7 @@ namespace ProceduralObjects
             proceduralTool = false;
             movingWholeModel = false;
             placingSelection = false;
+            textManager.CloseWindow();
             proceduralObjects.Remove(currentlyEditingObject);
             //  Object.Destroy(currentlyEditingObject.gameObject);
             currentlyEditingObject = null;

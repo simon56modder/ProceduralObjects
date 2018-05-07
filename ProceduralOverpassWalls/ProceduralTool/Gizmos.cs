@@ -147,7 +147,7 @@ namespace ProceduralObjects
         {
             if (!enableMovement)
             {
-                if (secClicked >= .5f)
+                if (secClicked >= .38f)
                     enableMovement = true;
                 secClicked += Time.deltaTime;
             }

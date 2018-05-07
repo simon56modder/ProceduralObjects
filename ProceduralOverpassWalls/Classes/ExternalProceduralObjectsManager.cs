@@ -4,8 +4,11 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 using System.IO;
-
 using ColossalFramework.PlatformServices;
+using ColossalFramework.Plugins;
+using ICities;
+
+using ProceduralObjects.ProceduralText;
 
 namespace ProceduralObjects.Classes
 {
@@ -32,6 +35,16 @@ namespace ProceduralObjects.Classes
             tw.WriteLine("customTexture = " + ((pobj.customTexture == null) ? "null" : pobj.customTexture.name));
             tw.WriteLine("renderDistance = " + pobj.renderDistance.ToString());
             tw.WriteLine("rotation = " + pobj.m_rotation.ToString());
+            if (pobj.textParam != null)
+            {
+                if (pobj.textParam.Count() > 0)
+                {
+                    foreach (TextField field in pobj.textParam.m_textFields)
+                    {
+                        tw.WriteLine(TextField.SaveString(field));
+                    }
+                }
+            }
             tw.WriteLine("VERTICES " + pobj.allVertices.Count());
             for (int i = 0; i < pobj.allVertices.Count(); i++)
             {
@@ -42,26 +55,26 @@ namespace ProceduralObjects.Classes
                 m_externals.Add(new ExternalInfo(name, path, pobj, false));
         }
 
-        public void DeleteExternal(ExternalInfo info, List<Texture2D> textures)
+        public void DeleteExternal(ExternalInfo info, List<Texture2D> textures, FontManager fManager)
         {
             if (m_externals == null)
             {
-                LoadExternals(textures);
+                LoadExternals(textures, fManager);
                 return;
             }
             if (!m_externals.Contains(info))
             {
-                LoadExternals(textures);
+                LoadExternals(textures, fManager);
                 return;
             }
             if (info.isWorkshop)
             {
-                LoadExternals(textures);
+                LoadExternals(textures, fManager);
                 return;
             }
             if (!File.Exists(info.m_filePath))
             {
-                LoadExternals(textures);
+                LoadExternals(textures, fManager);
                 return;
             }
             File.Delete(info.m_filePath);
@@ -72,12 +85,12 @@ namespace ProceduralObjects.Classes
         {
             if (info.isWorkshop)
             {
-                Debug.LogWarning("[Procedural Objects] Failed to rename an ExternalInfo instance because it came from the workshop");
+                Debug.LogWarning("[ProceduralObjects] Failed to rename an ExternalInfo instance because it came from the workshop");
                 return;
             }
             if (!File.Exists(info.m_filePath))
             {
-                Debug.LogError("[Procedural Objects] Failed to rename an ExternalInfo instance because it was moved from its original directory");
+                Debug.LogError("[ProceduralObjects] Failed to rename an ExternalInfo instance because it was moved from its original directory");
                 return;
             }
             var lines = File.ReadAllLines(info.m_filePath);
@@ -90,7 +103,7 @@ namespace ProceduralObjects.Classes
             File.WriteAllLines(info.m_filePath, lines);
             info.m_name = newName;
         }
-        public void LoadExternals(List<Texture2D> availableTextures)
+        public void LoadExternals(List<Texture2D> availableTextures, FontManager fManager)
         {
             m_externals = new List<ExternalInfo>();
 
@@ -110,7 +123,7 @@ namespace ProceduralObjects.Classes
             {
                 if (!File.Exists(path))
                     continue;
-                LoadOneExternal(path, availableTextures, false);
+                LoadOneExternal(path, availableTextures, false, fManager);
             }
 
             // workshop externals
@@ -126,13 +139,13 @@ namespace ProceduralObjects.Classes
                     {
                         if (!File.Exists(file))
                             continue;
-                        LoadOneExternal(file, availableTextures, true);
+                        LoadOneExternal(file, availableTextures, true, fManager);
                     }
                 }
             }
 
         }
-        private void LoadOneExternal(string path, List<Texture2D> availableTextures, bool fromWorkshop)
+        private void LoadOneExternal(string path, List<Texture2D> availableTextures, bool fromWorkshop, FontManager fManager)
         {
             try
             {
@@ -140,7 +153,7 @@ namespace ProceduralObjects.Classes
 
                 if (lines.Any(line => line.Contains("externaltype = selection")))
                 {
-                    LoadSelectionExternal(lines, path, availableTextures, fromWorkshop);
+                    LoadSelectionExternal(lines, path, availableTextures, fromWorkshop, fManager);
                 }
                 else
                 {
@@ -171,6 +184,12 @@ namespace ProceduralObjects.Classes
                             else
                                 obj.customTexture = availableTextures.FirstOrDefault(tex => tex.name == lines[i].Replace("customTexture = ", ""));
                         }
+                        else if (lines[i].Contains("textParam: "))
+                        {
+                            if (obj.textParam == null)
+                                obj.textParam = new TextParameters();
+                            obj.textParam.AddField(TextField.Parse(lines[i], fManager));
+                        }
                         else if (lines[i].Contains("VERTICES "))
                             obj.allVertices = new Vector3[int.Parse(lines[i].Replace("VERTICES ", ""))];
                         else if (lines[i].Contains("vertex"))
@@ -189,7 +208,7 @@ namespace ProceduralObjects.Classes
             } 
         }
 
-        private void LoadSelectionExternal(string[] fileLines, string path, List<Texture2D> availableTextures, bool fromWorkshop)
+        private void LoadSelectionExternal(string[] fileLines, string path, List<Texture2D> availableTextures, bool fromWorkshop, FontManager fManager)
         {
             Dictionary<CacheProceduralObject, Vector3> objects = new Dictionary<CacheProceduralObject, Vector3>();
 
@@ -226,6 +245,12 @@ namespace ProceduralObjects.Classes
                     obj.isPloppableAsphalt = bool.Parse(fileLines[i].Replace("isPloppableAsphalt = ", ""));
                 else if (fileLines[i].Contains("rotation = "))
                     obj.m_rotation = VertexUtils.ParseQuaternion(fileLines[i].Replace("rotation = ", ""));
+                else if (fileLines[i].Contains("textParam: "))
+                {
+                    if (obj.textParam == null)
+                        obj.textParam = new TextParameters();
+                    obj.textParam.AddField(TextField.Parse(fileLines[i], fManager));
+                }
                 else if (fileLines[i].Contains("customTexture = "))
                 {
                     if (fileLines[i].Replace("customTexture = ", "") == "null")

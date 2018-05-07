@@ -4,6 +4,8 @@ using System.Linq;
 using UnityEngine;
 using System.IO;
 
+using ProceduralObjects.ProceduralText;
+
 namespace ProceduralObjects.Classes
 {
     public class ClipboardProceduralObjects
@@ -56,6 +58,16 @@ namespace ProceduralObjects.Classes
                 tw.WriteLine("customTexture = " + ((kvp.Key.customTexture == null) ? "null" : kvp.Key.customTexture.name));
                 tw.WriteLine("renderDistance = " + kvp.Key.renderDistance.ToString());
                 tw.WriteLine("rotation = " + kvp.Key.m_rotation.ToString());
+                if (kvp.Key.textParam != null)
+                {
+                    if (kvp.Key.textParam.Count() > 0)
+                    {
+                        foreach (TextField field in kvp.Key.textParam.m_textFields)
+                        {
+                            tw.WriteLine(TextField.SaveString(field));
+                        }
+                    }
+                }
                 tw.WriteLine("VERTICES " + kvp.Key.allVertices.Count());
                 for (int i = 0; i < kvp.Key.allVertices.Count(); i++)
                 {

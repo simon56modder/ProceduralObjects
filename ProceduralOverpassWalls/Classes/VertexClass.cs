@@ -116,38 +116,40 @@ namespace ProceduralObjects.Classes
 
         public static Vector2[] RecalculateUVMap(ProceduralObject po, Vertex[] vertices)
         {
-            if (po.basePrefabName.Contains("NativeCube"))
+            if (po.basePrefabName.Contains("Cube"))
             {
+                // works all good
                 Vector2[] uvmap = new Vector2[] {
                 Vector2.zero,
-                new Vector2(Vector3.Distance(vertices[2].Position, vertices[1].Position) / 8, Vector3.Distance(vertices[3].Position, vertices[1].Position) / 8),
-                new Vector2(0, Vector3.Distance(vertices[0].Position, vertices[2].Position) / 8),
-                new Vector2(Vector3.Distance(vertices[0].Position, vertices[3].Position) / 8, 0),
-                new Vector2(0, Vector3.Distance(vertices[9].Position, vertices[4].Position) / 8),
-                new Vector2(Vector3.Distance(vertices[4].Position, vertices[5].Position) / 8, Vector3.Distance(vertices[8].Position, vertices[5].Position) / 8),
-                new Vector2(Vector3.Distance(vertices[11].Position, vertices[6].Position) / 8, Vector3.Distance(vertices[6].Position, vertices[14].Position) / 8),
-                new Vector2(Vector3.Distance(vertices[17].Position, vertices[7].Position) / 8, Vector3.Distance(vertices[7].Position, vertices[15].Position) / 8),
-                new Vector2(Vector3.Distance(vertices[9].Position, vertices[8].Position) / 8, 0), //8
-                Vector2.zero, //9
-                Vector2.zero, //10
-                new Vector2(0, Vector3.Distance(vertices[10].Position, vertices[11].Position) / 8),
-                new Vector2(0, Vector3.Distance(vertices[12].Position, vertices[22].Position) / 8),
-                new Vector2(Vector3.Distance(vertices[12].Position, vertices[13].Position) / 8, Vector3.Distance(vertices[13].Position, vertices[23].Position) / 8),
-                new Vector2(Vector3.Distance(vertices[10].Position, vertices[14].Position) / 8, 0),
-                new Vector2(Vector3.Distance(vertices[16].Position, vertices[15].Position) / 8, 0),
-                Vector2.zero, //16
-                new Vector2(0, Vector3.Distance(vertices[16].Position, vertices[17].Position) / 8),
-                new Vector2(Vector3.Distance(vertices[21].Position, vertices[18].Position) / 8, Vector3.Distance(vertices[19].Position, vertices[18].Position) / 8),
-                new Vector2(Vector3.Distance(vertices[20].Position, vertices[19].Position) / 8, 0),
-                Vector2.zero, //20
-                new Vector2(0, Vector3.Distance(vertices[20].Position, vertices[21].Position) / 8),
-                Vector2.zero, //22
-                new Vector2(Vector3.Distance(vertices[22].Position, vertices[23].Position) / 8, 0)
-            };
+                    new Vector2(Vector3.Distance(vertices[2].Position, vertices[1].Position) / 8, Vector3.Distance(vertices[3].Position, vertices[1].Position) / 8),
+                    new Vector2(0, Vector3.Distance(vertices[0].Position, vertices[2].Position) / 8),
+                    new Vector2(Vector3.Distance(vertices[0].Position, vertices[3].Position) / 8, 0),
+                    new Vector2(0, Vector3.Distance(vertices[9].Position, vertices[4].Position) / 8),
+                    new Vector2(Vector3.Distance(vertices[4].Position, vertices[5].Position) / 8, Vector3.Distance(vertices[8].Position, vertices[5].Position) / 8),
+                    new Vector2(Vector3.Distance(vertices[11].Position, vertices[6].Position) / 8, Vector3.Distance(vertices[6].Position, vertices[14].Position) / 8),
+                    new Vector2(Vector3.Distance(vertices[17].Position, vertices[7].Position) / 8, Vector3.Distance(vertices[7].Position, vertices[15].Position) / 8),
+                    new Vector2(Vector3.Distance(vertices[9].Position, vertices[8].Position) / 8, 0), //8
+                    Vector2.zero, //9
+                    Vector2.zero, //10
+                    new Vector2(0, Vector3.Distance(vertices[10].Position, vertices[11].Position) / 8),
+                    new Vector2(0, Vector3.Distance(vertices[12].Position, vertices[22].Position) / 8),
+                    new Vector2(Vector3.Distance(vertices[12].Position, vertices[13].Position) / 8, Vector3.Distance(vertices[13].Position, vertices[23].Position) / 8),
+                    new Vector2(Vector3.Distance(vertices[10].Position, vertices[14].Position) / 8, 0),
+                    new Vector2(Vector3.Distance(vertices[16].Position, vertices[15].Position) / 8, 0),
+                    Vector2.zero, //16
+                    new Vector2(0, Vector3.Distance(vertices[16].Position, vertices[17].Position) / 8),
+                    new Vector2(Vector3.Distance(vertices[21].Position, vertices[18].Position) / 8, Vector3.Distance(vertices[19].Position, vertices[18].Position) / 8),
+                    new Vector2(Vector3.Distance(vertices[20].Position, vertices[19].Position) / 8, 0),
+                    Vector2.zero, //20
+                    new Vector2(0, Vector3.Distance(vertices[20].Position, vertices[21].Position) / 8),
+                    Vector2.zero, //22
+                    new Vector2(Vector3.Distance(vertices[22].Position, vertices[23].Position) / 8, 0)
+                };
                 return uvmap;
             }
             else
             {
+                // not really the best thing ever made
                 Vector2[] uvmap = new Vector2[] {
                     Vector2.zero,
                     new Vector2(Vector3.Distance(vertices[2].Position, vertices[1].Position) / 8, Vector3.Distance(vertices[3].Position, vertices[1].Position) / 8),
@@ -160,6 +162,13 @@ namespace ProceduralObjects.Classes
                 };
                 return uvmap;
             }
+        }
+        public static Vector2[] DefaultUVMap(ProceduralObject po)
+        {
+            if (po.baseInfoType == "PROP")
+                return Resources.FindObjectsOfTypeAll<PropInfo>().FirstOrDefault(p => p.name == po.basePrefabName).m_mesh.uv;
+            else
+                return Resources.FindObjectsOfTypeAll<BuildingInfo>().FirstOrDefault(b => b.name == po.basePrefabName).m_mesh.uv;
         }
     }
 
@@ -196,10 +205,6 @@ namespace ProceduralObjects.Classes
         public static Vector3 PloppableAsphaltPosition(this Vector3 position)
         {
             return new Vector3(position.x, position.y, (-position.z) * 2.14f);
-        }
-        public static bool IsMouseInside(this Rect rect)
-        {
-            return rect.Contains(new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y));
         }
         public static Quaternion ParseQuaternion(this string s)
         {
