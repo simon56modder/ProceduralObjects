@@ -35,6 +35,9 @@ namespace ProceduralObjects.Classes
             tw.WriteLine("customTexture = " + ((pobj.customTexture == null) ? "null" : pobj.customTexture.name));
             tw.WriteLine("renderDistance = " + pobj.renderDistance.ToString());
             tw.WriteLine("rotation = " + pobj.m_rotation.ToString());
+            tw.WriteLine("disableRecalculation = " + pobj.disableRecalculation.ToString());
+            if (pobj.tilingFactor != 8)
+                tw.WriteLine("tilingFactor = " + pobj.tilingFactor.ToString());
             if (pobj.textParam != null)
             {
                 if (pobj.textParam.Count() > 0)
@@ -158,6 +161,7 @@ namespace ProceduralObjects.Classes
                 else
                 {
                     CacheProceduralObject obj = new CacheProceduralObject();
+                    obj.tilingFactor = 8;
                     string name = "";
                     for (int i = 0; i < lines.Count(); i++)
                     {
@@ -173,8 +177,12 @@ namespace ProceduralObjects.Classes
                         //       obj.scale = float.Parse(lines[i].Replace("scale = ", ""));
                         else if (lines[i].Contains("isPloppableAsphalt = "))
                             obj.isPloppableAsphalt = bool.Parse(lines[i].Replace("isPloppableAsphalt = ", ""));
+                        else if (lines[i].Contains("tilingFactor = "))
+                            obj.tilingFactor = int.Parse(lines[i].Replace("tilingFactor = ", ""));
                         else if (lines[i].Contains("rotation = "))
                             obj.m_rotation = VertexUtils.ParseQuaternion(lines[i].Replace("rotation = ", ""));
+                        else if (lines[i].Contains("disableRecalculation = "))
+                            obj.disableRecalculation = bool.Parse(lines[i].Replace("disableRecalculation = ", ""));
                         else if (lines[i].Contains("customTexture = "))
                         {
                             if (lines[i].Replace("customTexture = ", "") == "null")
@@ -188,7 +196,13 @@ namespace ProceduralObjects.Classes
                         {
                             if (obj.textParam == null)
                                 obj.textParam = new TextParameters();
-                            obj.textParam.AddField(TextField.Parse(lines[i], fManager));
+                            obj.textParam.AddField(TextField.ParseText(lines[i], fManager));
+                        }
+                        else if (lines[i].Contains("colorRect: "))
+                        {
+                            if (obj.textParam == null)
+                                obj.textParam = new TextParameters();
+                            obj.textParam.AddField(TextField.ParseColorRect(lines[i]));
                         }
                         else if (lines[i].Contains("VERTICES "))
                             obj.allVertices = new Vector3[int.Parse(lines[i].Replace("VERTICES ", ""))];
@@ -223,6 +237,7 @@ namespace ProceduralObjects.Classes
                 else if (fileLines[i].Contains("{"))
                 {
                     obj = new CacheProceduralObject();
+                    obj.tilingFactor = 8;
                     relativePos = Vector3.zero;
                 }
                 else if (fileLines[i].Contains("}"))
@@ -245,11 +260,21 @@ namespace ProceduralObjects.Classes
                     obj.isPloppableAsphalt = bool.Parse(fileLines[i].Replace("isPloppableAsphalt = ", ""));
                 else if (fileLines[i].Contains("rotation = "))
                     obj.m_rotation = VertexUtils.ParseQuaternion(fileLines[i].Replace("rotation = ", ""));
+                else if (fileLines[i].Contains("disableRecalculation = "))
+                    obj.disableRecalculation = bool.Parse(fileLines[i].Replace("disableRecalculation = ", ""));
+                else if (fileLines[i].Contains("tilingFactor = "))
+                    obj.tilingFactor = int.Parse(fileLines[i].Replace("tilingFactor = ", ""));
                 else if (fileLines[i].Contains("textParam: "))
                 {
                     if (obj.textParam == null)
                         obj.textParam = new TextParameters();
-                    obj.textParam.AddField(TextField.Parse(fileLines[i], fManager));
+                    obj.textParam.AddField(TextField.ParseText(fileLines[i], fManager));
+                }
+                else if (fileLines[i].Contains("colorRect: "))
+                {
+                    if (obj.textParam == null)
+                        obj.textParam = new TextParameters();
+                    obj.textParam.AddField(TextField.ParseColorRect(fileLines[i]));
                 }
                 else if (fileLines[i].Contains("customTexture = "))
                 {

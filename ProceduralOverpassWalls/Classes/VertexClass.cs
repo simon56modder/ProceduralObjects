@@ -9,6 +9,14 @@ namespace ProceduralObjects.Classes
     public class Vertex
     {
         public Vertex() { }
+        public Vertex(Vertex source)
+        {
+            this.Position = source.Position;
+            this.Locked = source.Locked;
+            this.IsDependent = source.IsDependent;
+            this.Index = source.Index;
+            this.DependencyIndex = source.DependencyIndex;
+        }
         public bool IsDependent, Locked;
         public int DependencyIndex, Index;
         public Vector3 Position;
@@ -32,10 +40,11 @@ namespace ProceduralObjects.Classes
                 v.Position = _vertex;
                 v.Index = i;
                 v.Locked = false;
-                if (list.Any(vertex => vertex.Position == _vertex))
+                List<Vertex> depV = list.Where(vertex => vertex.Position == _vertex).ToList();
+                if (depV.Count > 0)
                 {
                     v.IsDependent = true;
-                    v.DependencyIndex = list.First(vertex => vertex.Position == _vertex).Index;
+                    v.DependencyIndex = depV.First().Index;
                 }
                 else
                     v.IsDependent = false;
@@ -121,29 +130,29 @@ namespace ProceduralObjects.Classes
                 // works all good
                 Vector2[] uvmap = new Vector2[] {
                 Vector2.zero,
-                    new Vector2(Vector3.Distance(vertices[2].Position, vertices[1].Position) / 8, Vector3.Distance(vertices[3].Position, vertices[1].Position) / 8),
-                    new Vector2(0, Vector3.Distance(vertices[0].Position, vertices[2].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[0].Position, vertices[3].Position) / 8, 0),
-                    new Vector2(0, Vector3.Distance(vertices[9].Position, vertices[4].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[4].Position, vertices[5].Position) / 8, Vector3.Distance(vertices[8].Position, vertices[5].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[11].Position, vertices[6].Position) / 8, Vector3.Distance(vertices[6].Position, vertices[14].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[17].Position, vertices[7].Position) / 8, Vector3.Distance(vertices[7].Position, vertices[15].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[9].Position, vertices[8].Position) / 8, 0), //8
+                    new Vector2(Vector3.Distance(vertices[2].Position, vertices[1].Position) / po.tilingFactor, Vector3.Distance(vertices[3].Position, vertices[1].Position) / po.tilingFactor),
+                    new Vector2(0, Vector3.Distance(vertices[0].Position, vertices[2].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[0].Position, vertices[3].Position) / po.tilingFactor, 0),
+                    new Vector2(0, Vector3.Distance(vertices[9].Position, vertices[4].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[4].Position, vertices[5].Position) / po.tilingFactor, Vector3.Distance(vertices[8].Position, vertices[5].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[11].Position, vertices[6].Position) / po.tilingFactor, Vector3.Distance(vertices[6].Position, vertices[14].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[17].Position, vertices[7].Position) / po.tilingFactor, Vector3.Distance(vertices[7].Position, vertices[15].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[9].Position, vertices[8].Position) / po.tilingFactor, 0), //8
                     Vector2.zero, //9
                     Vector2.zero, //10
-                    new Vector2(0, Vector3.Distance(vertices[10].Position, vertices[11].Position) / 8),
-                    new Vector2(0, Vector3.Distance(vertices[12].Position, vertices[22].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[12].Position, vertices[13].Position) / 8, Vector3.Distance(vertices[13].Position, vertices[23].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[10].Position, vertices[14].Position) / 8, 0),
-                    new Vector2(Vector3.Distance(vertices[16].Position, vertices[15].Position) / 8, 0),
+                    new Vector2(0, Vector3.Distance(vertices[10].Position, vertices[11].Position) / po.tilingFactor),
+                    new Vector2(0, Vector3.Distance(vertices[12].Position, vertices[22].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[12].Position, vertices[13].Position) / po.tilingFactor, Vector3.Distance(vertices[13].Position, vertices[23].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[10].Position, vertices[14].Position) / po.tilingFactor, 0),
+                    new Vector2(Vector3.Distance(vertices[16].Position, vertices[15].Position) / po.tilingFactor, 0),
                     Vector2.zero, //16
-                    new Vector2(0, Vector3.Distance(vertices[16].Position, vertices[17].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[21].Position, vertices[18].Position) / 8, Vector3.Distance(vertices[19].Position, vertices[18].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[20].Position, vertices[19].Position) / 8, 0),
+                    new Vector2(0, Vector3.Distance(vertices[16].Position, vertices[17].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[21].Position, vertices[18].Position) / po.tilingFactor, Vector3.Distance(vertices[19].Position, vertices[18].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[20].Position, vertices[19].Position) / po.tilingFactor, 0),
                     Vector2.zero, //20
-                    new Vector2(0, Vector3.Distance(vertices[20].Position, vertices[21].Position) / 8),
+                    new Vector2(0, Vector3.Distance(vertices[20].Position, vertices[21].Position) / po.tilingFactor),
                     Vector2.zero, //22
-                    new Vector2(Vector3.Distance(vertices[22].Position, vertices[23].Position) / 8, 0)
+                    new Vector2(Vector3.Distance(vertices[22].Position, vertices[23].Position) / po.tilingFactor, 0)
                 };
                 return uvmap;
             }
@@ -152,13 +161,13 @@ namespace ProceduralObjects.Classes
                 // not really the best thing ever made
                 Vector2[] uvmap = new Vector2[] {
                     Vector2.zero,
-                    new Vector2(Vector3.Distance(vertices[2].Position, vertices[1].Position) / 8, Vector3.Distance(vertices[3].Position, vertices[1].Position) / 8),
-                    new Vector2(0, Vector3.Distance(vertices[0].Position, vertices[2].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[0].Position, vertices[3].Position) / 8, 0),
+                    new Vector2(Vector3.Distance(vertices[2].Position, vertices[1].Position) / po.tilingFactor, Vector3.Distance(vertices[3].Position, vertices[1].Position) / po.tilingFactor),
+                    new Vector2(0, Vector3.Distance(vertices[0].Position, vertices[2].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[0].Position, vertices[3].Position) / po.tilingFactor, 0),
                     Vector2.zero,
-                    new Vector2(Vector3.Distance(vertices[6].Position, vertices[7].Position) / 8, Vector3.Distance(vertices[5].Position, vertices[7].Position) / 8),
-                    new Vector2(0, Vector3.Distance(vertices[6].Position, vertices[4].Position) / 8),
-                    new Vector2(Vector3.Distance(vertices[4].Position, vertices[7].Position) / 8, 0)
+                    new Vector2(Vector3.Distance(vertices[6].Position, vertices[7].Position) / po.tilingFactor, Vector3.Distance(vertices[5].Position, vertices[7].Position) / po.tilingFactor),
+                    new Vector2(0, Vector3.Distance(vertices[6].Position, vertices[4].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[4].Position, vertices[7].Position) / po.tilingFactor, 0)
                 };
                 return uvmap;
             }
@@ -174,12 +183,66 @@ namespace ProceduralObjects.Classes
 
     public static class VertexUtils
     {
+        public static void MirrorX(Vertex[] vertices)
+        {
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i].Position.x = -vertices[i].Position.x;
+        }
+        public static void MirrorY(Vertex[] vertices)
+        {
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i].Position.y = -vertices[i].Position.y;
+        }
+        public static void MirrorZ( Vertex[] vertices)
+        {
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i].Position.z = -vertices[i].Position.z;
+        }
+
+        public static void StretchX(Vertex[] vertices, float factor)
+        {
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i].Position.x *= factor;
+        }
+        public static void StretchY(Vertex[] vertices, float factor)
+        {
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i].Position.y *= factor;
+        }
+        public static void StretchZ(Vertex[] vertices, float factor)
+        {
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i].Position.z *= factor;
+        }
+
+        public static void flipFaces(ProceduralObject obj)
+        {
+            for (int m = 0; m < obj.m_mesh.subMeshCount; m++)
+            {
+                int[] triangles = obj.m_mesh.GetTriangles(m);
+                for (int i = 0; i < triangles.Length; i += 3)
+                {
+                    int temp = triangles[i];
+                    triangles[i] = triangles[i + 1];
+                    triangles[i + 1] = temp;
+                }
+                obj.m_mesh.SetTriangles(triangles, m);
+            }
+            obj.m_mesh.RecalculateNormals();
+        }
+        public static Vertex[] CloneArray(this Vertex[] vertexArray)
+        {
+            var list = new List<Vertex>();
+            for (int i = 0; i < vertexArray.Length; i++)
+                list.Add(new Vertex(vertexArray[i]));
+            return list.ToArray();
+        }
         public static Vector3[] GetPositionsArray(this Vertex[] vertexArray)
         {
-            var list = new List<Vector3>();
-            foreach (Vertex v in vertexArray)
-                list.Add(v.Position);
-            return list.ToArray();
+            var array = new Vector3[vertexArray.Length];
+            for (int i = 0; i < vertexArray.Length; i++)
+                array[i] = vertexArray[i].Position;
+            return array;
         }
         public static Vector3 WorldToLocalVertexPosition(this Vector3 worldCoord, ProceduralObject obj)
         {

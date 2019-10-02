@@ -117,6 +117,31 @@ namespace ProceduralObjects.Classes
             }
             return false;
         }
+
+        public bool GetBindingUp()
+        {
+            int count = m_orderedKeys.Count();
+            if (count == 1)
+            {
+                return Input.GetKeyUp(m_orderedKeys[0]);
+            }
+            else
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    if (i != count - 1)
+                    {
+                        if (!Input.GetKey(m_orderedKeys[i]))
+                            return false;
+                    }
+                    else
+                    {
+                        return Input.GetKeyUp(m_orderedKeys[i]);
+                    }
+                }
+            }
+            return false;
+        }
     }
 
     public class KeyBindingsManager
@@ -163,7 +188,7 @@ namespace ProceduralObjects.Classes
             }
             if (!keyBindingsDictionary.ContainsKey(name))
             {
-                throw new Exception("[ProceduralObjects] KeyBinding missing : A key binding was missing in the config file");
+                throw new Exception("[ProceduralObjects] KeyBinding missing : A key binding with id '" + name + "' was missing in the config file");
             }
             return keyBindingsDictionary[name];
         }
@@ -208,10 +233,12 @@ namespace ProceduralObjects.Classes
                 tw.WriteLine("scale_scaleDown = PageDown");
                 tw.WriteLine("");
                 tw.WriteLine("snapStoredHeight = H");
+                tw.WriteLine("undo = LeftControl+Z");
+                tw.WriteLine("redo = LeftControl+Y");
                 tw.Close();
             }
             m_keyBindings = new List<KeyBindingInfo>();
-            var lines = File.ReadAllLines(BindingsConfigPath);
+            var lines = File.ReadAllLines(BindingsConfigPath).ToList();
             if (!lines.Any(line => line.Contains("snapStoredHeight = ")))
             {
                 if (File.Exists(BindingsConfigPath))
@@ -221,6 +248,29 @@ namespace ProceduralObjects.Classes
                     tw.WriteLine(line);
                 tw.WriteLine("");
                 tw.WriteLine("snapStoredHeight = H");
+                lines.Add("snapStoredHeight = H");
+                tw.Close();
+            }
+            if (!lines.Any(line => line.Contains("undo = ")))
+            {
+                if (File.Exists(BindingsConfigPath))
+                    File.Delete(BindingsConfigPath);
+                TextWriter tw = new StreamWriter(BindingsConfigPath);
+                foreach (string line in lines)
+                    tw.WriteLine(line);
+                tw.WriteLine("undo = LeftControl+Z");
+                lines.Add("undo = LeftControl+Z");
+                tw.Close();
+            }
+            if (!lines.Any(line => line.Contains("redo = ")))
+            {
+                if (File.Exists(BindingsConfigPath))
+                    File.Delete(BindingsConfigPath);
+                TextWriter tw = new StreamWriter(BindingsConfigPath);
+                foreach (string line in lines)
+                    tw.WriteLine(line);
+                tw.WriteLine("redo = LeftControl+Y");
+                lines.Add("redo = LeftControl+Y");
                 tw.Close();
             }
             foreach (string line in lines)
@@ -237,7 +287,7 @@ namespace ProceduralObjects.Classes
             {
                 keyBindingsDictionary.Add(kbInfo.m_name, kbInfo);
             }
-            Debug.Log("[ProceduralObjects] Key Bindings loading ended.");
+            Debug.Log("[ProceduralObjects] Key Bindings loading ended from " + BindingsConfigPath);
         }
     }
 }

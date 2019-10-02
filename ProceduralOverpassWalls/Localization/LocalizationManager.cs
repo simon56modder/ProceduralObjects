@@ -6,6 +6,7 @@ using ColossalFramework.IO;
 using System.IO;
 using ColossalFramework.PlatformServices;
 using ColossalFramework.Globalization;
+using UnityEngine;
 
 namespace ProceduralObjects.Localization
 {
@@ -22,9 +23,9 @@ namespace ProceduralObjects.Localization
             instance.SelectCurrent();
         }
 
-
         public Localization current;
         public List<Localization> available;
+        public Localization english;
 
         public void LoadLocalizations()
         {
@@ -44,6 +45,8 @@ namespace ProceduralObjects.Localization
                         var locale = new Localization();
                         locale.LoadFromFile(localeFiles[i]);
                         available.Add(locale);
+                        if (locale.identifier == "en")
+                            english = locale;
                     }
                 }
             }
@@ -51,12 +54,30 @@ namespace ProceduralObjects.Localization
 
         public void SelectCurrent()
         {
-            if (available.Any(locale => locale.identifier.ToLower() == LocaleManager.instance.language.ToLower()))
-                current = available.First(locale => locale.identifier.ToLower() == LocaleManager.instance.language.ToLower());
+            var loadIdentifier = LocaleManager.instance.language.ToLower();
+            if (ProceduralObjectsMod.LanguageUsed.value != "default")
+                loadIdentifier = ProceduralObjectsMod.LanguageUsed.value;
+            if (available.Any(locale => locale.identifier.ToLower() == loadIdentifier))
+                current = available.First(locale => locale.identifier.ToLower() == loadIdentifier);
             else if (available.Count > 0)
                 current = available.First(locale => locale.identifier == "en");
             else
                 throw new Exception("ProceduralObjects localization exception : No localization was found to load !");
+        }
+        public void SetCurrent(int i)
+        {
+            current = this.available.ElementAt(i);
+        }
+
+        public string[] identifiers
+        {
+            get
+            {
+                var list = new List<string>();
+                foreach (Localization l in available)
+                    list.Add(l.identifier.ToUpper() + " (" + l.name + ")");
+                return list.ToArray();
+            }
         }
     }
 }

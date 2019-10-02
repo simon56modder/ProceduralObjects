@@ -57,13 +57,19 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\AdvancedEdition.cs" />
     <Compile Include="Classes\ClipboardProceduralObjects.cs" />
     <Compile Include="Classes\ExternalProceduralObjectsManager.cs" />
     <Compile Include="Classes\GUIUtils.cs" />
     <Compile Include="Classes\KeyBindings.cs" />
+    <Compile Include="Classes\LayerManager.cs" />
+    <Compile Include="Classes\NormalSolver.cs" />
+    <Compile Include="Classes\PO_MoveIt.cs" />
     <Compile Include="Classes\ProceduralClasses.cs" />
+    <Compile Include="Classes\ProceduralUndo.cs" />
     <Compile Include="Classes\SerializationUtils.cs" />
     <Compile Include="Classes\TextureUtils.cs" />
+    <Compile Include="Classes\TimeUtils.cs" />
     <Compile Include="Classes\UIMainButton.cs" />
     <Compile Include="Classes\UpdateInformant.cs" />
     <Compile Include="Classes\VertexClass.cs" />
@@ -84,15 +90,37 @@
     <Compile Include="ProceduralTool\ToolMan.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\invisible.png" />
+    <EmbeddedResource Include="Icons\visible.png" />
+  </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Icons\duplicate.png" />
     <EmbeddedResource Include="Icons\maximize.png" />
     <EmbeddedResource Include="Icons\minimize.png" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\rotate_right.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\move_down.png" />
+    <EmbeddedResource Include="Icons\move_up.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\locked.png" />
+    <EmbeddedResource Include="Icons\unlocked.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\CursorMoveVertices.png" />
+    <EmbeddedResource Include="Icons\CursorRotateVertices.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\CursorScaleVertices.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>xcopy /y  "$(TargetDir)ProceduralObjects.dll" "C:\Users\Simon\AppData\Local\Colossal Order\Cities_Skylines\Addons\Mods\ProceduralObjects"</PostBuildEvent>
+    <PostBuildEvent>xcopy /y  "$(TargetDir)ProceduralObjects.dll" "C:\Users\Simon\AppData\Local\Colossal Order\Cities_Skylines\Addons\Mods\ProceduralObjects"
+xcopy /y  "$(TargetDir)ProceduralObjects.dll" "C:\Program Files (x86)\Steam\steamapps\workshop\content\255710\1094334744"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

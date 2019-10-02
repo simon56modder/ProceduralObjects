@@ -14,7 +14,7 @@ namespace ProceduralObjects.Localization
             keys = new Dictionary<string, string>();
         }
 
-        public string identifier;
+        public string identifier, name;
         public Dictionary<string, string> keys;
 
         public void LoadFromFile(string path)
@@ -27,6 +27,8 @@ namespace ProceduralObjects.Localization
             {
                 if (lines[i].Contains("identifier = "))
                     identifier = lines[i].Replace("identifier = ", "");
+                else if (lines[i].Contains("locale_name = "))
+                    name = lines[i].Replace("locale_name = ", "");
                 else if (lines[i].Contains(" = "))
                 {
                     var kvp = lines[i].Split(new string[] { " = " }, StringSplitOptions.RemoveEmptyEntries);
@@ -43,7 +45,12 @@ namespace ProceduralObjects.Localization
                 if (key == "")
                     return "";
                 if (!keys.ContainsKey(key))
-                    return identifier.ToUpper() + ":NOTFOUND[" + key + "]";
+                {
+                    if (!LocalizationManager.instance.english.keys.ContainsKey(key))
+                        return identifier.ToUpper() + ":NOTFOUND[" + key + "]";
+                    else
+                        return LocalizationManager.instance.english.keys[key].Replace("\\n", "\n");
+                }
                 return keys[key].Replace("\\n", "\n");
             }
             set

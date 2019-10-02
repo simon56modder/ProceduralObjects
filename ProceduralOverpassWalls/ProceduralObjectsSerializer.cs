@@ -14,13 +14,13 @@ namespace ProceduralObjects
 {
     public class ProceduralObjectsSerializer : SerializableDataExtensionBase
     {
-        private readonly string dataKey = "ProceduralObjectsDataKey";
+        private readonly string dataKey = "ProceduralObjectsDataKey", layerKey = "ProceduralObjectsLayerData";
 
         public override void OnSaveData()
         {
             base.OnSaveData();
             Debug.Log("[ProceduralObjects] Data saving started.");
-            MemoryStream proceduralObjStream = new MemoryStream();
+            MemoryStream proceduralObjStream = new MemoryStream(), layerStream = new MemoryStream();
             if (ProceduralObjectsMod.gameLogicObject == null)
                 return;
             ProceduralObjectsLogic logic = ProceduralObjectsMod.gameLogicObject.GetComponent<ProceduralObjectsLogic>();
@@ -28,6 +28,7 @@ namespace ProceduralObjects
                 return;
             BinaryFormatter bFormatter = new BinaryFormatter();
             ProceduralObjectContainer[] dataContainer = logic.GetContainerList();
+            Layer[] layerContainer = logic.layerManager.m_layers.ToArray();
             try
             {
                 if (dataContainer != null)
@@ -49,15 +50,21 @@ namespace ProceduralObjects
                     }
                     Debug.Log("[ProceduralObjects] Data was serialized and saved. Saved " + dataContainer.Count() + " procedural objects.");
                 }
+                if (layerContainer != null)
+                {
+                    bFormatter.Serialize(layerStream, layerContainer);
+                    serializableDataManager.SaveData(layerKey, layerStream.ToArray());
+                } 
                 // logic.Refresh();
             }
             catch (Exception e)
             {
-                Debug.LogError("[ProceduralObjects] Data wasn't saved due to " + e.GetType().ToString() + " : \"" + e.Message + "\"");
+                Debug.LogError("[ProceduralObjects] Data failed to save completely due to " + e.GetType().ToString() + " : \"" + e.Message + "\"");
             }
             finally
             {
                 proceduralObjStream.Close();
+                layerStream.Close();
                 Debug.Log("[ProceduralObjects] Data saving ended.");
             }
         }
@@ -107,18 +114,45 @@ namespace ProceduralObjects
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError("[ProceduralObjects] Data wasn't loaded due to " + e.GetType().ToString() + " : \"" + e.Message + "\"");
+                    Debug.LogError("[ProceduralObjects] Data failed to load due to " + e.GetType().ToString() + " : \"" + e.Message + "\"");
                 }
                 finally
                 {
                     proceduralObjStream.Close();
-                    Debug.Log("[ProceduralObjects] Data loading ended.");
+                    Debug.Log("[ProceduralObjects] Objects data loading ended.");
                 }
             }
             else
             {
-                Debug.Log("[ProceduralObjects] No data was found to load!");
+                Debug.Log("[ProceduralObjects] No objects data was found to load!");
             }
+            byte[] layerData = serializableDataManager.LoadData(layerKey);
+            if (layerData != null)
+            {
+                MemoryStream layerStream = new MemoryStream();
+                layerStream.Write(layerData, 0, layerData.Length);
+                layerStream.Position = 0;
+                try
+                {
+                    Layer[] data = new BinaryFormatter().Deserialize(layerStream) as Layer[];
+                    if (data.Count() > 0)
+                    {
+                        ProceduralObjectsMod.tempLayerData = data;
+                        Debug.Log("[ProceduralObjects] Data Loading : transfered " + data.Count() + " Layer instances to ProceduralObjectsLogic.");
+                    }
+                    else
+                        Debug.LogWarning("[ProceduralObjects] No layer found while loading the map.");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError("[ProceduralObjects] Layer data failed to load due to " + e.GetType().ToString() + " : \"" + e.Message + "\"");
+                }
+                finally
+                {
+                    layerStream.Close();
+                }
+            }
+            Debug.Log("[ProceduralObjects] Data loading ended.");
         }
 
         private Dictionary<string, byte[]> SplitArray(byte[] sourceArray)
@@ -156,10 +190,12 @@ namespace ProceduralObjects
     [Serializable]
     public class ProceduralObjectContainer
     {
-        public int id;
+        public int id, tilingFactor;
+       // public byte meshStatus;
         public string basePrefabName, objectType, customTextureName;
         public float scale, renderDistance;
-        public bool hasCustomTexture, disableRecalculation;
+        public bool hasCustomTexture, disableRecalculation/*, flipFaces*/;
+        public uint layerId;
         public SerializableVector3 position;
         public SerializableQuaternion rotation;
         public SerializableVector3[] vertices;
@@ -172,20 +208,25 @@ namespace ProceduralObjects
             id = baseObject.id;
             basePrefabName = baseObject.basePrefabName;
             objectType = baseObject.baseInfoType;
+            // meshStatus = baseObject.meshStatus;
             renderDistance = baseObject.renderDistance;
             position = new SerializableVector3(baseObject.m_position);
             rotation = new SerializableQuaternion(baseObject.m_rotation);
             scale = 1f;
+           // if (meshStatus > 0)
             vertices = SerializableVector3.ToSerializableArray(baseObject.m_mesh.vertices);
             hasCustomTexture = baseObject.customTexture != null;
             visibility = baseObject.m_visibility;
             disableRecalculation = baseObject.disableRecalculation;
+            layerId = (baseObject.layer == null) ? 0 : baseObject.layer.m_id;
+         // flipFaces = baseObject.flipFaces;
+            tilingFactor = baseObject.tilingFactor;
             if (baseObject.m_textParameters != null)
             {
                 textParam = TextParameters.Clone(baseObject.m_textParameters, false);
                 for (int i = 0; i < textParam.Count(); i++)
                 {
-                    textParam[i].serializableColor = new SerializableQuaternion(textParam[i].m_fontColor);
+                    textParam[i].serializableColor = null;
                 }
             }
             if (hasCustomTexture == true)
@@ -232,12 +273,72 @@ namespace ProceduralObjects
             z = source.z;
             w = source.w;
         }
-        public SerializableQuaternion(Color source)
+    }
+
+    [Serializable]
+    public class SerializableColor
+    {
+        public float r, g, b, a;
+        public SerializableColor() { }
+        public SerializableColor(SerializableColor c)
         {
-            x = source.r;
-            y = source.g;
-            z = source.b;
-            w = source.a;
+            if (c == null)
+            {
+                this.r = 1f;
+                this.g = 1f;
+                this.b = 1f;
+                this.a = 1f;
+            }
+            else
+            {
+                this.r = c.r;
+                this.g = c.g;
+                this.b = c.b;
+                this.a = c.a;
+            }
         }
+        public SerializableColor(float r, float g, float b)
+        {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+            this.a = 1f;
+        }
+        public SerializableColor(float r, float g, float b, float a)
+        {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+            this.a = a;
+        }
+
+        public override string ToString()
+        {
+            return "(" + r + ", " + g + ", " + b + ", " + a + ")";
+        }
+        public static SerializableColor Parse(string s)
+        {
+            string[] str = s.Replace("RGBA", "").Replace("(", "").Replace(")", "").Split(new string[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
+            if (str.Length == 3)
+                return new SerializableColor(float.Parse(str[0]), float.Parse(str[1]), float.Parse(str[2]));
+            if (str.Length == 4)
+                return new SerializableColor(float.Parse(str[0]), float.Parse(str[1]), float.Parse(str[2]), float.Parse(str[3]));
+            return Color.white;
+        }
+
+        public static implicit operator Color(SerializableColor c)
+        {
+            return new Color(c.r, c.g, c.b, c.a);
+        }
+        public static implicit operator SerializableColor(Color c)
+        {
+            return new SerializableColor(c.r, c.g, c.b, c.a);
+        }
+
+        public static bool Different(SerializableColor A, SerializableColor B)
+        {
+            return A.a != B.a || A.r != B.r || A.g != B.g || A.b != B.b;
+        }
+
     }
 } 

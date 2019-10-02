@@ -9,6 +9,7 @@ namespace ProceduralObjects.Classes
 {
     public static class GUIUtils
     {
+        /*
         // From ModTools by BloodyPenguin 
         // https://github.com/bloodypenguin/Skylines-ModTools
 
@@ -42,6 +43,7 @@ namespace ProceduralObjects.Classes
 
             return (Q)field.GetValue(o);
         }
+         * */
         public static Rect ClampRectToScreen(Rect source)
         {
             var rect = new Rect(source);
@@ -76,6 +78,24 @@ namespace ProceduralObjects.Classes
         public static string GetStringAfter(this string source, string str)
         {
             return source.Substring(source.IndexOf(str) + str.Length);
+        }
+        public static Rect RectFromCorners(Vector2 topLeftCorner, Vector2 bottomRightCorner, bool fixInversed)
+        {
+            if (fixInversed)
+            {
+                if (bottomRightCorner.x >= topLeftCorner.x && bottomRightCorner.y >= topLeftCorner.y)
+                    return new Rect(topLeftCorner, new Vector2(bottomRightCorner.x - topLeftCorner.x, bottomRightCorner.y - topLeftCorner.y));
+
+                else if (bottomRightCorner.x < topLeftCorner.x && bottomRightCorner.y > topLeftCorner.y)
+                    return new Rect(bottomRightCorner.x, topLeftCorner.y, topLeftCorner.x - bottomRightCorner.x, bottomRightCorner.y - topLeftCorner.y);
+
+                else if (bottomRightCorner.x < topLeftCorner.x && bottomRightCorner.y < topLeftCorner.y)
+                    return new Rect(bottomRightCorner.x, bottomRightCorner.y, topLeftCorner.x - bottomRightCorner.x, topLeftCorner.y - bottomRightCorner.y);
+
+                else if (bottomRightCorner.x > topLeftCorner.x && bottomRightCorner.y < topLeftCorner.y)
+                    return new Rect(topLeftCorner.x, bottomRightCorner.y, bottomRightCorner.x - topLeftCorner.x, topLeftCorner.y - bottomRightCorner.y);
+            }
+            return new Rect(topLeftCorner, new Vector2(bottomRightCorner.x - topLeftCorner.x, bottomRightCorner.y - topLeftCorner.y));
         }
     }
 }

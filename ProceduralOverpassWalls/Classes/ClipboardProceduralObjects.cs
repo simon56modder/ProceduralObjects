@@ -78,7 +78,6 @@ namespace ProceduralObjects.Classes
             tw.Close();
         }
 
-
         public enum ClipboardType
         {
             Single,

@@ -5,6 +5,8 @@ using System.Text;
 using System.IO;
 using UnityEngine;
 
+using ProceduralObjects.Classes;
+
 namespace ProceduralObjects.ProceduralText
 {
     public class TextureFont
@@ -18,6 +20,7 @@ namespace ProceduralObjects.ProceduralText
             m_spaceWidth = spaceWidth;
             m_italicExists = false;
             m_boldExists = false;
+            m_stylesNames = null;
         }
         public TextureFont(string name, Texture2D texNormal, Texture2D texItalic, Texture2D texBold, uint spaceWidth)
         {
@@ -34,6 +37,7 @@ namespace ProceduralObjects.ProceduralText
             m_spaceWidth = spaceWidth;
             m_italicExists = true;
             m_boldExists = true;
+            m_stylesNames = null;
         }
 
         public void BuildFont()
@@ -41,58 +45,65 @@ namespace ProceduralObjects.ProceduralText
             if (m_textureNormal == null)
                 return;
             m_charTexturesNormal = new Dictionary<char, Texture2D>();
-            for (int i = 0; i < OrderedChars.Length; i++)
+            for (int i = 0; i < m_orderedChars.Length; i++)
             {
-                char c = OrderedChars[i];
+                char c = m_orderedChars[i];
                 m_charTexturesNormal[c] = GetCharInFont(c, m_textureNormal);
             }
             if (m_textureItalic != null && m_italicExists)
             {
                 m_charTexturesItalic = new Dictionary<char, Texture2D>();
-                for (int i = 0; i < OrderedChars.Length; i++)
+                for (int i = 0; i < m_orderedChars.Length; i++)
                 {
-                    char c = OrderedChars[i];
+                    char c = m_orderedChars[i];
                     m_charTexturesItalic[c] = GetCharInFont(c, m_textureItalic);
                 }
             }
             if (m_textureBold != null && m_boldExists)
             {
                 m_charTexturesBold = new Dictionary<char, Texture2D>();
-                for (int i = 0; i < OrderedChars.Length; i++)
+                for (int i = 0; i < m_orderedChars.Length; i++)
                 {
-                    char c = OrderedChars[i];
+                    char c = m_orderedChars[i];
                     m_charTexturesBold[c] = GetCharInFont(c, m_textureBold);
                 }
             }
         }
 
         public static readonly Color blank = new Color(0, 0, 0, 0);
-        public const string OrderedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzàáäåâãìíïîòóöøôõœèéëêùúü-ûð&ÿ'ñßç,!.?:0123456789+=%µ#§€$£;<>\"°@(){}/\\_*[]¤^²|~";
 
         public Dictionary<char, Texture2D> m_charTexturesNormal, m_charTexturesItalic, m_charTexturesBold;
         public Texture2D m_textureNormal, m_textureBold, m_textureItalic;
+        public string m_orderedChars;
         public string m_fontName;
+        public string[] m_stylesNames;
         public uint m_spaceWidth, m_defaultSpacing;
         public bool m_italicExists, m_boldExists, m_disableColorOverwriting;
         public Dictionary<Vector2, int> m_kerningNormal, m_kerningItalic, m_kerningBold;
 
-        public void PrintString(Texture2D originalTex, string str, FontStyle style, Vector2 position, uint spacing, uint size, Color fontColor, out int width, out int height, float scaleX = 1f, float scaleY = 1f)
+        public void PrintString(Texture2D originalTex, string str, FontStyle style, Vector2 position, uint spacing, uint size, Color fontColor, byte rotation, out int width, out int height, float scaleX = 1f, float scaleY = 1f)
         {
             var stringTex = GetString(str, style, spacing);
             if (size != 50 || scaleX != 1f || scaleY != 1f)
             {
                 TextureScale.Bilinear(stringTex, (int)((stringTex.width * size / 50) * scaleX), (int)(size * scaleY));
             }
+            if (rotation > 0)
+            {
+                for (byte b = 0; b <= rotation; b++)
+                    stringTex = TextureUtils.RotateRight(stringTex);
+            }
             width = stringTex.width;
             height = stringTex.height;
-            position.y = Mathf.Abs(position.y - originalTex.height) - stringTex.height;
+        //  position.y = Mathf.Abs(position.y - originalTex.height) - stringTex.height;
+            position.y = originalTex.height - position.y - height;
             for (int x = 0; x < stringTex.width; x++)
             {
                 if ((int)position.x + x < originalTex.width)
                 {
                     for (int y = 0; y < stringTex.height; y++)
                     {
-                        if ((int)position.y + y < originalTex.height)
+                        if ((int)position.y + y > 0)
                         {
                             Color stringColor = stringTex.GetPixel(x, y);
                             if (stringColor.a > 0)
@@ -100,7 +111,7 @@ namespace ProceduralObjects.ProceduralText
                                 if (!m_disableColorOverwriting)
                                     stringColor = new Color(fontColor.r, fontColor.g, fontColor.b, stringColor.a);
                                 if (stringColor.a < 1)
-                                    stringColor = AverageColor(originalTex.GetPixel((int)position.x + x, (int)position.y + y), stringColor);
+                                    stringColor = TextureUtils.AverageColor(originalTex.GetPixel((int)position.x + x, (int)position.y + y), stringColor);
 
                                 originalTex.SetPixel((int)position.x + x, (int)position.y + y, stringColor);
                             }
@@ -111,27 +122,13 @@ namespace ProceduralObjects.ProceduralText
             originalTex.Apply();
           //  return originalTex;
         }
-        private Texture2D PlainTexture(int width, int height, Color color)
-        {
-            var texture = new Texture2D(width, height);
-            Color[] resetColorArray = texture.GetPixels();
-
-            for (int i = 0; i < resetColorArray.Length; i++)
-            {
-                resetColorArray[i] = color;
-            }
-
-            texture.SetPixels(resetColorArray);
-            texture.Apply();
-            return texture;
-        }
         private int kerning(int i, string s, FontStyle style)
         {
             if (i == 0)
                 return 0;
-            if (!OrderedChars.Contains(s[i]) || !OrderedChars.Contains(s[i - 1]))
+            if (!m_orderedChars.Contains(s[i]) || !m_orderedChars.Contains(s[i - 1]))
                 return 0;
-            Vector2 chars = new Vector2(OrderedChars.IndexOf(s[i - 1]), OrderedChars.IndexOf(s[i]));
+            Vector2 chars = new Vector2(m_orderedChars.IndexOf(s[i - 1]), m_orderedChars.IndexOf(s[i]));
             if (style == FontStyle.Bold)
             {
                 if (m_kerningBold.ContainsKey(chars))
@@ -151,7 +148,7 @@ namespace ProceduralObjects.ProceduralText
         }
         public Texture2D GetString(string str, FontStyle style, uint spacing)
         {
-            var tex = PlainTexture(GetStringLength(str, style, spacing), 50, blank);
+            var tex = TextureUtils.PlainTexture(GetStringLength(str, style, spacing), 50, blank);
             int offsetX = 0;
             var charTextures = getStyleDictionary(style);
 
@@ -215,15 +212,15 @@ namespace ProceduralObjects.ProceduralText
         }
         private Texture2D GetCharInFont(char c, Texture2D font)
         {
-            if (!OrderedChars.Contains(c))
+            if (!m_orderedChars.Contains(c))
                 return null;
           //  int charPerLine = 10;
-            int index = OrderedChars.IndexOf(c);
+            int index = m_orderedChars.IndexOf(c);
             int line = Mathf.FloorToInt(index / 10);
             index %= 10;
             Texture2D charTex = new Texture2D(50, 50);
 
-            int savedStart = -1, savedEnd = -1;
+            int savedStart = -1, savedEnd = -1, heightDiff = font.height - 50;
 
             for (int x = 0; x < 50; x++)
             {
@@ -231,7 +228,7 @@ namespace ProceduralObjects.ProceduralText
                 {
                     for (int y = 0; y < 50; y++)
                     {
-                        Color color = font.GetPixel(index * 52 + x, y + 624 - (52 * line));
+                        Color color = font.GetPixel(index * 52 + x, y + heightDiff - (52 * line));
                         if (color.a > 0)
                         {
                             charTex.SetPixel(x, y, color);
@@ -246,7 +243,7 @@ namespace ProceduralObjects.ProceduralText
                     bool foundEnd = true;
                     for (int y = 0; y < 50; y++)
                     {
-                        Color color = font.GetPixel(index * 52 + x, y + 624 - (52 * line));
+                        Color color = font.GetPixel(index * 52 + x, y + heightDiff - (52 * line));
                         if (color.a > 0)
                         {
                             charTex.SetPixel(x, y, color);
@@ -267,7 +264,11 @@ namespace ProceduralObjects.ProceduralText
                 {
                     for (int x = 0; x < newTex.width; x++)
                     {
-                        newTex.SetPixel(x, y, charTex.GetPixel(x + savedStart, y));
+                        var color = charTex.GetPixel(x + savedStart, y);
+                        if (m_disableColorOverwriting)
+                            newTex.SetPixel(x, y, color);
+                        else
+                            newTex.SetPixel(x, y, new Color(1, 1, 1, color.a));
                     }
                 }
                 newTex.Apply();
@@ -290,13 +291,328 @@ namespace ProceduralObjects.ProceduralText
             return this.m_charTexturesNormal;
         }
 
-        private Color AverageColor(Color original, Color newColor)
+        public void ExportKerning(string excludedCharacters)
         {
-            return new Color(
-                ((original.r * (100 - (newColor.a * 100))) + (newColor.r * (newColor.a * 100))) / 100,
-                ((original.g * (100 - (newColor.a * 100))) + (newColor.g * (newColor.a * 100))) / 100,
-                ((original.b * (100 - (newColor.a * 100))) + (newColor.b * (newColor.a * 100))) / 100,
-                1);
+            List<int> excluded = new List<int>();
+            if (excludedCharacters.Trim() != "")
+            {
+                foreach (var str in excludedCharacters.Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries))
+                    excluded.Add(int.Parse(str));
+            }
+
+            CalculateNormalKerning(excluded);
+            if (m_italicExists)
+                CalculateItalicKerning(excluded);
+            if (m_boldExists)
+                CalculateBoldKerning(excluded);
+
+            if (File.Exists(ProceduralObjectsMod.TextureConfigPath + "KerningData_" + m_fontName + ".txt"))
+                File.Delete(ProceduralObjectsMod.TextureConfigPath + "KerningData_" + m_fontName + ".txt");
+
+            TextWriter tw = new StreamWriter(ProceduralObjectsMod.TextureConfigPath + "KerningData_" + m_fontName + ".txt");
+            for (int i = 0; i < m_orderedChars.Length; i++)
+            {
+                if (excluded.Contains(i))
+                    continue;
+
+                for (int j = 0; j < m_orderedChars.Length; j++)
+                {
+                    if (excluded.Contains(j))
+                        continue;
+                    var comb = new Vector2(i, j);
+                    if (m_italicExists && m_boldExists)
+                    {
+                        if (m_kerningBold[comb] == m_kerningNormal[comb] && m_kerningNormal[comb] == m_kerningItalic[comb])
+                        {
+                            if (m_kerningNormal[comb] != 0)
+                                tw.WriteLine("krngNormalItalicBold(" + i + "," + j + ") = " + m_kerningNormal[comb]);
+                        }
+                        else if (m_kerningNormal[comb] == m_kerningItalic[comb] && m_kerningBold[comb] != m_kerningNormal[comb])
+                        {
+                            if (m_kerningNormal[comb] != 0)
+                                tw.WriteLine("krngNormalItalic(" + i + "," + j + ") = " + m_kerningNormal[comb]);
+                            if (m_kerningBold[comb] != 0)
+                                tw.WriteLine("krngBold(" + i + "," + j + ") = " + m_kerningBold[comb]);
+                        }
+                        else if (m_kerningNormal[comb] == m_kerningBold[comb] && m_kerningItalic[comb] != m_kerningNormal[comb])
+                        {
+                            if (m_kerningNormal[comb] != 0)
+                                tw.WriteLine("krngNormalBold(" + i + "," + j + ") = " + m_kerningNormal[comb]);
+                            if (m_kerningItalic[comb] != 0)
+                                tw.WriteLine("krngItalic(" + i + "," + j + ") = " + m_kerningItalic[comb]);
+                        }
+                        else
+                        {
+                            if (m_kerningNormal[comb] != 0)
+                                tw.WriteLine("krngNormal(" + i + "," + j + ") = " + m_kerningNormal[comb]);
+                            if (m_kerningItalic[comb] != 0)
+                                tw.WriteLine("krngItalic(" + i + "," + j + ") = " + m_kerningItalic[comb]);
+                            if (m_kerningBold[comb] != 0)
+                                tw.WriteLine("krngBold(" + i + "," + j + ") = " + m_kerningBold[comb]);
+                        }
+                    }
+                    else
+                    {
+                        if (m_kerningNormal[comb] != 0)
+                            tw.WriteLine("krngNormal(" + i + "," + j + ") = " + m_kerningNormal[comb]);
+                    }
+                }
+            }
+            tw.Close();
+        }
+        private void CalculateNormalKerning(List<int> excluded)
+        {
+            m_kerningNormal = new Dictionary<Vector2, int>();
+            /*
+            if (m_boldExists)
+                m_kerningBold = new Dictionary<Vector2, int>();
+            if (m_italicExists)
+                m_kerningItalic = new Dictionary<Vector2, int>(); */
+
+            var normalSpacesBefore = new Dictionary<char, List<int>>();
+            var normalSpacesAfter = new Dictionary<char, List<int>>();
+            for (int i = 0; i < m_orderedChars.Length; i++)
+            {
+                if (excluded.Contains(i))
+                    continue;
+
+                char c = m_orderedChars[i];
+                var tex = m_charTexturesNormal[c];
+                normalSpacesBefore[c] = new List<int>();
+                normalSpacesAfter[c] = new List<int>();
+                int smallestY = -1, verticalSize = 0;
+                for (int y = 0; y < tex.height; y++)
+                {
+                    int spaceBef = -1;
+                    int spaceAf = 0;
+                    for (int x = 0; x < tex.width; x++)
+                    {
+                        if (tex.GetPixel(x, y).a > 0)
+                        {
+                            verticalSize = y;
+                            if (smallestY == -1)
+                                smallestY = y;
+                            if (spaceBef == -1)
+                                spaceBef = x;
+                            if (spaceAf < x)
+                                spaceAf = x;
+                        }
+                    }
+                    if (spaceBef == -1 && spaceAf == 0)
+                    {
+                        int space = tex.width / 2;
+                        normalSpacesBefore[c].Add(space);
+                        normalSpacesAfter[c].Add(tex.width - space);
+                    }
+                    else
+                    {
+                        normalSpacesBefore[c].Add(spaceBef);
+                        normalSpacesAfter[c].Add(tex.width - spaceAf);
+                    }
+                }
+                verticalSize = Mathf.Max(verticalSize, smallestY) - Mathf.Min(verticalSize, smallestY);
+
+                // fix thin characters being too tight (Before)
+                int deltaXBef = Mathf.Max(normalSpacesBefore[c].ToArray()) - Mathf.Min(normalSpacesBefore[c].ToArray());
+                int spaceSurplusBef = deltaXBef <= 5 ? (verticalSize >= 5 ? 3 : 2) : (deltaXBef <= 9 ? 1 : 0);
+                for (int y = 0; y < normalSpacesBefore[c].Count; y++)
+                    normalSpacesBefore[c][y] -= spaceSurplusBef;
+                // (after)
+                int deltaXAf = Mathf.Max(normalSpacesAfter[c].ToArray()) - Mathf.Min(normalSpacesAfter[c].ToArray());
+                int spaceSurplusAf = deltaXAf <= 5 ? (verticalSize >= 6 ? 3 : 2) : (deltaXAf <= 9 ? 1 : 0);
+                for (int y = 0; y < normalSpacesAfter[c].Count; y++)
+                    normalSpacesAfter[c][y] -= spaceSurplusAf;
+            }
+
+            for (int i = 0; i < m_orderedChars.Length; i++)
+            {
+                if (excluded.Contains(i))
+                    continue;
+                char c1 = m_orderedChars[i];
+                for (int j = 0; j < m_orderedChars.Length; j++)
+                {
+                    if (excluded.Contains(j))
+                        continue;
+                    char c2 = m_orderedChars[j];
+                    int space = m_charTexturesNormal[c1].width;
+                    for (int y = 0; y < normalSpacesAfter[c1].Count; y++)
+                    {
+                        int newSpace = normalSpacesAfter[c1][y] + normalSpacesBefore[c2][y];
+                        space = Mathf.Min(newSpace, space);
+                    }
+                    m_kerningNormal[new Vector2(i, j)] = Mathf.FloorToInt((float)space * (5f / 7f));
+                }
+            }
+        }
+        private void CalculateItalicKerning(List<int> excluded)
+        {
+            m_kerningItalic = new Dictionary<Vector2, int>();
+            /*
+            if (m_boldExists)
+                m_kerningBold = new Dictionary<Vector2, int>();
+            if (m_italicExists)
+                m_kerningItalic = new Dictionary<Vector2, int>(); */
+
+            var italicSpacesBefore = new Dictionary<char, List<int>>();
+            var italicSpacesAfter = new Dictionary<char, List<int>>();
+            for (int i = 0; i < m_orderedChars.Length; i++)
+            {
+                if (excluded.Contains(i))
+                    continue;
+
+                char c = m_orderedChars[i];
+                var tex = m_charTexturesItalic[c];
+                italicSpacesBefore[c] = new List<int>();
+                italicSpacesAfter[c] = new List<int>();
+                int smallestY = -1, verticalSize = 0;
+                for (int y = 0; y < tex.height; y++)
+                {
+                    int spaceBef = -1;
+                    int spaceAf = 0;
+                    for (int x = 0; x < tex.width; x++)
+                    {
+                        if (tex.GetPixel(x, y).a > 0)
+                        {
+                            verticalSize = y;
+                            if (smallestY == -1)
+                                smallestY = y;
+                            if (spaceBef == -1)
+                                spaceBef = x;
+                            if (spaceAf < x)
+                                spaceAf = x;
+                        }
+                    }
+                    if (spaceBef == -1 && spaceAf == 0)
+                    {
+                        int space = tex.width / 2;
+                        italicSpacesBefore[c].Add(space);
+                        italicSpacesAfter[c].Add(tex.width - space);
+                    }
+                    else
+                    {
+                        italicSpacesBefore[c].Add(spaceBef);
+                        italicSpacesAfter[c].Add(tex.width - spaceAf);
+                    }
+                }
+                verticalSize = Mathf.Max(verticalSize, smallestY) - Mathf.Min(verticalSize, smallestY);
+
+                // fix thin characters being too tight (Before)
+                int deltaXBef = Mathf.Max(italicSpacesBefore[c].ToArray()) - Mathf.Min(italicSpacesBefore[c].ToArray());
+                int spaceSurplusBef = deltaXBef <= 5 ? (verticalSize >= 5 ? 3 : 2) : (deltaXBef <= 9 ? 1 : 0);
+                for (int y = 0; y < italicSpacesBefore[c].Count; y++)
+                    italicSpacesBefore[c][y] -= spaceSurplusBef;
+                // (after)
+                int deltaXAf = Mathf.Max(italicSpacesAfter[c].ToArray()) - Mathf.Min(italicSpacesAfter[c].ToArray());
+                int spaceSurplusAf = deltaXAf <= 5 ? (verticalSize >= 6 ? 3 : 2) : (deltaXAf <= 9 ? 1 : 0);
+                for (int y = 0; y < italicSpacesAfter[c].Count; y++)
+                    italicSpacesAfter[c][y] -= spaceSurplusAf;
+            }
+
+            for (int i = 0; i < m_orderedChars.Length; i++)
+            {
+                if (excluded.Contains(i))
+                    continue;
+                char c1 = m_orderedChars[i];
+                for (int j = 0; j < m_orderedChars.Length; j++)
+                {
+                    if (excluded.Contains(j))
+                        continue;
+                    char c2 = m_orderedChars[j];
+                    int space = m_charTexturesItalic[c1].width;
+                    for (int y = 0; y < italicSpacesAfter[c1].Count; y++)
+                    {
+                        int newSpace = italicSpacesAfter[c1][y] + italicSpacesBefore[c2][y];
+                        space = Mathf.Min(newSpace, space);
+                    }
+                    space = Mathf.FloorToInt((float)space * (5f / 7f));
+                    m_kerningItalic[new Vector2(i, j)] = space;
+                }
+            }
+        }
+        private void CalculateBoldKerning(List<int> excluded)
+        {
+            m_kerningBold = new Dictionary<Vector2, int>();
+            /*
+            if (m_boldExists)
+                m_kerningBold = new Dictionary<Vector2, int>();
+            if (m_italicExists)
+                m_kerningItalic = new Dictionary<Vector2, int>(); */
+
+            var boldSpacesBefore = new Dictionary<char, List<int>>();
+            var boldSpacesAfter = new Dictionary<char, List<int>>();
+            for (int i = 0; i < m_orderedChars.Length; i++)
+            {
+                if (excluded.Contains(i))
+                    continue;
+
+                char c = m_orderedChars[i];
+                var tex = m_charTexturesBold[c];
+                boldSpacesBefore[c] = new List<int>();
+                boldSpacesAfter[c] = new List<int>();
+                int smallestY = -1, verticalSize = 0;
+                for (int y = 0; y < tex.height; y++)
+                {
+                    int spaceBef = -1;
+                    int spaceAf = 0;
+                    for (int x = 0; x < tex.width; x++)
+                    {
+                        if (tex.GetPixel(x, y).a > 0)
+                        {
+                            verticalSize = y;
+                            if (smallestY == -1)
+                                smallestY = y;
+                            if (spaceBef == -1)
+                                spaceBef = x;
+                            if (spaceAf < x)
+                                spaceAf = x;
+                        }
+                    }
+                    if (spaceBef == -1 && spaceAf == 0)
+                    {
+                        int space = tex.width / 2;
+                        boldSpacesBefore[c].Add(space);
+                        boldSpacesAfter[c].Add(tex.width - space);
+                    }
+                    else
+                    {
+                        boldSpacesBefore[c].Add(spaceBef);
+                        boldSpacesAfter[c].Add(tex.width - spaceAf);
+                    }
+                }
+                verticalSize = Mathf.Max(verticalSize, smallestY) - Mathf.Min(verticalSize, smallestY);
+
+                // fix thin characters being too tight (Before)
+                int deltaXBef = Mathf.Max(boldSpacesBefore[c].ToArray()) - Mathf.Min(boldSpacesBefore[c].ToArray());
+                int spaceSurplusBef = deltaXBef <= 5 ? (verticalSize >= 5 ? 3 : 2) : (deltaXBef <= 9 ? 1 : 0);
+                for (int y = 0; y < boldSpacesBefore[c].Count; y++)
+                    boldSpacesBefore[c][y] -= spaceSurplusBef;
+                // (after)
+                int deltaXAf = Mathf.Max(boldSpacesAfter[c].ToArray()) - Mathf.Min(boldSpacesAfter[c].ToArray());
+                int spaceSurplusAf = deltaXAf <= 5 ? (verticalSize >= 6 ? 3 : 2) : (deltaXAf <= 9 ? 1 : 0);
+                for (int y = 0; y < boldSpacesAfter[c].Count; y++)
+                    boldSpacesAfter[c][y] -= spaceSurplusAf;
+            }
+
+            for (int i = 0; i < m_orderedChars.Length; i++)
+            {
+                if (excluded.Contains(i))
+                    continue;
+                char c1 = m_orderedChars[i];
+                for (int j = 0; j < m_orderedChars.Length; j++)
+                {
+                    if (excluded.Contains(j))
+                        continue;
+                    char c2 = m_orderedChars[j];
+                    int space = m_charTexturesBold[c1].width;
+                    for (int y = 0; y < boldSpacesAfter[c1].Count; y++)
+                    {
+                        int newSpace = boldSpacesAfter[c1][y] + boldSpacesBefore[c2][y];
+                        space = Mathf.Min(newSpace, space);
+                    }
+                    space = Mathf.FloorToInt((float)space * (5f / 7f));
+                    m_kerningBold[new Vector2(i, j)] = space;
+                }
+            }
         }
     }
 }

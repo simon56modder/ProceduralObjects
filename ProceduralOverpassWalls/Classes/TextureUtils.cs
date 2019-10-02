@@ -113,14 +113,88 @@ namespace ProceduralObjects.Classes
             return texture2D;
         }
 
-        public static Color ParseColor(this string s)
+        public static Texture2D RotateRight(Texture2D originalTexture)
         {
-            string[] str = s.Replace("RGBA", "").Replace("(", "").Replace(")", "").Split(new string[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
-            if (str.Length == 3)
-                return new Color(float.Parse(str[0]), float.Parse(str[1]), float.Parse(str[2]));
-            if (str.Length == 4)
-                return new Color(float.Parse(str[0]), float.Parse(str[1]), float.Parse(str[2]), float.Parse(str[3]));
-            return Color.white;
+            Color32[] original = originalTexture.GetPixels32();
+            Color32[] rotated = new Color32[original.Length];
+            int w = originalTexture.width;
+            int h = originalTexture.height;
+
+           // int iRotated, iOriginal;
+
+            for (int j = 0; j < h; ++j)
+            {
+                for (int i = 0; i < w; ++i)
+                {
+                    rotated[(i + 1) * h - j - 1] = original[original.Length - 1 - (j * w + i)];
+                }
+            }
+
+            Texture2D rotatedTexture = new Texture2D(h, w);
+            rotatedTexture.SetPixels32(rotated);
+            rotatedTexture.Apply();
+            return rotatedTexture;
+        }
+
+        public static Texture2D PlainTexture(int width, int height, Color color)
+        {
+            var texture = new Texture2D(width, height);
+            Color[] resetColorArray = texture.GetPixels();
+
+            for (int i = 0; i < resetColorArray.Length; i++)
+            {
+                resetColorArray[i] = color;
+            }
+
+            texture.SetPixels(resetColorArray);
+            texture.Apply();
+            return texture;
+        }
+
+        public static void PrintRectangle(Texture2D originalTex, int x, int y, int width, int height, Color color)
+        {
+            var oldY = y;
+            y = originalTex.height - y - height;
+            for (int i = 1; i <= width; i++)
+            {
+                if (i + x < originalTex.width)
+                {
+                    for (int j = 1; j <= height; j++)
+                    {
+                        if (y + j >= 0)
+                        {
+                            /*
+                            if (haveBorder)
+                            {
+                                bool isLeftBorder = (i >= bDistance && i < bDistance + bWidth) && (j <= originalTex.height - bDistance && j >= bDistance);
+                                bool isRightBorder = (i > originalTex.width - bDistance - bWidth && i <= originalTex.width - bDistance) && (j <= originalTex.height - bDistance && j >= bDistance);
+                                bool isTopBorder = (j >= bDistance && j < bDistance + bWidth) && (i <= originalTex.width - bDistance && i >= bDistance);
+                                bool isBottomBorder = (j > originalTex.height - bDistance - bWidth && j <= originalTex.height - bDistance) && (i <= originalTex.width - bDistance && i >= bDistance);
+                                if (isLeftBorder || isRightBorder || isTopBorder || isBottomBorder)
+                                {
+                                    float alpha = color.a;
+                                    color = bColor;
+                                    color.a = alpha;
+                                }
+                            } */
+                            if (color.a < 1)
+                                originalTex.SetPixel(i + x, j + y, AverageColor(originalTex.GetPixel(i + x, j + y), color));
+                            else
+                                originalTex.SetPixel(i + x, j + y, color);
+                        }
+                    }
+                }
+            }
+            originalTex.Apply();
+        }
+
+        public static Color AverageColor(Color original, Color newColor)
+        {
+            return new Color(
+                ((original.r * (100 - (newColor.a * 100))) + (newColor.r * (newColor.a * 100))) / 100,
+                ((original.g * (100 - (newColor.a * 100))) + (newColor.g * (newColor.a * 100))) / 100,
+                ((original.b * (100 - (newColor.a * 100))) + (newColor.b * (newColor.a * 100))) / 100,
+                1);
         }
     }
     public class TextureResourceInfo

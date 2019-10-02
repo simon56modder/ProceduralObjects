@@ -33,110 +33,115 @@ namespace ProceduralObjects
         }
         void Update()
         {
-            if (useRegion && showUI && !settingMainVertex && selectedDependencyGroup != null)
+            if (ProceduralObjectsMod.ShowDeveloperTools.value)
             {
-                if (Input.GetMouseButton(0))
+                if (useRegion && showUI && !settingMainVertex && selectedDependencyGroup != null)
                 {
-                    if (!clickingRegion)
+                    if (Input.GetMouseButton(0))
                     {
-                        topLeftRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
-                        clickingRegion = true;
-                    }
-                    else
-                        bottomRightRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
-                }
-                else if (clickingRegion)
-                {
-                    bottomRightRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
-                    Rect region = CreateRectFromVector2s(topLeftRegion, bottomRightRegion);
-                    clickingRegion = false;
-                    foreach (Vertex vertex in allVertices.Where(v => !v.IsDependent))
-                    {
-                        if (!DependencyGroup.AlreadyBelongsToAGroup(vertex, dependencyGroups, true, selectedDependencyGroup) && !lockedVertices.Contains(vertex))
+                        if (!clickingRegion)
                         {
-                            if (Input.GetKey(KeyCode.LeftShift))
+                            topLeftRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
+                            clickingRegion = true;
+                        }
+                        else
+                            bottomRightRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
+                    }
+                    else if (clickingRegion)
+                    {
+                        bottomRightRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
+                        Rect region = CreateRectFromVector2s(topLeftRegion, bottomRightRegion);
+                        clickingRegion = false;
+                        foreach (Vertex vertex in allVertices.Where(v => !v.IsDependent))
+                        {
+                            if (!DependencyGroup.AlreadyBelongsToAGroup(vertex, dependencyGroups, true, selectedDependencyGroup) && !lockedVertices.Contains(vertex))
                             {
-                                if ((selectedDependencyGroup.mainVertex != vertex) && selectedDependencyGroup.subVertices.Contains(vertex))
+                                if (Input.GetKey(KeyCode.LeftShift))
                                 {
-                                    if (region.Contains((vertex.Position + levelVector).WorldToGuiPoint()))
-                                        selectedDependencyGroup.subVertices.Remove(vertex);
+                                    if ((selectedDependencyGroup.mainVertex != vertex) && selectedDependencyGroup.subVertices.Contains(vertex))
+                                    {
+                                        if (region.Contains((vertex.Position + levelVector).WorldToGuiPoint()))
+                                            selectedDependencyGroup.subVertices.Remove(vertex);
+                                    }
                                 }
-                            }
-                            else
-                            {
-                                if ((selectedDependencyGroup.mainVertex != vertex) && !selectedDependencyGroup.subVertices.Contains(vertex))
+                                else
                                 {
-                                    if (region.Contains((vertex.Position + levelVector).WorldToGuiPoint()))
-                                        selectedDependencyGroup.subVertices.Add(vertex);
+                                    if ((selectedDependencyGroup.mainVertex != vertex) && !selectedDependencyGroup.subVertices.Contains(vertex))
+                                    {
+                                        if (region.Contains((vertex.Position + levelVector).WorldToGuiPoint()))
+                                            selectedDependencyGroup.subVertices.Add(vertex);
+                                    }
                                 }
                             }
                         }
-                    } 
+                    }
                 }
             }
         }
         void OnGUI()
         {
-            if (clickingRegion && useRegion)
-                GUI.Box(CreateRectFromVector2s(topLeftRegion, bottomRightRegion), "");
-            if (!showUI)
+            if (ProceduralObjectsMod.ShowDeveloperTools.value)
             {
-                if (GUI.Button(new Rect(Screen.width - 200, 60, 195, 30), "Procedural Obj Helper"))
+                if (clickingRegion && useRegion)
+                    GUI.Box(CreateRectFromVector2s(topLeftRegion, bottomRightRegion), "");
+                if (!showUI)
                 {
-                    try
+                    if (GUI.Button(new Rect(Screen.width - 200, 60, 195, 30), "Procedural Obj Helper"))
                     {
-                        if (ToolsModifierControl.toolController.m_editPrefabInfo.GetType() == typeof(PropInfo))
+                        try
                         {
-                            editingType = "PROP";
-                            editingProp = ToolsModifierControl.toolController.m_editPrefabInfo as PropInfo;
-                            allVertices = Vertex.CreateVertexList(editingProp);
-                            showUI = true;
-                        }
-                        else if (ToolsModifierControl.toolController.m_editPrefabInfo.GetType() == typeof(BuildingInfo))
-                        {
-                            editingType = "BUILDING";
-                            editingBuilding = ToolsModifierControl.toolController.m_editPrefabInfo as BuildingInfo;
-                            allVertices = Vertex.CreateVertexList(editingBuilding);
-                            showUI = true;
-                        }
-                    }
-                    catch { }
-                }
-            }
-            else
-            {
-                window = GUI.Window(this.GetInstanceID(), window, DrawWindow, "Procedural Objects Asset Creator Helper");
-                if (settingMainVertex)
-                {
-                    #region when user is Setting the MAIN VERTEX
-                    foreach (Vertex vertex in allVertices.Where(v => !v.IsDependent))
-                    {
-                        if (!DependencyGroup.AlreadyBelongsToAGroup(vertex, dependencyGroups, true, selectedDependencyGroup) && !lockedVertices.Contains(vertex))
-                        {
-                            if (selectedDependencyGroup.mainVertex != vertex)
+                            if (ToolsModifierControl.toolController.m_editPrefabInfo.GetType() == typeof(PropInfo))
                             {
-                                if (GUI.Button(new Rect((vertex.Position + levelVector).WorldToGuiPoint() + new Vector2(-11, -11), new Vector2(23, 22)), "<size=20>+</size>"))
+                                editingType = "PROP";
+                                editingProp = ToolsModifierControl.toolController.m_editPrefabInfo as PropInfo;
+                                allVertices = Vertex.CreateVertexList(editingProp);
+                                showUI = true;
+                            }
+                            else if (ToolsModifierControl.toolController.m_editPrefabInfo.GetType() == typeof(BuildingInfo))
+                            {
+                                editingType = "BUILDING";
+                                editingBuilding = ToolsModifierControl.toolController.m_editPrefabInfo as BuildingInfo;
+                                allVertices = Vertex.CreateVertexList(editingBuilding);
+                                showUI = true;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                else
+                {
+                    window = GUI.Window(this.GetInstanceID(), window, DrawWindow, "Procedural Objects Asset Creator Helper");
+                    if (settingMainVertex)
+                    {
+                        #region when user is Setting the MAIN VERTEX
+                        foreach (Vertex vertex in allVertices.Where(v => !v.IsDependent))
+                        {
+                            if (!DependencyGroup.AlreadyBelongsToAGroup(vertex, dependencyGroups, true, selectedDependencyGroup) && !lockedVertices.Contains(vertex))
+                            {
+                                if (selectedDependencyGroup.mainVertex != vertex)
                                 {
-                                    if (selectedDependencyGroup.subVertices.Contains(vertex))
+                                    if (GUI.Button(new Rect((vertex.Position + levelVector).WorldToGuiPoint() + new Vector2(-11, -11), new Vector2(23, 22)), "<size=20>+</size>"))
                                     {
-                                        selectedDependencyGroup.subVertices.Add(selectedDependencyGroup.mainVertex);
-                                        selectedDependencyGroup.mainVertex = vertex;
-                                        selectedDependencyGroup.subVertices.Remove(vertex);
-                                        settingMainVertex = false;
-                                    }
-                                    else
-                                    {
-                                        selectedDependencyGroup.mainVertex = vertex;
-                                        settingMainVertex = false;
+                                        if (selectedDependencyGroup.subVertices.Contains(vertex))
+                                        {
+                                            selectedDependencyGroup.subVertices.Add(selectedDependencyGroup.mainVertex);
+                                            selectedDependencyGroup.mainVertex = vertex;
+                                            selectedDependencyGroup.subVertices.Remove(vertex);
+                                            settingMainVertex = false;
+                                        }
+                                        else
+                                        {
+                                            selectedDependencyGroup.mainVertex = vertex;
+                                            settingMainVertex = false;
+                                        }
                                     }
                                 }
                             }
                         }
+                        #endregion
                     }
-                    #endregion
-                }
-                else if (selectedDependencyGroup != null)
-                {
+                    else if (selectedDependencyGroup != null)
+                    {
                         #region vertex edit tool
                         foreach (Vertex vertex in allVertices.Where(v => !v.IsDependent))
                         {
@@ -167,9 +172,9 @@ namespace ProceduralObjects
                             }
                         }
                         #endregion
+                    }
                 }
             }
-
         }
         public void DrawWindow(int id)
         {

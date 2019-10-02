@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Text.RegularExpressions;
 using ColossalFramework.PlatformServices;
 using System.IO;
 using UnityEngine;
@@ -85,13 +85,15 @@ namespace ProceduralObjects.ProceduralText
             string dir = Path.GetDirectoryName(infoFilePath);
 
             string[] lines = File.ReadAllLines(infoFilePath);
-            string name = "", normal = "", italic = "", bold = "";
+            string name = "", normal = "", italic = "", bold = "", orderedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzàáäåâãìíïîòóöøôõœèéëêùúü-ûð&ÿ'ñßç,!.?:0123456789+=%µ#§€$£;<>\"°@(){}/\\_*[]¤^²|~";
             uint spaceWidth = 0, defaultSpacing = 2;
             bool disableOverwriting = false;
             var kerningNormal = new Dictionary<Vector2, int>();
             var kerningItalic = new Dictionary<Vector2, int>();
             var kerningBold = new Dictionary<Vector2, int>();
-            for (int i = 0; i < lines.Count(); i++)
+            string[] stylesNames = null;
+
+            for (int i = 0; i < lines.Length; i++)
             {
                 if (lines[i].Contains("name = "))
                     name = lines[i].Replace("name = ", "");
@@ -105,6 +107,20 @@ namespace ProceduralObjects.ProceduralText
                     spaceWidth = uint.Parse(lines[i].Replace("spaceWidth = ", "").Trim());
                 else if (lines[i].Contains("defaultSpacing = "))
                     defaultSpacing = uint.Parse(lines[i].Replace("defaultSpacing = ", "").Trim());
+                else if (lines[i].Contains("characters = "))
+                {
+                    orderedChars = "";
+                    var charUnicodes = lines[i].Replace("characters = ", "").Trim().Split(new string[] { ";" }, StringSplitOptions.RemoveEmptyEntries);
+                    for (int j = 0; j < charUnicodes.Length; j++)
+                    {
+                        orderedChars += "\\u" + charUnicodes[j];
+                    }
+                    orderedChars = Regex.Unescape(orderedChars);
+                }
+                else if (lines[i].Contains("stylesNames = "))
+                {
+                    stylesNames = lines[i].GetStringAfter(" = ").Split(new string[] { ",", ";" }, StringSplitOptions.RemoveEmptyEntries);
+                }
                 else if (lines[i].Contains("krng"))
                 {
                     // kerning
@@ -112,7 +128,7 @@ namespace ProceduralObjects.ProceduralText
                     Vector2 charIndexes = new Vector2(int.Parse(chars[0]), int.Parse(chars[1]));
                     if (lines[i].Contains("krngNormal("))
                         kerningNormal[charIndexes] = int.Parse(lines[i].GetStringAfter(" = "));
-                    else if (lines[i].Contains("krngItalic(")) 
+                    else if (lines[i].Contains("krngItalic("))
                         kerningItalic[charIndexes] = int.Parse(lines[i].GetStringAfter(" = "));
                     else if (lines[i].Contains("krngBold("))
                         kerningBold[charIndexes] = int.Parse(lines[i].GetStringAfter(" = "));
@@ -138,14 +154,14 @@ namespace ProceduralObjects.ProceduralText
             }
             if (normal == "")
             {
-                Debug.LogError("[ProceduralObjects] Font error : No normal style found for a font, couldn't create it.");
+                Debug.LogError("[ProceduralObjects] Font error : No normal style specified for a font, couldn't create it. Occured at path " + infoFilePath);
                 return;
             }
             Texture2D normaltex = null, italictex = null, boldtex = null;
             string normalpath = Path.Combine(dir, normal) + ".png";
             if (!File.Exists(normalpath))
             {
-                Debug.LogError("[ProceduralObjects] Font error : Normal style for a font not found, couldn't create it.");
+                Debug.LogError("[ProceduralObjects] Font error : Normal style for a font does not exist at the specified path, couldn't create it. Occured at path " + infoFilePath);
                 return;
             }
             else
@@ -171,12 +187,14 @@ namespace ProceduralObjects.ProceduralText
                 font = new TextureFont(name, normaltex, italictex, boldtex, spaceWidth);
             else
                 font = new TextureFont(name, normaltex, spaceWidth);
-            font.BuildFont();
+            font.m_orderedChars = orderedChars;
             font.m_disableColorOverwriting = disableOverwriting;
+            font.BuildFont();
             font.m_defaultSpacing = defaultSpacing;
             font.m_kerningNormal = kerningNormal;
             font.m_kerningItalic = kerningItalic;
             font.m_kerningBold = kerningBold;
+            font.m_stylesNames = stylesNames;
             m_fonts.Add(font);
         }
     }
