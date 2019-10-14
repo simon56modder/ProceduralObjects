@@ -21,6 +21,7 @@ namespace ProceduralObjects
     public class ProceduralObjectsLogic : MonoBehaviour
     {
         public List<ProceduralObject> proceduralObjects, pObjSelection, alignHeightObj;
+        public HashSet<int> activeIds;
         public ProceduralObject currentlyEditingObject;
         public List<ProceduralInfo> availableProceduralInfos;
         public ProceduralInfo chosenProceduralInfo = null;
@@ -142,6 +143,7 @@ namespace ProceduralObjects
             else
             {
                 proceduralObjects = new List<ProceduralObject>();
+                activeIds = new HashSet<int>();
             }
             var cursors = Resources.FindObjectsOfTypeAll<CursorInfo>();
             ProceduralTool.buildCursor = cursors.First(cursor => cursor.name == "Building Placement");
@@ -1435,6 +1437,7 @@ namespace ProceduralObjects
                                                     {
                                                         proceduralObjects.Remove(obj);
                                                         pObjSelection.Remove(obj);
+                                                        activeIds.Remove(obj.id);
                                                         hoveredObj = null;
                                                     });
                                                 }
@@ -1518,6 +1521,7 @@ namespace ProceduralObjects
                                                         for (int i = 0; i < pObjSelection.Count; i++)
                                                         {
                                                             proceduralObjects.Remove(pObjSelection[i]);
+                                                            activeIds.Remove(pObjSelection[i].id);
                                                             // Object.Destroy(pObjSelection[i].gameObject);
                                                         }
                                                         pObjSelection.Clear();
@@ -2718,6 +2722,7 @@ namespace ProceduralObjects
                 textManager.CloseWindow();
                 advEdManager = null;
                 proceduralObjects.Remove(currentlyEditingObject);
+                activeIds.Remove(currentlyEditingObject.id);
                 //  Object.Destroy(currentlyEditingObject.gameObject);
                 SetCurrentlyEditingObj(null);
                 Gizmos.DestroyGizmo();
