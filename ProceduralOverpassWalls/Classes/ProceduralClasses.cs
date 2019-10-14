@@ -457,19 +457,15 @@ namespace ProceduralObjects.Classes
     {
         public static int GetNextUnusedId(this List<ProceduralObject> list)
         {
+            ProceduralObjectsLogic logic = ProceduralObjectsMod.gameLogicObject.GetComponent<ProceduralObjectsLogic>();
             for (int i = 0; true; i++)
             {
-                if (list.GetObjectWithId(i) == null)
+                if (!logic.activeIds.Contains(i))
+                {
+                    logic.activeIds.Add(i);
                     return i;
+                }
             }
-        }
-        public static ProceduralObject GetObjectWithId(this List<ProceduralObject> list, int id)
-        {
-            if (list.Any(po => po.id == id))
-            {
-                return list.FirstOrDefault(po => po.id == id);
-            }
-            return null;
         }
         public static Vector2 WorldToGuiPoint(this Vector3 position)
         {
@@ -515,6 +511,7 @@ namespace ProceduralObjects.Classes
         public static void LoadContainerData(this ProceduralObjectsLogic logic, ProceduralObjectContainer[] containerArray)
         {
             logic.proceduralObjects = new List<ProceduralObject>();
+            logic.activeIds = new HashSet<int>();
             if (logic.availableProceduralInfos == null)
                 logic.availableProceduralInfos = CreateProceduralInfosList();
             if (logic.availableProceduralInfos.Count < 0 )
@@ -535,6 +532,7 @@ namespace ProceduralObjects.Classes
                         obj.m_mesh.RecalculateBounds();
                     }
                     logic.proceduralObjects.Add(obj);
+                    logic.activeIds.Add(obj.id);
                 }
                 catch (Exception e)
                 {
