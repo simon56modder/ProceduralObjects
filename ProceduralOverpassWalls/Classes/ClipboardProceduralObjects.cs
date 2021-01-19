@@ -52,12 +52,19 @@ namespace ProceduralObjects.Classes
                 tw.WriteLine("{");
                 tw.WriteLine("baseInfoType = " + kvp.Key.baseInfoType);
                 tw.WriteLine("basePrefabName = " + kvp.Key.basePrefabName);
-                tw.WriteLine("relativePosition = " + kvp.Value.ToString());
+                tw.WriteLine("relativePosition = " + kvp.Value.ToStringUnrounded());
                 tw.WriteLine("isPloppableAsphalt = " + kvp.Key.isPloppableAsphalt.ToString());
                 //  tw.WriteLine("scale = " + pobj.scale.ToString());
                 tw.WriteLine("customTexture = " + ((kvp.Key.customTexture == null) ? "null" : kvp.Key.customTexture.name));
                 tw.WriteLine("renderDistance = " + kvp.Key.renderDistance.ToString());
-                tw.WriteLine("rotation = " + kvp.Key.m_rotation.ToString());
+                tw.WriteLine("rotation = " + kvp.Key.m_rotation.ToStringUnrounded());
+                tw.WriteLine("disableRecalculation = " + kvp.Key.disableRecalculation.ToString());
+                if (kvp.Key.tilingFactor != 8)
+                    tw.WriteLine("tilingFactor = " + kvp.Key.tilingFactor.ToString());
+                tw.WriteLine("color = " + ((SerializableColor)kvp.Key.m_color).ToString());
+                tw.WriteLine("flipFaces = " + kvp.Key.flipFaces.ToString());
+                tw.WriteLine("normalsRecalc = " + kvp.Key.normalsRecalculation.ToString());
+                tw.WriteLine("visibility = " + kvp.Key.visibility.ToString());
                 if (kvp.Key.textParam != null)
                 {
                     if (kvp.Key.textParam.Count() > 0)
@@ -68,10 +75,20 @@ namespace ProceduralObjects.Classes
                         }
                     }
                 }
-                tw.WriteLine("VERTICES " + kvp.Key.allVertices.Count());
-                for (int i = 0; i < kvp.Key.allVertices.Count(); i++)
+                if (kvp.Key.modules != null)
                 {
-                    tw.WriteLine("vertex " + i.ToString() + " = " + kvp.Key.allVertices[i].ToString());
+                    if (kvp.Key.modules.Count > 0)
+                        ModuleManager.WriteModules(tw, kvp.Key.modules, false);
+                }
+                if (kvp.Key.meshStatus == 1)
+                    tw.WriteLine("ORIGINALMODEL");
+                else
+                {
+                    tw.WriteLine("VERTICES " + kvp.Key.allVertices.Count());
+                    for (int i = 0; i < kvp.Key.allVertices.Count(); i++)
+                    {
+                        tw.WriteLine("vertex " + i.ToString() + " = " + kvp.Key.allVertices[i].ToStringUnrounded());
+                    }
                 }
                 tw.WriteLine("}");
             }

@@ -7,7 +7,7 @@ using UnityEngine;
 using ColossalFramework;
 using ColossalFramework.UI;
 
-namespace ProceduralObjects.Classes
+namespace ProceduralObjects.UI
 {
     public class ProceduralObjectsButton : UIButton
     {
@@ -22,7 +22,6 @@ namespace ProceduralObjects.Classes
             {
                 Debug.Log("Found component of type " + comp.GetType().ToString() + " named " + comp.name + " (cache name : " + comp.cachedName + ")");
             } */
-
             text = "Procedural Objects";
             width = 180;
             height = 30;

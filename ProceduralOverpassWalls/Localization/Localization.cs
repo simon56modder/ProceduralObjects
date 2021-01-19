@@ -70,5 +70,21 @@ namespace ProceduralObjects.Localization
             }
             return this["visibility_always"];
         }
+
+        public string normalsRecalcString(NormalsRecalculation recalc)
+        {
+            string s = this["normalsRecalc"] + " : ";
+            if (recalc == NormalsRecalculation.None)
+                s += this["normalsRecalc_none"];
+            else if (recalc == NormalsRecalculation.Default)
+                s += this["normalsRecalc_def"];
+            else if (recalc == NormalsRecalculation.Tolerance0)
+                s += string.Format(this["normalsRecalc_degTolerance"], "0");
+            else if (recalc == NormalsRecalculation.Tolerance30)
+                s += string.Format(this["normalsRecalc_degTolerance"], "30");
+            else if (recalc == NormalsRecalculation.Tolerance60)
+                s += string.Format(this["normalsRecalc_degTolerance"], "60");
+            return s;
+        }
     }
 }

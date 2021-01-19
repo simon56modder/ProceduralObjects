@@ -5,6 +5,7 @@ using UnityEngine.Rendering;
 using UnityEngine;
 
 using ProceduralObjects.Classes;
+using ProceduralObjects.UI;
 
 namespace ProceduralObjects
 {
@@ -110,7 +111,7 @@ namespace ProceduralObjects
                 }
                 else
                 {
-                    window = GUI.Window(this.GetInstanceID(), window, DrawWindow, "Procedural Objects Asset Creator Helper");
+                    window = GUIUtils.Window(this.GetInstanceID(), window, DrawWindow, "Procedural Objects Asset Creator Helper");
                     if (settingMainVertex)
                     {
                         #region when user is Setting the MAIN VERTEX
@@ -179,7 +180,7 @@ namespace ProceduralObjects
         public void DrawWindow(int id)
         {
             GUI.DragWindow(new Rect(0, 0, 348, 28));
-            if (GUI.Button(new Rect(356, 3, 30, 30), "X"))
+            if (GUIUtils.CloseHelpButtons(window, "Asset_Creator_Helper"))
             {
                 showUI = false;
                 editingType = string.Empty;

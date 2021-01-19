@@ -33,12 +33,21 @@ namespace ProceduralObjects
         }
 
 
-        public const string VERSION = "1.6";
-        public const string DOCUMENTATION_URL = "http://proceduralobjects.shoutwiki.com/wiki/Main_Page";
-        public const string OTHER_SETTINGS_FILENAME = "ProceduralObjectsSettings";
+        public static readonly string VERSION = "1.7";
+        public static readonly string DOCUMENTATION_URL = "http://proceduralobjects.shoutwiki.com/wiki/";
+        public static readonly string OTHER_SETTINGS_FILENAME = "ProceduralObjectsSettings";
 
 
-        public static string TextureConfigPath
+        public static string PODirectoryPath
+        {
+            get
+            {
+                if (IsLinux)
+                    return DataLocation.localApplicationData + @"/ProceduralObjects/";
+                return DataLocation.localApplicationData + @"\ProceduralObjects\";
+            }
+        }
+        public static string OldTextureConfigPath
         {
             get
             {
@@ -47,7 +56,34 @@ namespace ProceduralObjects
                 return DataLocation.localApplicationData + @"\ModConfig\ProceduralObjects\";
             }
         }
+        public static string TextureConfigPath
+        {
+            get
+            {
+                if (IsLinux)
+                    return DataLocation.localApplicationData + @"/ProceduralObjects/Textures/";
+                return DataLocation.localApplicationData + @"\ProceduralObjects\Textures\";
+            }
+        }
+        public static string FontsPath
+        {
+            get
+            {
+                if (IsLinux)
+                    return DataLocation.localApplicationData + @"/ProceduralObjects/Fonts/";
+                return DataLocation.localApplicationData + @"\ProceduralObjects\Fonts\";
+            }
+        }
         public static string ExternalsConfigPath
+        {
+            get
+            {
+                if (IsLinux)
+                    return DataLocation.localApplicationData + @"/ProceduralObjects/ExportedObjects/";
+                return DataLocation.localApplicationData + @"\ProceduralObjects\ExportedObjects\";
+            }
+        }
+        public static string OldExternalsConfigPath
         {
             get
             {
@@ -64,7 +100,10 @@ namespace ProceduralObjects
             }
         }
         public static GameObject gameLogicObject, editorHelperObject;
-        public static Texture2D[] Icons = null;
+        public static Texture2D[] Icons = null, SelectionModeIcons = null;
+        public static System.Random randomizer;
+
+        public static List<POModuleType> ModuleTypes = new List<POModuleType>();
 
         public static ProceduralObjectContainer[] tempContainerData = null;
         public static Layer[] tempLayerData = null;
@@ -77,10 +116,13 @@ namespace ProceduralObjects
             if (_initializeToolMan)
                 Debug.Log("[ProceduralObjects] Successfully created the ProceduralTool");
 
-            if (mode == LoadMode.NewGame || mode == LoadMode.LoadGame)
+            if (mode == LoadMode.NewGame || mode == LoadMode.LoadGame || mode == LoadMode.NewMap || mode == LoadMode.LoadMap)
             {
                 if (gameLogicObject == null)
                 {
+                    if (!Directory.Exists(PODirectoryPath))
+                        Directory.CreateDirectory(PODirectoryPath);
+
                     if (Icons == null)
                     {
                         Icons = new Texture2D[] { TextureUtils.LoadTextureFromAssembly("duplicate"), 
@@ -92,10 +134,18 @@ namespace ProceduralObjects
                             TextureUtils.LoadTextureFromAssembly("move_up"),
                             TextureUtils.LoadTextureFromAssembly("move_down"), 
                             TextureUtils.LoadTextureFromAssembly("locked"),
-                            TextureUtils.LoadTextureFromAssembly("unlocked")};
+                            TextureUtils.LoadTextureFromAssembly("unlocked"),
+                            TextureUtils.LoadTextureFromAssembly("painterPicker"),
+                            TextureUtils.LoadTextureFromAssembly("painterSlider") };
+                        SelectionModeIcons = new Texture2D[] { TextureUtils.LoadTextureFromAssembly("main_layers"),
+                            TextureUtils.LoadTextureFromAssembly("main_exported"),
+                            TextureUtils.LoadTextureFromAssembly("main_textures"),
+                            TextureUtils.LoadTextureFromAssembly("main_fonts"),
+                            TextureUtils.LoadTextureFromAssembly("main_modules"),
+                            TextureUtils.LoadTextureFromAssembly("main_stats") };
                     }
                     gameLogicObject = new GameObject("Logic_ProceduralObjects");
-                    gameLogicObject.AddComponent<ProceduralObjectsLogic>();
+                    ProceduralObjectsLogic.instance = gameLogicObject.AddComponent<ProceduralObjectsLogic>();
                     gameLogicObject.AddComponent<UpdateInformant>();
                 }
             }
@@ -114,6 +164,7 @@ namespace ProceduralObjects
 
             if (gameLogicObject != null)
             {
+                ProceduralObjectsLogic.instance = null;
                 UnityEngine.Object.Destroy(gameLogicObject);
                 gameLogicObject = null;
             }
@@ -141,27 +192,37 @@ namespace ProceduralObjects
 
         // Settings panel
 
-        public static SavedFloat PropRenderDistance = new SavedFloat("propRenderDist", OTHER_SETTINGS_FILENAME, 1700f, true);
-        public static SavedFloat BuildingRenderDistance = new SavedFloat("buildingRenderDist", OTHER_SETTINGS_FILENAME, 2200f, true);
+        public static SavedFloat PropRenderDistance = new SavedFloat("propRenderDist", OTHER_SETTINGS_FILENAME, 1400f, true);
+        public static SavedFloat BuildingRenderDistance = new SavedFloat("buildingRenderDist", OTHER_SETTINGS_FILENAME, 2000f, true);
         public static SavedFloat GizmoSize = new SavedFloat("gizmoSize", OTHER_SETTINGS_FILENAME, 1.2f, true);
+        public static SavedBool HideDisabledLayersIcon = new SavedBool("hideIconLayerHidden", OTHER_SETTINGS_FILENAME, true, true);
+        public static SavedBool AutoResizeDecals = new SavedBool("autoResizeDecals", OTHER_SETTINGS_FILENAME, true, true);
+        public static SavedBool UseColorVariation = new SavedBool("useColorVar", OTHER_SETTINGS_FILENAME, true, true);
         public static SavedInt ConfirmDeletionThreshold = new SavedInt("confirmDeletionPanelThreshold", OTHER_SETTINGS_FILENAME, 2, true);
         public static SavedBool ShowConfirmDeletion = new SavedBool("showConfirmDeletion", OTHER_SETTINGS_FILENAME, true, true);
         public static SavedBool ShowDeveloperTools = new SavedBool("showDevTools", OTHER_SETTINGS_FILENAME, false, true);
         public static SavedString LanguageUsed = new SavedString("languageUsed", OTHER_SETTINGS_FILENAME, "default", true);
+        public static SavedInt DistanceUnits = new SavedInt("distanceUnits", OTHER_SETTINGS_FILENAME, 0, true);
+        public static SavedInt AngleUnits = new SavedInt("angleUnits", OTHER_SETTINGS_FILENAME, 0, true);
+        public static SavedBool UseUINightMode = new SavedBool("useNightMode", OTHER_SETTINGS_FILENAME, false, true);
+        public static SavedBool UsePasteInto = new SavedBool("usePasteInto", OTHER_SETTINGS_FILENAME, false, true);
+
+        public static SavedBool ShowToolsControls = new SavedBool("showToolsControls", OTHER_SETTINGS_FILENAME, true, true);
 
         private UISlider propRenderSlider, buildingRenderSlider, confirmDelThresholdSlider, gizmoSizeSlider;
         private UILabel propRenderLabel, buildingRenderLabel, confirmDelThresholdLabel, gizmoSizeLabel;
-        private UICheckBox confirmDelCheckbox, showDevCheckbox;
+        private UICheckBox confirmDelCheckbox, showDevCheckbox, hideDisLayerIconCheckbox, useUINightModeCheckbox, usePasteIntoCheckbox, autoResizeDecalsCheckbox, useColorVariationCheckbox;
 
         public void OnSettingsUI(UIHelperBase helper)
         {
             if (LocalizationManager.instance == null)
                 LocalizationManager.CreateManager();
+            SetUnits();
 
             UIHelperBase group = helper.AddGroup("    Procedural Objects");
             UIPanel globalPanel = ((UIPanel)((UIHelper)group).self);
 
-            propRenderSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"], PropRenderDistance.value.ToString()), 0f, 16000f, 10f, PropRenderDistance.value, propRenderDistanceChanged);
+            propRenderSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"], Gizmos.ConvertRoundToDistanceUnit(PropRenderDistance.value).ToString()) + distanceUnit, 0f, 16000f, 10f, PropRenderDistance.value, propRenderDistanceChanged);
             propRenderSlider.width = 715;
             propRenderSlider.height = 16;
             propRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_PROP_tooltip"];
@@ -173,7 +234,7 @@ namespace ProceduralObjects
 
             //  group.AddSpace(10);
 
-            buildingRenderSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"], BuildingRenderDistance.value.ToString()), 0f, 16000f, 10f, BuildingRenderDistance.value, buildingRenderDistanceChanged);
+            buildingRenderSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"], Gizmos.ConvertRoundToDistanceUnit(BuildingRenderDistance.value).ToString()) + distanceUnit, 0f, 16000f, 10f, BuildingRenderDistance.value, buildingRenderDistanceChanged);
             buildingRenderSlider.width = 715;
             buildingRenderSlider.height = 16;
             buildingRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_BUILDING_tooltip"];
@@ -182,11 +243,10 @@ namespace ProceduralObjects
             buildingRenderPanel.name = "BuildingRenderSliderPanel";
             buildingRenderLabel = buildingRenderPanel.Find<UILabel>("Label");
             buildingRenderLabel.width *= 3.5f;
-
-
+            
             //  group.AddSpace(10);
 
-            gizmoSizeSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], GizmoSize.value.ToString()), 0.3f, 2.5f, 0.1f, GizmoSize.value, gizmoSizeChanged);
+            gizmoSizeSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], (GizmoSize.value * 100).ToString()), 0.2f, 3f, 0.1f, GizmoSize.value, gizmoSizeChanged);
             gizmoSizeSlider.width = 715;
             gizmoSizeSlider.height = 16;
             gizmoSizeSlider.tooltip = LocalizationManager.instance.current["settings_GIZMO_tooltip"];
@@ -196,13 +256,36 @@ namespace ProceduralObjects
             gizmoSizeLabel = gizmoPanel.Find<UILabel>("Label");
             gizmoSizeLabel.width *= 3.5f;
 
-            group.AddSpace(32);
+            group.AddDropdown(LocalizationManager.instance.current["settings_DISTUNITS_label"],
+                new string[] { LocalizationManager.instance.current["settings_DISTUNITS_m"] + " (m)", 
+                    LocalizationManager.instance.current["settings_DISTUNITS_ft"] + " (ft)", 
+                    LocalizationManager.instance.current["settings_DISTUNITS_yd"] + " (yd)" }, DistanceUnits.value, 
+                    (int value) => { 
+                        DistanceUnits.value = value; 
+                        SetUnits();
+                        propRenderDistanceChanged(PropRenderDistance.value);
+                        buildingRenderDistanceChanged(BuildingRenderDistance.value);
+                    });
+
+            group.AddDropdown(LocalizationManager.instance.current["settings_ANGUNITS_label"],
+                new string[] { LocalizationManager.instance.current["settings_ANGUNITS_deg"] + " (°)", 
+                    LocalizationManager.instance.current["settings_ANGUNITS_rad"] + " (rad)" }, AngleUnits.value, (int value) => { AngleUnits.value = value; SetUnits(); });
+
+            useUINightModeCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_USEUINIGHTMODE_toggle"], UseUINightMode.value, (bool value) => { UseUINightMode.value = value; });
+
+            hideDisLayerIconCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_HIDEDISABLEDLAYERSICON_toggle"], HideDisabledLayersIcon.value, hideDisabledLayersIconChanged);
+
+            usePasteIntoCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_USEPASTEINTO_toggle"], UsePasteInto.value, usePasteIntoChanged);
+
+            autoResizeDecalsCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_AUTORESIZEDECALS_toggle"], AutoResizeDecals.value, autoResizeDecalsChanged);
+
+            useColorVariationCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_USECOLORVAR_toggle"], UseColorVariation.value, useColorVariationChanged);
+
+            group.AddSpace(16);
 
             var sliderGroup = helper.AddGroup("  " + LocalizationManager.instance.current["settings_CONFDEL_title"]);
 
             confirmDelCheckbox = (UICheckBox)sliderGroup.AddCheckbox(LocalizationManager.instance.current["settings_CONFDEL_toggle"], ShowConfirmDeletion.value, confirmDeletionCheckboxChanged);
-
-            //   sliderGroup.AddSpace(10);
 
             confirmDelThresholdSlider = (UISlider)sliderGroup.AddSlider(string.Format(LocalizationManager.instance.current["settings_CONFDEL_SLIDER_label"], ConfirmDeletionThreshold.value.ToString()), 1f, 15f, 1f, ConfirmDeletionThreshold.value, confirmDeletionThresholdChanged);
             confirmDelThresholdSlider.width = 715;
@@ -215,11 +298,12 @@ namespace ProceduralObjects
             if (!ShowConfirmDeletion.value)
                 confirmDelThresholdSlider.isEnabled = false;
 
-            sliderGroup.AddSpace(32);
-            var languageGroup = helper.AddGroup("  " + LocalizationManager.instance.current["settings_LANG_title"]);
-            languageGroup.AddDropdown("Language selection", LocalizationManager.instance.identifiers, LocalizationManager.instance.available.IndexOf(LocalizationManager.instance.current), languageChanged);
 
-            languageGroup.AddSpace(32);
+            sliderGroup.AddSpace(16);
+            var languageGroup = helper.AddGroup("  " + LocalizationManager.instance.current["settings_LANG_title"]);
+            languageGroup.AddDropdown(LocalizationManager.instance.current["settings_LANG_title"], LocalizationManager.instance.identifiers, LocalizationManager.instance.available.IndexOf(LocalizationManager.instance.current), languageChanged);
+
+            languageGroup.AddSpace(16);
 
             showDevCheckbox = (UICheckBox)languageGroup.AddCheckbox(LocalizationManager.instance.current["settings_DEVTOOLS_toggle"], ShowDeveloperTools.value, (value) =>
             {
@@ -230,17 +314,17 @@ namespace ProceduralObjects
         private void propRenderDistanceChanged(float value)
         {
             PropRenderDistance.value = value;
-            propRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"], value.ToString());
+            propRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"], Gizmos.ConvertRoundToDistanceUnit(value).ToString()) + distanceUnit;
         }
         private void buildingRenderDistanceChanged(float value)
         {
             BuildingRenderDistance.value = value;
-            buildingRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"], value.ToString());
+            buildingRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"], Gizmos.ConvertRoundToDistanceUnit(value).ToString()) + distanceUnit;
         }
         private void gizmoSizeChanged(float value)
         {
             GizmoSize.value = value;
-            gizmoSizeLabel.text = string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], value.ToString());
+            gizmoSizeLabel.text = string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], (value * 100).ToString());
         }
         private void confirmDeletionThresholdChanged(float value)
         {
@@ -255,21 +339,71 @@ namespace ProceduralObjects
             else
               confirmDelThresholdSlider.isEnabled = false;
         }
+        private void hideDisabledLayersIconChanged(bool value)
+        {
+            HideDisabledLayersIcon.value = value;
+        }
+        private void autoResizeDecalsChanged(bool value)
+        {
+            AutoResizeDecals.value = value;
+        }
+        private void useColorVariationChanged(bool value)
+        {
+            UseColorVariation.value = value;
+        }
+        private void usePasteIntoChanged(bool value)
+        {
+            UsePasteInto.value = value;
+        }
         private void languageChanged(int value)
         {
             LocalizationManager.instance.SetCurrent(value);
             LanguageUsed.value = LocalizationManager.instance.current.identifier;
-            propRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"], PropRenderDistance.value.ToString());
+            propRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"], Gizmos.ConvertRoundToDistanceUnit(PropRenderDistance.value).ToString()) + distanceUnit;
             confirmDelThresholdLabel.text = string.Format(LocalizationManager.instance.current["settings_CONFDEL_SLIDER_label"], ConfirmDeletionThreshold.value.ToString());
-            buildingRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"], BuildingRenderDistance.value.ToString());
+            buildingRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"], Gizmos.ConvertRoundToDistanceUnit(BuildingRenderDistance.value).ToString()) + distanceUnit;
             confirmDelThresholdSlider.tooltip = LocalizationManager.instance.current["settings_CONFDEL_SLIDER_tooltip"];
             buildingRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_BUILDING_tooltip"];
             propRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_PROP_tooltip"];
-            gizmoSizeLabel.text = string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], GizmoSize.value.ToString());
+            gizmoSizeLabel.text = string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], (GizmoSize.value * 100).ToString());
             gizmoSizeSlider.tooltip = LocalizationManager.instance.current["settings_GIZMO_tooltip"];
             confirmDelCheckbox.text = LocalizationManager.instance.current["settings_CONFDEL_toggle"];
             showDevCheckbox.text = LocalizationManager.instance.current["settings_DEVTOOLS_toggle"];
             showDevCheckbox.tooltip = LocalizationManager.instance.current["settings_DEVTOOLS_tooltip"];
+            hideDisLayerIconCheckbox.text = LocalizationManager.instance.current["settings_HIDEDISABLEDLAYERSICON_toggle"];
+            useUINightModeCheckbox.text = LocalizationManager.instance.current["settings_USEUINIGHTMODE_toggle"];
+            autoResizeDecalsCheckbox.text = LocalizationManager.instance.current["settings_AUTORESIZEDECALS_toggle"];
+            useColorVariationCheckbox.text = LocalizationManager.instance.current["settings_USECOLORVAR_toggle"];
+            usePasteIntoCheckbox.text = LocalizationManager.instance.current["settings_USEPASTEINTO_toggle"];
+            if (ProceduralObjectsLogic.instance != null)
+                ProceduralObjectsLogic.instance.SetupLocalizationInternally();
+        }
+
+        public static string distanceUnit, angleUnit;
+
+        private void SetUnits()
+        {
+            switch (DistanceUnits.value)
+            {
+                case 0:
+                    distanceUnit = " m";
+                    break;
+                case 1:
+                    distanceUnit = " ft";
+                    break;
+                case 2:
+                    distanceUnit = " yd";
+                    break;
+            }
+            switch (AngleUnits.value)
+            {
+                case 0:
+                    angleUnit = "°";
+                    break;
+                case 1:
+                    angleUnit = " rad";
+                    break;
+            }
         }
     }
 }

@@ -20,6 +20,7 @@ namespace ProceduralObjects.Classes
                 var _fullBinding = inputConfigLine.Split(new string[] { " = " }, StringSplitOptions.RemoveEmptyEntries)[1].Replace(" ", "");
 
                 this.m_fullKeys = _fullBinding;
+                AdjustFullKeys();
 
                 List<KeyCode> keyCodes = new List<KeyCode>();
                 int plusCharCount = _fullBinding.Count(c => c == '+');
@@ -142,6 +143,17 @@ namespace ProceduralObjects.Classes
             }
             return false;
         }
+
+        private void AdjustFullKeys()
+        {
+            this.m_fullKeys = this.m_fullKeys.Replace("LeftControl", "Ctrl").Replace("LeftShift", "Shift").Replace("LeftAlt", "Alt")
+                .Replace("LeftArrow", "⇦")
+                .Replace("RightArrow", "⇨")
+                .Replace("UpArrow", "⇧")
+                .Replace("DownArrow", "⇩")
+                .Replace("PageUp", "PgUp")
+                .Replace("PageDown", "PgDown");
+        }
     }
 
     public class KeyBindingsManager
@@ -235,44 +247,16 @@ namespace ProceduralObjects.Classes
                 tw.WriteLine("snapStoredHeight = H");
                 tw.WriteLine("undo = LeftControl+Z");
                 tw.WriteLine("redo = LeftControl+Y");
+                tw.WriteLine("enableSnapping = S");
                 tw.Close();
             }
             m_keyBindings = new List<KeyBindingInfo>();
             var lines = File.ReadAllLines(BindingsConfigPath).ToList();
-            if (!lines.Any(line => line.Contains("snapStoredHeight = ")))
-            {
-                if (File.Exists(BindingsConfigPath))
-                    File.Delete(BindingsConfigPath);
-                TextWriter tw = new StreamWriter(BindingsConfigPath);
-                foreach (string line in lines)
-                    tw.WriteLine(line);
-                tw.WriteLine("");
-                tw.WriteLine("snapStoredHeight = H");
-                lines.Add("snapStoredHeight = H");
-                tw.Close();
-            }
-            if (!lines.Any(line => line.Contains("undo = ")))
-            {
-                if (File.Exists(BindingsConfigPath))
-                    File.Delete(BindingsConfigPath);
-                TextWriter tw = new StreamWriter(BindingsConfigPath);
-                foreach (string line in lines)
-                    tw.WriteLine(line);
-                tw.WriteLine("undo = LeftControl+Z");
-                lines.Add("undo = LeftControl+Z");
-                tw.Close();
-            }
-            if (!lines.Any(line => line.Contains("redo = ")))
-            {
-                if (File.Exists(BindingsConfigPath))
-                    File.Delete(BindingsConfigPath);
-                TextWriter tw = new StreamWriter(BindingsConfigPath);
-                foreach (string line in lines)
-                    tw.WriteLine(line);
-                tw.WriteLine("redo = LeftControl+Y");
-                lines.Add("redo = LeftControl+Y");
-                tw.Close();
-            }
+            // settings added after v1.2.2
+            CheckAddMissingSetting(lines, "snapStoredHeight", "H");
+            CheckAddMissingSetting(lines, "undo", "LeftControl+Z");
+            CheckAddMissingSetting(lines, "redo", "LeftControl+Y");
+            CheckAddMissingSetting(lines, "enableSnapping", "S");
             foreach (string line in lines)
             {
                 if (line != string.Empty && line.Contains("="))
@@ -288,6 +272,20 @@ namespace ProceduralObjects.Classes
                 keyBindingsDictionary.Add(kbInfo.m_name, kbInfo);
             }
             Debug.Log("[ProceduralObjects] Key Bindings loading ended from " + BindingsConfigPath);
+        }
+        private void CheckAddMissingSetting(List<string> lines, string id, string defaultValue)
+        {
+            if (!lines.Any(line => line.Contains(id + " = ")))
+            {
+                if (File.Exists(BindingsConfigPath))
+                    File.Delete(BindingsConfigPath);
+                TextWriter tw = new StreamWriter(BindingsConfigPath);
+                foreach (string line in lines)
+                    tw.WriteLine(line);
+                tw.WriteLine(id + " = " + defaultValue);
+                lines.Add(id + " = " + defaultValue);
+                tw.Close();
+            }
         }
     }
 }

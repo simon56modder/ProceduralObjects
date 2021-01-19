@@ -191,16 +191,21 @@ namespace ProceduralObjects
     public class ProceduralObjectContainer
     {
         public int id, tilingFactor;
-       // public byte meshStatus;
+        public byte meshStatus;
         public string basePrefabName, objectType, customTextureName;
         public float scale, renderDistance;
-        public bool hasCustomTexture, disableRecalculation/*, flipFaces*/;
+        public bool hasCustomTexture, disableRecalculation, flipFaces;
         public uint layerId;
+        public int groupRootId;
+        public bool belongsToGroup;
         public SerializableVector3 position;
         public SerializableQuaternion rotation;
         public SerializableVector3[] vertices;
+        public SerializableColor color;
         public ProceduralObjectVisibility visibility;
+        public NormalsRecalculation normalsRecalculation;
         public TextParameters textParam;
+        public List<Dictionary<string, string>> modulesData;
 
         public ProceduralObjectContainer() { }
         public ProceduralObjectContainer(ProceduralObject baseObject)
@@ -208,18 +213,36 @@ namespace ProceduralObjects
             id = baseObject.id;
             basePrefabName = baseObject.basePrefabName;
             objectType = baseObject.baseInfoType;
-            // meshStatus = baseObject.meshStatus;
             renderDistance = baseObject.renderDistance;
             position = new SerializableVector3(baseObject.m_position);
             rotation = new SerializableQuaternion(baseObject.m_rotation);
             scale = 1f;
-           // if (meshStatus > 0)
-            vertices = SerializableVector3.ToSerializableArray(baseObject.m_mesh.vertices);
+            if (baseObject.group != null)
+            {
+                belongsToGroup = true;
+                if (baseObject.isRootOfGroup)
+                    groupRootId = -1; // = we are a group root 
+                else
+                    groupRootId = baseObject.group.root.id;
+            }
+            else
+            {
+                belongsToGroup = false; // we don't have a group
+            }
+            color = baseObject.m_color;
+            // if (meshStatus > 0)
+            meshStatus = baseObject.meshStatus;
+            if (meshStatus != 1)
+                vertices = SerializableVector3.ToSerializableArray(baseObject.m_mesh.vertices);
+            else
+                vertices = null;
             hasCustomTexture = baseObject.customTexture != null;
             visibility = baseObject.m_visibility;
             disableRecalculation = baseObject.disableRecalculation;
+            normalsRecalculation = baseObject.normalsRecalcMode;
             layerId = (baseObject.layer == null) ? 0 : baseObject.layer.m_id;
-         // flipFaces = baseObject.flipFaces;
+            flipFaces = baseObject.flipFaces;
+            // recalculateNormals = baseObject.recalculateNormals;
             tilingFactor = baseObject.tilingFactor;
             if (baseObject.m_textParameters != null)
             {
@@ -233,6 +256,12 @@ namespace ProceduralObjects
                 customTextureName = baseObject.customTexture.name;
             else
                 customTextureName = string.Empty;
+            modulesData = new List<Dictionary<string, string>>();
+            if (baseObject.m_modules != null)
+            {
+                foreach (POModule m in baseObject.m_modules)
+                    modulesData.Add(m._get_data(true));
+            }
         }
     }
     [Serializable]
@@ -318,7 +347,7 @@ namespace ProceduralObjects
         }
         public static SerializableColor Parse(string s)
         {
-            string[] str = s.Replace("RGBA", "").Replace("(", "").Replace(")", "").Split(new string[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
+            string[] str = s.Trim().Replace("RGBA", "").Replace("(", "").Replace(")", "").Split(new string[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
             if (str.Length == 3)
                 return new SerializableColor(float.Parse(str[0]), float.Parse(str[1]), float.Parse(str[2]));
             if (str.Length == 4)

@@ -6,6 +6,7 @@ using UnityEngine;
 
 using ProceduralObjects.Classes;
 using ProceduralObjects.Localization;
+using ProceduralObjects.UI;
 
 namespace ProceduralObjects.ProceduralText
 {
@@ -22,6 +23,7 @@ namespace ProceduralObjects.ProceduralText
             zoomFactor = 1f;
             movingField = -1;
             dragTexPos = Vector2.zero;
+            colorPickerSelected = null;
         }
 
         public Rect windowRect;
@@ -36,6 +38,7 @@ namespace ProceduralObjects.ProceduralText
         private Vector2 scrollParams, scrollTex, dragTexPos;
         private float updateTimer, dragTimer, zoomFactor;
         private int movingField;
+        public GUIPainter colorPickerSelected;
 
         private TextureFont selectedCharTable = null;
         private Rect charTableRect = new Rect(575, 120, 421, 400);
@@ -45,9 +48,16 @@ namespace ProceduralObjects.ProceduralText
         public void DrawWindow()
         {
             if (canDrawWindow)
-                windowRect = GUI.Window(99043, windowRect, draw, LocalizationManager.instance.current["text_customization"]);
+            {
+                windowRect = GUIUtils.Window(99043, windowRect, draw, LocalizationManager.instance.current["text_customization"]);
+                if (colorPickerSelected != null)
+                {
+                    colorPickerSelected.pickerPosition = new Vector2(windowRect.x + 403, windowRect.y + 386);
+                    GUIPainter.DrawPicker(colorPickerSelected, Color.HSVToRGB(colorPickerSelected.H, colorPickerSelected.S, colorPickerSelected.V));
+                }
+            }
             if (selectedCharTable != null)
-                charTableRect = GUI.Window(99044, charTableRect, drawCharTable, LocalizationManager.instance.current["char_table"]);
+                charTableRect = GUIUtils.Window(99044, charTableRect, drawCharTable, LocalizationManager.instance.current["char_table"]);
         }
         public void Update()
         {
@@ -58,6 +68,12 @@ namespace ProceduralObjects.ProceduralText
                     GUIUtils.SetMouseScrolling(!windowRect.IsMouseInside());
                  * */
                 updateTimer += TimeUtils.deltaTime;
+
+                if (colorPickerSelected != null)
+                {
+                    GUIPainter.UpdatePainter(colorPickerSelected, () => { colorPickerSelected = null; });
+                }
+
                 if (dragTimer < .14f)
                     dragTimer += TimeUtils.deltaTime;
                 if (new Rect(windowRect.x + 5, windowRect.y + 30, 375, 285).IsMouseInside())
@@ -97,7 +113,7 @@ namespace ProceduralObjects.ProceduralText
                     dragTexPos = Vector2.zero;
                     dragTimer = 0f;
                 }
-                if (updateTimer > .22f)
+                if (updateTimer > .15f)
                 {
                     if (TextParameters.IsDifference(parameters, parametersOld))
                     {
@@ -114,10 +130,9 @@ namespace ProceduralObjects.ProceduralText
         }
         private void draw(int id)
         {
-            GUI.DragWindow(new Rect(0, 0, 365, 28));
-            if (GUI.Button(new Rect(370, 3, 28, 28), "X"))
+            GUI.DragWindow(new Rect(0, 0, 348, 28));
+            if (GUIUtils.CloseHelpButtons(windowRect, "Text_Customization"))
             {
-                ProceduralObjectsLogic.PlaySound();
                 CloseWindow();
             }
             else
@@ -132,13 +147,12 @@ namespace ProceduralObjects.ProceduralText
                 {
                     for (int i = 0; i < parameters.Count(); i++)
                     {
-                        if (!parameters[i].locked)
+                        if (parameters[i].locked)
+                            continue;
+                        if (GUI.Button(new Rect(parameters[i].x * zoomFactor, parameters[i].y * zoomFactor, parameters[i].texWidth * zoomFactor, parameters[i].texHeight * zoomFactor), string.Empty, GUI.skin.label))
                         {
-                            if (GUI.Button(new Rect(parameters[i].x * zoomFactor, parameters[i].y * zoomFactor, parameters[i].texWidth * zoomFactor, parameters[i].texHeight * zoomFactor), string.Empty, GUI.skin.label))
-                            {
-                                ProceduralObjectsLogic.PlaySound();
-                                movingField = i;
-                            }
+                            ProceduralObjectsLogic.PlaySound();
+                            movingField = i;
                         }
                     }
                 }
@@ -179,10 +193,10 @@ namespace ProceduralObjects.ProceduralText
         }
         private void drawCharTable(int id)
         {
-            GUI.DragWindow(new Rect(0, 0, 388, 28));
+            GUI.DragWindow(new Rect(0, 0, 395, 28));
             GUI.Label(new Rect(7, 30, 385, 26), string.Format(LocalizationManager.instance.current["font_chars_available"], selectedCharTable.m_fontName));
             var height = (Mathf.FloorToInt(selectedCharTable.m_orderedChars.Length / 10) + 1) * 67 + (ProceduralObjectsMod.ShowDeveloperTools.value ? 52 : 6);
-            scrollCharTable = GUI.BeginScrollView(new Rect(5, 57, 416, 338), scrollCharTable, new Rect(0, 0, 400, height));
+            scrollCharTable = GUI.BeginScrollView(new Rect(3, 57, 415, 338), scrollCharTable, new Rect(0, 0, 400, height));
             GUI.skin.label.alignment = TextAnchor.MiddleCenter;
             for (int i = 0; i < selectedCharTable.m_orderedChars.Length; i++)
             {
@@ -203,9 +217,8 @@ namespace ProceduralObjects.ProceduralText
                 }
             }
             GUI.EndScrollView();
-            if (GUI.Button(new Rect(391, 3, 28, 28), "X"))
+            if (GUIUtils.CloseButton(charTableRect))
             {
-                ProceduralObjectsLogic.PlaySound(); 
                 CloseCharTable();
             }
         }
@@ -233,6 +246,7 @@ namespace ProceduralObjects.ProceduralText
             windowTex = null;
             parameters = null;
             parametersOld = null;
+            colorPickerSelected = null;
             scrollParams = Vector2.zero;
             scrollTex = Vector2.zero;
             updateTimer = 0f;
@@ -254,6 +268,7 @@ namespace ProceduralObjects.ProceduralText
             originalTex = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
             originalTex.SetPixels(((Texture2D)tex).GetPixels());
             windowTex = (Texture2D)GameObject.Instantiate(originalTex);
+            colorPickerSelected = null;
             // load stored data if it exists
             if (editingObject.m_textParameters == null)
             {

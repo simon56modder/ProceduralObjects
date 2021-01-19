@@ -129,7 +129,7 @@ namespace ProceduralObjects.Classes
             {
                 // works all good
                 Vector2[] uvmap = new Vector2[] {
-                Vector2.zero,
+                    Vector2.zero,
                     new Vector2(Vector3.Distance(vertices[2].Position, vertices[1].Position) / po.tilingFactor, Vector3.Distance(vertices[3].Position, vertices[1].Position) / po.tilingFactor),
                     new Vector2(0, Vector3.Distance(vertices[0].Position, vertices[2].Position) / po.tilingFactor),
                     new Vector2(Vector3.Distance(vertices[0].Position, vertices[3].Position) / po.tilingFactor, 0),
@@ -165,7 +165,7 @@ namespace ProceduralObjects.Classes
                     new Vector2(0, Vector3.Distance(vertices[0].Position, vertices[2].Position) / po.tilingFactor),
                     new Vector2(Vector3.Distance(vertices[0].Position, vertices[3].Position) / po.tilingFactor, 0),
                     Vector2.zero,
-                    new Vector2(Vector3.Distance(vertices[6].Position, vertices[7].Position) / po.tilingFactor, Vector3.Distance(vertices[5].Position, vertices[7].Position) / po.tilingFactor),
+                    new Vector2(Vector3.Distance(vertices[6].Position, vertices[5].Position) / po.tilingFactor, Vector3.Distance(vertices[5].Position, vertices[7].Position) / po.tilingFactor),
                     new Vector2(0, Vector3.Distance(vertices[6].Position, vertices[4].Position) / po.tilingFactor),
                     new Vector2(Vector3.Distance(vertices[4].Position, vertices[7].Position) / po.tilingFactor, 0)
                 };
@@ -183,20 +183,123 @@ namespace ProceduralObjects.Classes
 
     public static class VertexUtils
     {
-        public static void MirrorX(Vertex[] vertices)
+        public static readonly Texture2D[] vertexIcons = new Texture2D[] { TextureUtils.LoadTextureFromAssembly("vertexUnselected"), TextureUtils.LoadTextureFromAssembly("vertexSelected") };
+
+
+        public static void FlattenSelection(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer)
+        {
+            obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, buffer);
+            var bounds = new Bounds(buffer.First(v => v.Index == editingVertexIndex[0]).Position, Vector3.zero);
+            var vertices = buffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex))));
+            foreach (Vertex v in vertices)
+                bounds.Encapsulate(v.Position);
+
+            foreach (Vertex v in vertices)
+            {
+                v.Position.y = bounds.center.y;
+            }
+            obj.historyEditionBuffer.ConfirmNewStep(buffer);
+        }
+        public static void MergeVertices(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer)
+        {
+            obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, buffer);
+            var bounds = new Bounds(buffer.First(v => v.Index == editingVertexIndex[0]).Position, Vector3.zero);
+            var vertices = buffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex))));
+            foreach (Vertex v in vertices)
+                bounds.Encapsulate(v.Position);
+
+            foreach (Vertex v in vertices)
+            {
+                v.Position = bounds.center;
+            }
+            obj.historyEditionBuffer.ConfirmNewStep(buffer);
+        }
+        public static void SnapEachToGround(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer)
+        {
+            obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, buffer);
+            var vertices = buffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex))));
+
+            foreach (Vertex v in vertices)
+            {
+                var worldPos = ProceduralUtils.NearestGroundPointVertical(ProceduralUtils.VertexWorldPosition(v, obj));
+                v.Position = Quaternion.Inverse(obj.m_rotation) * (worldPos - obj.m_position);
+            }
+
+            obj.historyEditionBuffer.ConfirmNewStep(buffer);
+        }
+        public static void SnapSelectionToGround(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer)
+        {
+            obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, buffer);
+            var bounds = new Bounds(ProceduralUtils.VertexWorldPosition(buffer.First(v => v.Index == editingVertexIndex[0]).Position, obj), Vector3.zero);
+            var vertices = buffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex))));
+            foreach (Vertex v in vertices)
+                bounds.Encapsulate(ProceduralUtils.VertexWorldPosition(v.Position, obj));
+
+            Vector3 bottomPoint = bounds.center;
+            bottomPoint.y -= bounds.extents.y;
+
+            var yWorldDiff = bottomPoint.y - ProceduralUtils.NearestGroundPointVertical(bottomPoint).y;
+
+            foreach (Vertex v in vertices)
+            {
+                var worldPos = ProceduralUtils.VertexWorldPosition(v, obj);
+                worldPos.y -= yWorldDiff;
+                v.Position = Quaternion.Inverse(obj.m_rotation) * (worldPos - obj.m_position);
+            }
+
+            obj.historyEditionBuffer.ConfirmNewStep(buffer);
+        }
+        public static void ConformSelectionToTerrain(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer)
+        {
+            conformSelection(obj, editingVertexIndex, buffer, false);
+        }
+        public static void ConformSelectionToTerrainNetBuildings(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer)
+        {
+            conformSelection(obj, editingVertexIndex, buffer, true);
+        }
+        private static void conformSelection(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer, bool andNetBuildings)
+        {
+            obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, buffer);
+            var bounds = new Bounds(ProceduralUtils.VertexWorldPosition(buffer.First(v => v.Index == editingVertexIndex[0]).Position, obj), Vector3.zero);
+            var vertices = buffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex))));
+            foreach (Vertex v in vertices)
+                bounds.Encapsulate(ProceduralUtils.VertexWorldPosition(v.Position, obj));
+
+            Vector3 bottomPoint = bounds.center;
+            bottomPoint.y -= bounds.extents.y;
+            var boundsOffset = new Vector3(0, bounds.size.y, 0);
+
+            foreach (Vertex v in vertices)
+            {
+                var worldPos = ProceduralUtils.VertexWorldPosition(v, obj);
+                var yDiff = worldPos.y - bottomPoint.y;
+                worldPos = ProceduralUtils.NearestGroundPointVertical(worldPos + boundsOffset, andNetBuildings);
+                worldPos.y += yDiff;
+                v.Position = Quaternion.Inverse(obj.m_rotation) * (worldPos - obj.m_position);
+            }
+            obj.historyEditionBuffer.ConfirmNewStep(buffer);
+        }
+
+        public static void MirrorX(Vertex[] vertices, ProceduralObject obj)
         {
             for (int i = 0; i < vertices.Length; i++)
                 vertices[i].Position.x = -vertices[i].Position.x;
+            obj.flipFaces = !obj.flipFaces;
+            VertexUtils.flipFaces(obj);
         }
-        public static void MirrorY(Vertex[] vertices)
+        public static void MirrorY(Vertex[] vertices, ProceduralObject obj)
         {
             for (int i = 0; i < vertices.Length; i++)
                 vertices[i].Position.y = -vertices[i].Position.y;
+            obj.flipFaces = !obj.flipFaces;
+            VertexUtils.flipFaces(obj);
         }
-        public static void MirrorZ( Vertex[] vertices)
+        public static void MirrorZ(Vertex[] vertices, ProceduralObject obj)
         {
             for (int i = 0; i < vertices.Length; i++)
                 vertices[i].Position.z = -vertices[i].Position.z;
+            obj.flipFaces = !obj.flipFaces;
+            VertexUtils.flipFaces(obj);
         }
 
         public static void StretchX(Vertex[] vertices, float factor)
@@ -204,15 +307,30 @@ namespace ProceduralObjects.Classes
             for (int i = 0; i < vertices.Length; i++)
                 vertices[i].Position.x *= factor;
         }
+        public static void StretchX(Vector3[] originalPositions, Vertex[] vertices, float factor)
+        {
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i].Position.x = originalPositions[i].x * factor;
+        }
         public static void StretchY(Vertex[] vertices, float factor)
         {
             for (int i = 0; i < vertices.Length; i++)
                 vertices[i].Position.y *= factor;
         }
+        public static void StretchY(Vector3[] originalPositions, Vertex[] vertices, float factor)
+        {
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i].Position.y = originalPositions[i].y * factor;
+        }
         public static void StretchZ(Vertex[] vertices, float factor)
         {
             for (int i = 0; i < vertices.Length; i++)
                 vertices[i].Position.z *= factor;
+        }
+        public static void StretchZ(Vector3[] originalPositions, Vertex[] vertices, float factor)
+        {
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i].Position.z = originalPositions[i].z * factor;
         }
 
         public static void flipFaces(ProceduralObject obj)
@@ -228,7 +346,7 @@ namespace ProceduralObjects.Classes
                 }
                 obj.m_mesh.SetTriangles(triangles, m);
             }
-            obj.m_mesh.RecalculateNormals();
+            obj.RecalculateNormals();
         }
         public static Vertex[] CloneArray(this Vertex[] vertexArray)
         {
@@ -244,6 +362,18 @@ namespace ProceduralObjects.Classes
                 array[i] = vertexArray[i].Position;
             return array;
         }
+        public static List<Vector3> ResizeDecal(this Vector3[] list)
+        {
+            var newList = new List<Vector3>();
+            for (int i = 0; i < list.Length; i++)
+            {
+                if (list[i].y >= 0)
+                    newList.Add(new Vector3(list[i].x, 0.008f, list[i].z));
+                else
+                    newList.Add(list[i]);
+            }
+            return newList;
+        }
         public static Vector3 WorldToLocalVertexPosition(this Vector3 worldCoord, ProceduralObject obj)
         {
             return (worldCoord - obj.m_position);
@@ -251,12 +381,14 @@ namespace ProceduralObjects.Classes
         }
         public static Quaternion Rotate(this Quaternion rot, float x, float y, float z)
         {
+            return rot * Quaternion.Euler(x, y, z);
+            /*
             var gObj = new GameObject("temp_obj");
             gObj.transform.rotation = rot;
             gObj.transform.Rotate(x, y, z);
             var newRot = gObj.transform.rotation;
             UnityEngine.Object.Destroy(gObj);
-            return newRot;
+            return newRot; */
         }
         public static void Scale(this ProceduralObject obj, Vertex[] vertices, float scaleFactor)
         {
@@ -268,6 +400,18 @@ namespace ProceduralObjects.Classes
         public static Vector3 PloppableAsphaltPosition(this Vector3 position)
         {
             return new Vector3(position.x, position.y, (-position.z) * 2.14f);
+        }
+        public static Vector3 NegativeZ(this Vector3 v)
+        {
+            return new Vector3(v.x, v.y, -v.z);
+        }
+        public static string ToStringUnrounded(this Quaternion quat)
+        {
+            return "(" + quat.x.ToString("G") + ", " + quat.y.ToString("G") + ", " + quat.z.ToString("G") + ", " + quat.w.ToString("G") + ")";
+        }
+        public static string ToStringUnrounded(this Vector3 vector)
+        {
+            return "(" + vector.x.ToString("G") + ", " + vector.y.ToString("G") + ", " + vector.z.ToString("G") + ")";
         }
         public static Quaternion ParseQuaternion(this string s)
         {

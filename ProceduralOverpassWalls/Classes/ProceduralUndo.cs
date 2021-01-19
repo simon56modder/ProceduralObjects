@@ -50,6 +50,7 @@ namespace ProceduralObjects.Classes
 
         public Dictionary<Vertex, Vertex> verticesMoved;
         public StepType type;
+        public AxisEditionState axisUsed;
         public KeyValuePair<Vector3, Vector3> positions;
         public KeyValuePair<Quaternion, Quaternion> rotations;
         public float stretchFactor;
@@ -146,6 +147,7 @@ namespace ProceduralObjects.Classes
             prevTempPos = Vector3.zero;
             prevTempRot = Quaternion.identity;
             currentStepType = EditingStep.StepType.none;
+            axisUsed = AxisEditionState.none;
         }
 
         public List<EditingStep> stepsDone;
@@ -154,7 +156,8 @@ namespace ProceduralObjects.Classes
 
         private Vertex[] prevTempBuffer;
         private EditingStep.StepType currentStepType;
-        private Vector3 prevTempPos;
+        public AxisEditionState axisUsed;
+        public Vector3 prevTempPos;
         private Quaternion prevTempRot;
         public float currentStretchFactor;
 
@@ -236,7 +239,9 @@ namespace ProceduralObjects.Classes
                     stepsDone.Add(new EditingStep(prevTempBuffer, tempbuffer));
                     break;
                 case EditingStep.StepType.position:
-                    stepsDone.Add(new EditingStep(prevTempPos, obj.m_position));
+                    var step = new EditingStep(prevTempPos, obj.m_position);
+                    step.axisUsed = axisUsed;
+                    stepsDone.Add(step);
                     break;
                 case EditingStep.StepType.rotation:
                     stepsDone.Add(new EditingStep(prevTempRot, obj.m_rotation));
@@ -258,6 +263,15 @@ namespace ProceduralObjects.Classes
             prevTempBuffer = null;
             currentStretchFactor = 1f;
             currentStepType = EditingStep.StepType.none;
+            axisUsed = AxisEditionState.none;
+        }
+
+        public EditingStep LastStep
+        {
+            get
+            {
+                return stepsDone[stepsDone.Count - 1];
+            }
         }
 
         public EditingStep.StepType UndoLastStep(Vertex[] currentTempBuffer, out Vertex[] buffer)
@@ -268,7 +282,7 @@ namespace ProceduralObjects.Classes
             if (stepsDone.Count == 0)
                 return EditingStep.StepType.none;
 
-            var last = stepsDone[stepsDone.Count - 1];
+            var last = LastStep;
             switch (last.type)
             {
                 case EditingStep.StepType.vertices:
@@ -284,13 +298,13 @@ namespace ProceduralObjects.Classes
                     last.UndoPosRotMoveTo(obj);
                     break;
                 case EditingStep.StepType.mirrorX:
-                    VertexUtils.MirrorX(currentTempBuffer);
+                    VertexUtils.MirrorX(currentTempBuffer, obj);
                     break;
                 case EditingStep.StepType.mirrorY:
-                    VertexUtils.MirrorY(currentTempBuffer);
+                    VertexUtils.MirrorY(currentTempBuffer, obj);
                     break;
                 case EditingStep.StepType.mirrorZ:
-                    VertexUtils.MirrorZ(currentTempBuffer);
+                    VertexUtils.MirrorZ(currentTempBuffer, obj);
                     break;
                 case EditingStep.StepType.stretchX:
                     VertexUtils.StretchX(currentTempBuffer, 1 / last.stretchFactor);
@@ -331,13 +345,13 @@ namespace ProceduralObjects.Classes
                     last.RedoPosRotMoveTo(obj);
                     break;
                 case EditingStep.StepType.mirrorX:
-                    VertexUtils.MirrorX(currentTempBuffer);
+                    VertexUtils.MirrorX(currentTempBuffer, obj);
                     break;
                 case EditingStep.StepType.mirrorY:
-                    VertexUtils.MirrorY(currentTempBuffer);
+                    VertexUtils.MirrorY(currentTempBuffer, obj);
                     break;
                 case EditingStep.StepType.mirrorZ:
-                    VertexUtils.MirrorZ(currentTempBuffer);
+                    VertexUtils.MirrorZ(currentTempBuffer, obj);
                     break;
                 case EditingStep.StepType.stretchX:
                     VertexUtils.StretchX(currentTempBuffer, last.stretchFactor);

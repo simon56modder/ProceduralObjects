@@ -5,13 +5,20 @@ using System.Text;
 using System.IO;
 using UnityEngine;
 
+using ColossalFramework.PlatformServices;
+
 using ProceduralObjects.Classes;
 
 namespace ProceduralObjects.ProceduralText
 {
     public class TextureFont
     {
-        public TextureFont(string name, Texture2D texNormal, uint spaceWidth)
+        public TextureFont(string path)
+        {
+            m_path = path;
+        }
+
+        public void Initialize(string name, Texture2D texNormal, uint spaceWidth)
         {
             m_fontName = name;
             m_textureNormal = texNormal;
@@ -22,22 +29,17 @@ namespace ProceduralObjects.ProceduralText
             m_boldExists = false;
             m_stylesNames = null;
         }
-        public TextureFont(string name, Texture2D texNormal, Texture2D texItalic, Texture2D texBold, uint spaceWidth)
+        public void Initialize(string name, Texture2D texNormal, Texture2D texItalic, Texture2D texBold, uint spaceWidth)
         {
-            m_fontName = name;
-            m_textureNormal = texNormal;
+            Initialize(name, texNormal, spaceWidth);
             m_textureBold = texBold;
             m_textureItalic = texItalic;
-            m_charTexturesNormal = new Dictionary<char, Texture2D>();
             m_charTexturesItalic = new Dictionary<char, Texture2D>();
             m_charTexturesBold = new Dictionary<char, Texture2D>();
-            m_kerningNormal = new Dictionary<Vector2, int>();
             m_kerningItalic = new Dictionary<Vector2, int>();
             m_kerningBold = new Dictionary<Vector2, int>();
-            m_spaceWidth = spaceWidth;
             m_italicExists = true;
             m_boldExists = true;
-            m_stylesNames = null;
         }
 
         public void BuildFont()
@@ -74,19 +76,19 @@ namespace ProceduralObjects.ProceduralText
 
         public Dictionary<char, Texture2D> m_charTexturesNormal, m_charTexturesItalic, m_charTexturesBold;
         public Texture2D m_textureNormal, m_textureBold, m_textureItalic;
-        public string m_orderedChars;
-        public string m_fontName;
+        public string m_fontName, m_orderedChars, m_path;
         public string[] m_stylesNames;
-        public uint m_spaceWidth, m_defaultSpacing;
+        public uint m_spaceWidth, m_defaultSpacing, m_charSize;
         public bool m_italicExists, m_boldExists, m_disableColorOverwriting;
         public Dictionary<Vector2, int> m_kerningNormal, m_kerningItalic, m_kerningBold;
-
+        public PublishedFileId file_id;
+        
         public void PrintString(Texture2D originalTex, string str, FontStyle style, Vector2 position, uint spacing, uint size, Color fontColor, byte rotation, out int width, out int height, float scaleX = 1f, float scaleY = 1f)
         {
             var stringTex = GetString(str, style, spacing);
-            if (size != 50 || scaleX != 1f || scaleY != 1f)
+            if (size != m_charSize || scaleX != 1f || scaleY != 1f)
             {
-                TextureScale.Bilinear(stringTex, (int)((stringTex.width * size / 50) * scaleX), (int)(size * scaleY));
+                TextureScale.Bilinear(stringTex, (int)((stringTex.width * size / m_charSize) * scaleX), (int)(size * scaleY));
             }
             if (rotation > 0)
             {
@@ -148,7 +150,7 @@ namespace ProceduralObjects.ProceduralText
         }
         public Texture2D GetString(string str, FontStyle style, uint spacing)
         {
-            var tex = TextureUtils.PlainTexture(GetStringLength(str, style, spacing), 50, blank);
+            var tex = TextureUtils.PlainTexture(GetStringLength(str, style, spacing), (int)m_charSize, blank);
             int offsetX = 0;
             var charTextures = getStyleDictionary(style);
 
@@ -158,7 +160,7 @@ namespace ProceduralObjects.ProceduralText
                     str = str.Replace(str[i], ' ');
                 if (str[i] == ' ')
                 {
-                    for (int y = 0; y < 50; y++)
+                    for (int y = 0; y < m_charSize; y++)
                     {
                         for (int x = 0; x < m_spaceWidth; x++)
                         {
@@ -171,7 +173,7 @@ namespace ProceduralObjects.ProceduralText
                 {
                     var chartex = charTextures[str[i]];
                     var k = kerning(i, str, style);
-                    for (int y = 0; y < 50; y++)
+                    for (int y = 0; y < m_charSize; y++)
                     {
                         for (int x = 0; x < chartex.width + (int)spacing; x++)
                         {
@@ -218,17 +220,17 @@ namespace ProceduralObjects.ProceduralText
             int index = m_orderedChars.IndexOf(c);
             int line = Mathf.FloorToInt(index / 10);
             index %= 10;
-            Texture2D charTex = new Texture2D(50, 50);
+            Texture2D charTex = new Texture2D((int)m_charSize, (int)m_charSize);
 
-            int savedStart = -1, savedEnd = -1, heightDiff = font.height - 50;
+            int savedStart = -1, savedEnd = -1, heightDiff = font.height - (int)m_charSize;
 
-            for (int x = 0; x < 50; x++)
+            for (int x = 0; x < m_charSize; x++)
             {
                 if (savedStart == -1)
                 {
-                    for (int y = 0; y < 50; y++)
+                    for (int y = 0; y < m_charSize; y++)
                     {
-                        Color color = font.GetPixel(index * 52 + x, y + heightDiff - (52 * line));
+                        Color color = font.GetPixel(index * ((int)m_charSize + 2) + x, y + heightDiff - (((int)m_charSize + 2) * line));
                         if (color.a > 0)
                         {
                             charTex.SetPixel(x, y, color);
@@ -241,9 +243,9 @@ namespace ProceduralObjects.ProceduralText
                 else if (savedEnd == -1)
                 {
                     bool foundEnd = true;
-                    for (int y = 0; y < 50; y++)
+                    for (int y = 0; y < m_charSize; y++)
                     {
-                        Color color = font.GetPixel(index * 52 + x, y + heightDiff - (52 * line));
+                        Color color = font.GetPixel(index * ((int)m_charSize + 2) + x, y + heightDiff - (((int)m_charSize + 2) * line));
                         if (color.a > 0)
                         {
                             charTex.SetPixel(x, y, color);
@@ -259,8 +261,8 @@ namespace ProceduralObjects.ProceduralText
             charTex.Apply();
             try
             {
-                var newTex = new Texture2D(savedEnd - savedStart, 50);
-                for (int y = 0; y < 50; y++)
+                var newTex = new Texture2D(savedEnd - savedStart, (int)m_charSize);
+                for (int y = 0; y < m_charSize; y++)
                 {
                     for (int x = 0; x < newTex.width; x++)
                     {
@@ -276,7 +278,7 @@ namespace ProceduralObjects.ProceduralText
             }
             catch (Exception e)
             {
-                Debug.LogError("[ProceduralObjects] Font error : Exception with character " + c.ToString() + " : " + e.Message);
+                Debug.LogWarning("[ProceduralObjects] Font error in font " + m_fontName + " : Failed to fully setup character " + c.ToString() + " : " + e.Message);
                 return charTex;
             }
         }
@@ -306,10 +308,13 @@ namespace ProceduralObjects.ProceduralText
             if (m_boldExists)
                 CalculateBoldKerning(excluded);
 
-            if (File.Exists(ProceduralObjectsMod.TextureConfigPath + "KerningData_" + m_fontName + ".txt"))
-                File.Delete(ProceduralObjectsMod.TextureConfigPath + "KerningData_" + m_fontName + ".txt");
+            if (!Directory.Exists(ProceduralObjectsMod.FontsPath))
+                Directory.CreateDirectory(ProceduralObjectsMod.FontsPath);
 
-            TextWriter tw = new StreamWriter(ProceduralObjectsMod.TextureConfigPath + "KerningData_" + m_fontName + ".txt");
+            if (File.Exists(ProceduralObjectsMod.FontsPath + "KerningData_" + m_fontName + ".txt"))
+                File.Delete(ProceduralObjectsMod.FontsPath + "KerningData_" + m_fontName + ".txt");
+
+            TextWriter tw = new StreamWriter(ProceduralObjectsMod.FontsPath + "KerningData_" + m_fontName + ".txt");
             for (int i = 0; i < m_orderedChars.Length; i++)
             {
                 if (excluded.Contains(i))

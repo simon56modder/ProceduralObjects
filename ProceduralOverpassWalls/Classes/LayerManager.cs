@@ -5,6 +5,7 @@ using System.Text;
 using UnityEngine;
 
 using ProceduralObjects.Localization;
+using ProceduralObjects.UI;
 
 namespace ProceduralObjects.Classes
 {
@@ -18,7 +19,7 @@ namespace ProceduralObjects.Classes
         }
         public List<Layer> m_layers;
 
-        public Rect winRect = new Rect(300, 300, 320, 350);
+        public Rect winRect = new Rect(155, 500, 320, 350);
         public bool showWindow = false;
         private Vector2 scrollLayers = Vector2.zero;
         private string newLayerText;
@@ -27,14 +28,13 @@ namespace ProceduralObjects.Classes
         public void DrawWindow()
         {
             if (showWindow)
-                winRect = GUIUtils.ClampRectToScreen(GUI.Window(99045, winRect, draw, LocalizationManager.instance.current["layers"]));
+                winRect = GUIUtils.ClampRectToScreen(GUIUtils.Window(99045, winRect, draw, LocalizationManager.instance.current["layers"]));
         }
         void draw(int id)
         {
-            GUI.DragWindow(new Rect(0, 0, 287, 28));
-            if (GUI.Button(new Rect(289, 4, 28, 27), "X"))
+            GUI.DragWindow(new Rect(0, 0, 268, 28));
+            if (GUIUtils.CloseHelpButtons(winRect, "Layers"))
             {
-                ProceduralObjectsLogic.PlaySound();
                 showWindow = false;
             }
             GUI.Label(new Rect(5, 22, 310, 28), LocalizationManager.instance.current["layers_desc"]);
@@ -47,7 +47,27 @@ namespace ProceduralObjects.Classes
                     ProceduralObjectsLogic.PlaySound();
                     m_layers[i].m_isHidden = !m_layers[i].m_isHidden;
                 }
-                m_layers[i].m_name = GUI.TextField(new Rect(35, i * 26 + 1, 219, 24), m_layers[i].m_name);
+                bool canBeMoved = CanLayerMoveUp(m_layers[i]) || CanLayerMoveDown(m_layers[i]);
+                if (canBeMoved)
+                {
+                    if (CanLayerMoveUp(m_layers[i]))
+                    {
+                        if (GUI.Button(new Rect(35, i * 26 + 1, 25, 12), ProceduralObjectsMod.Icons[6]))
+                        {
+                            ProceduralObjectsLogic.PlaySound();
+                            MoveLayerUp(m_layers[i]);
+                        }
+                    }
+                    if (CanLayerMoveDown(m_layers[i]))
+                    {
+                        if (GUI.Button(new Rect(35, i * 26 + 13.5f, 25, 12), ProceduralObjectsMod.Icons[7]))
+                        {
+                            ProceduralObjectsLogic.PlaySound();
+                            MoveLayerDown(m_layers[i]);
+                        }
+                    }
+                }
+                m_layers[i].m_name = GUI.TextField(new Rect(canBeMoved ? 62 : 35, i * 26 + 1, canBeMoved ? 192 : 219, 24), m_layers[i].m_name);
                 GUI.color = Color.red;
                 if (GUI.Button(new Rect(256, i * 26 + 1, 24, 24), "X"))
                 {
@@ -93,6 +113,52 @@ namespace ProceduralObjects.Classes
             if (!m_layers.Contains(layer))
                 return;
             m_layers.Remove(layer);
+        }
+        public void MoveLayerUp(Layer layer)
+        {
+            if (!CanLayerMoveUp(layer))
+                return;
+            var buffer = new List<Layer>(m_layers);
+            var index = buffer.IndexOf(layer);
+            buffer.Remove(layer);
+            m_layers.Clear();
+            for (int i = 0; i < buffer.Count; i++)
+            {
+                if (i == index - 1)
+                    m_layers.Add(layer);
+                m_layers.Add(buffer[i]);
+            }
+        }
+        public void MoveLayerDown(Layer layer)
+        {
+            if (!CanLayerMoveDown(layer))
+                return;
+            var buffer = new List<Layer>(m_layers);
+            var index = buffer.IndexOf(layer);
+            buffer.Remove(layer);
+            m_layers.Clear();
+            for (int i = 0; i < buffer.Count; i++)
+            {
+                m_layers.Add(buffer[i]);
+                if (i == index)
+                    m_layers.Add(layer);
+            }
+        }
+        public bool CanLayerMoveUp(Layer layer)
+        {
+            if (!m_layers.Contains(layer))
+                return false;
+            if (m_layers.IndexOf(layer) == 0)
+                return false;
+            return true;
+        }
+        public bool CanLayerMoveDown(Layer layer)
+        {
+            if (!m_layers.Contains(layer))
+                return false;
+            if (m_layers.IndexOf(layer) == m_layers.Count - 1)
+                return false;
+            return true;
         }
         public void UpdateLocalization()
         {

@@ -7,6 +7,7 @@ using ColossalFramework.IO;
 using UnityEngine;
 
 using ProceduralObjects.Localization;
+using ProceduralObjects.UI;
 
 namespace ProceduralObjects.Classes
 {
@@ -25,11 +26,18 @@ namespace ProceduralObjects.Classes
         {
             if (File.Exists(CachePath))
             {
-                var lines = File.ReadAllLines(CachePath);
-                OldVersion = lines.FirstOrDefault(line => line.Contains("VERSION ")).Replace("VERSION ", "");
-                if (OldVersion == ProceduralObjectsMod.VERSION)
+                try
                 {
-                    AllowedToShow = false;
+                    var lines = File.ReadAllLines(CachePath);
+                    OldVersion = lines.FirstOrDefault(line => line.Contains("VERSION ")).Replace("VERSION ", "");
+                    if (OldVersion == ProceduralObjectsMod.VERSION)
+                    {
+                        AllowedToShow = false;
+                    }
+                }
+                catch
+                {
+                    Debug.LogError("[ProceduralObjects] Update Informant found a cache file but was unable to read it !");
                 }
                 File.Delete(CachePath);
             }
@@ -38,11 +46,11 @@ namespace ProceduralObjects.Classes
             tw.Close();
 
             Changelog = new string[] {
+                "1.7 changelog :\n\n■ Added PO Groups\n■ Added PO Modules (external mods that add behaviours to POs)\n■ New Customization Tool actions : 'Conform to Terrain' and 'conform to networks...'\n■ Position fields moved from Adv. Edition tools to General Tool, new Rotation fields\n■ Rendering improvement & Thumbnail/High-res screenshot issue fix thanks to @krzychu124\n■ 'Paste into Selection' turned into an option, disabled by default.\n\nCheckout the full changelog on the wiki",
+                "1.6.3 changelog :\n\n■ Edit mode UI revamp\n■ New Customization Tool actions\n■ Type in values for distances, angles, stretch factors using the keyboard\n   in General Tool with Gizmos, or in Customization Tool with the Mouse tools while holding the movements, then press Enter.\n   (configurable units in the settings)\n■ New Font Management window\n■ Chinese translation by SteinsGateSG\n\nCheckout the full changelog on the wiki",
+                "1.6.2 changelog :\n\n■ Selection mode improvements\n■ PO now available in the Map Editor !\n■ Use Ctrl while moving an object with the General Tool position gizmo to duplicate an object\n■ Customization Tool improvements (New snap to axis feature for mouse movements, new vertex look...)\n■ Text Customization & Layers improvements\n■ Various fixes\n\nCheckout the full changelog on the wiki",
+                "1.6.1 changelog :\n\n■ Painter for POs\n■ Huge copy/paste speed increase thanks to Quboid\n■ Controls improvements\n   New gizmos, world/local gizmo settings, keyboard moves finetuning\n■ New Advanced Editions tools specific features\n■ Move To Tool improvements\n■ Ability to Ctrl+V objects into others to replace them\n■ Various fixes, including Ploppable Surfaces vertices edition issue\n\nCheckout the full changelog on the wiki",
                 "1.6 changelog :\n\n■Added Undo (Ctrl+Z) and Redo (Ctrl+Y) in Edit mode\n■Added the Advanced Edition tools window accessible from the General Tool\n■Text Customization improvements : rotation, sorting and color rectangles\n■Added Customization Tool modes : Position, Rotation, Scale, Flatten (right click to open the dropdown menu)\n■Added \"Confirm Deletion\" and \"Not PO compatible\" popups\n■Adaptive and configurable Gizmo size\n■New tools for font creation\n■Optimization of UI rendering and copy/paste, added sounds & effects\n■Revamped the settings\n<b>See the full changelog on the wiki</b>",
-                "1.6 - beta 4 changelog :\n\n■ Flatten tool in Customization mode (select vertices > right click > Flatten)\n■ Some Move It compatibility added\n■ Fixed Language selection, fixed text customization issue after cloning.\n■ Added styles names for custom fonts",
-                "1.6 - beta 3 changelog :\n\n■ New Customization tool modes : \n  - Position mode : standard mode\n  - Rotation mode : use Left Click to rotate the selection\n  - Scale mode : Left Click to scale the selection up/down\n  - Right Click to change modes - the mouse cursor changes accordingly\n■ Added Mirror and Stretch in the Advanced Edition window\n■ Fixed the \"object out of view\" issue",
-                "1.6 - beta 2 changelog :\n\n■ Full integration of Undo/Redo in Edit mode\n■ Added the Advanced Edition window\n  - Coordinates fields for Position ; Snap to Ground, Store height manually\n  - Texture tiling factor for custom textures\n■ Text Customization improvements \n  - Ability to sort fields (move up/down like layers)\n  - Rotation of text fields\n  - Ability to create plain color rectangles\n  - Added an automated Kerning data generator for font developers in the Character table\n■ Added \"Confirm Delete\" popup (configurable in the settings panel) and \"Not PO compatible\" popup\n■ Adaptive Gizmo size based on distance from the object (configurable in settings)\n■ Optimization of Copy/Paste and fixed UI rendering\n■ Added cursors style, effects and UI sound \n■ Revamped the settings UI\n  - The mod language can be independently chosen from the game's language\n  - Added the \"Show Developers tools\" option (enables Asset editor tools and Kerning generator)",
-                "1.6 - beta 1 changelog :\n\n■ Added Undo (Ctrl+Z) and Redo (Ctrl+Y) for vertices movement\n■ Optimized UI rendering (faster)\n■ Optimized Copy/Paste (in theory - not proven)",
                 "1.5.5 changelog :\n\n■ Added 'Align Heights' : click one or more Objects, click Align Heights, and select an object on which the others will have to align\n■ Rotation can be done on all axis in the 'Move To' mode with the Arrow keys",
                 "1.5.4 changelog :\n\n■ Added the Layers system : show/hide parts of your builds/city through a system of layers (virtually no limit to the number of layers)\n■ Attempt to fix the Detail nature mod bug.\n■ Ability to Move entire selections without the need of copy/paste.\n■ Using 'Move To' doesn't make you enter Edit mode.\n■ Changed the order of edition buttons for better workflow.",
                 "1.5.3 changelog :\n\n■ Added the Characters Table : click on the font name while editing a text field to make it appear.\n■ Russian translation now available thanks to Vitalii201",
@@ -73,12 +81,13 @@ namespace ProceduralObjects.Classes
                     return;
                 if (LocalizationManager.instance.current == null)
                     return;
-                uiRect = GUI.Window(this.GetInstanceID(), uiRect, DrawUpdateUI, "Procedural Objects - " + LocalizationManager.instance.current["installed_version"] + " : " + ProceduralObjectsMod.VERSION);
+                uiRect = GUIUtils.Window(this.GetInstanceID(), uiRect, DrawUpdateUI, "Procedural Objects - " + LocalizationManager.instance.current["installed_version"] + " : " + ProceduralObjectsMod.VERSION);
             }
         }
         void DrawUpdateUI(int id)
         {
-            GUI.DragWindow(new Rect(0, 0, 600, 22));
+            GUI.DragWindow(new Rect(0, 0, 575, 22));
+            GUIUtils.HelpButton(600, "Changelog");
 
             GUI.Label(new Rect(10, 25, 580, 275), LocalizationManager.instance.current["version"] + " " + Changelog[currentShowingChangelogIndex]);
 
@@ -87,7 +96,7 @@ namespace ProceduralObjects.Classes
                 if (GUI.Button(new Rect(125, 310, 110, 30), LocalizationManager.instance.current["next_version"]))
                     currentShowingChangelogIndex -= 1;
             }
-            if (currentShowingChangelogIndex != (Changelog.Count() - 1))
+            if (currentShowingChangelogIndex != (Changelog.Length - 1))
             {
                 if (GUI.Button(new Rect(5, 310, 120, 30), LocalizationManager.instance.current["prev_version"]))
                     currentShowingChangelogIndex += 1;

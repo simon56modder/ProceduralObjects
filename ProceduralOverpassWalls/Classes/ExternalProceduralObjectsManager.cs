@@ -9,6 +9,7 @@ using ColossalFramework.Plugins;
 using ICities;
 
 using ProceduralObjects.ProceduralText;
+using ProceduralObjects.UI;
 
 namespace ProceduralObjects.Classes
 {
@@ -34,52 +35,53 @@ namespace ProceduralObjects.Classes
           //  tw.WriteLine("scale = " + pobj.scale.ToString());
             tw.WriteLine("customTexture = " + ((pobj.customTexture == null) ? "null" : pobj.customTexture.name));
             tw.WriteLine("renderDistance = " + pobj.renderDistance.ToString());
-            tw.WriteLine("rotation = " + pobj.m_rotation.ToString());
+            tw.WriteLine("rotation = " + pobj.m_rotation.ToStringUnrounded());
             tw.WriteLine("disableRecalculation = " + pobj.disableRecalculation.ToString());
             if (pobj.tilingFactor != 8)
                 tw.WriteLine("tilingFactor = " + pobj.tilingFactor.ToString());
+            tw.WriteLine("color = " + ((SerializableColor)pobj.m_color).ToString());
+            tw.WriteLine("flipFaces = " + pobj.flipFaces.ToString());
+            tw.WriteLine("normalsRecalc = " + pobj.normalsRecalculation.ToString());
+            tw.WriteLine("visibility = " + pobj.visibility.ToString());
             if (pobj.textParam != null)
             {
                 if (pobj.textParam.Count() > 0)
                 {
                     foreach (TextField field in pobj.textParam.m_textFields)
-                    {
                         tw.WriteLine(TextField.SaveString(field));
-                    }
                 }
             }
-            tw.WriteLine("VERTICES " + pobj.allVertices.Count());
-            for (int i = 0; i < pobj.allVertices.Count(); i++)
+            if (pobj.modules != null)
             {
-                tw.WriteLine("vertex " + i.ToString() + " = " + pobj.allVertices[i].ToString());
+                if (pobj.modules.Count > 0)
+                    ModuleManager.WriteModules(tw, pobj.modules, false);
             }
-            tw.Close();
+            if (pobj.meshStatus == 1)
+                tw.WriteLine("ORIGINALMODEL");
+            else
+            {
+                tw.WriteLine("VERTICES " + pobj.allVertices.Count());
+                for (int i = 0; i < pobj.allVertices.Count(); i++)
+                {
+                    tw.WriteLine("vertex " + i.ToString() + " = " + pobj.allVertices[i].ToStringUnrounded());
+                }
+                tw.Close();
+            }
             if (!m_externals.Any(ext => ext.m_object == pobj))
                 m_externals.Add(new ExternalInfo(name, path, pobj, false));
         }
 
-        public void DeleteExternal(ExternalInfo info, List<Texture2D> textures, FontManager fManager)
+        public void DeleteExternal(ExternalInfo info)
         {
             if (m_externals == null)
-            {
-                LoadExternals(textures, fManager);
                 return;
-            }
             if (!m_externals.Contains(info))
-            {
-                LoadExternals(textures, fManager);
                 return;
-            }
             if (info.isWorkshop)
-            {
-                LoadExternals(textures, fManager);
                 return;
-            }
             if (!File.Exists(info.m_filePath))
-            {
-                LoadExternals(textures, fManager);
                 return;
-            }
+
             File.Delete(info.m_filePath);
             if (m_externals.Contains(info))
                 m_externals.Remove(info);
@@ -106,27 +108,39 @@ namespace ProceduralObjects.Classes
             File.WriteAllLines(info.m_filePath, lines);
             info.m_name = newName;
         }
-        public void LoadExternals(List<Texture2D> availableTextures, FontManager fManager)
+        public void LoadExternals(FontManager fManager)
         {
             m_externals = new List<ExternalInfo>();
 
             // local externals
             if (!Directory.Exists(ProceduralObjectsMod.ExternalsConfigPath))
             {
-                Debug.Log("[ProceduralObjects] No Externals folder found : creating one and skipping loading.");
-                Directory.CreateDirectory(ProceduralObjectsMod.ExternalsConfigPath);
-                return;
-            }
-            if (!Directory.Exists(ProceduralObjectsMod.ExternalsConfigPath))
-            {
-                Debug.LogError("[ProceduralObjects] Fatal Directory error : couldn't create the Externals folder properly. Skipping Externals loading.");
-                return;
+                if (Directory.Exists(ProceduralObjectsMod.OldExternalsConfigPath))
+                {
+                    try
+                    {
+                        Directory.Move(ProceduralObjectsMod.OldExternalsConfigPath, ProceduralObjectsMod.ExternalsConfigPath);
+                        Debug.Log("[ProceduralObjects] Found old externals directory, moving to the new.");
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogError("[ProceduralObjects] Failed to move the old externals directory to the new one : " + e);
+                        Directory.CreateDirectory(ProceduralObjectsMod.ExternalsConfigPath);
+                        return;
+                    }
+                }
+                else
+                {
+                    Debug.Log("[ProceduralObjects] No Externals folder found (neither old nor new) : creating one and skipping loading.");
+                    Directory.CreateDirectory(ProceduralObjectsMod.ExternalsConfigPath);
+                    return;
+                }
             }
             foreach (string path in Directory.GetFiles(ProceduralObjectsMod.ExternalsConfigPath, "*.pobj", SearchOption.AllDirectories))
             {
                 if (!File.Exists(path))
                     continue;
-                LoadOneExternal(path, availableTextures, false, fManager);
+                LoadOneExternal(path, false, fManager);
             }
 
             // workshop externals
@@ -142,13 +156,13 @@ namespace ProceduralObjects.Classes
                     {
                         if (!File.Exists(file))
                             continue;
-                        LoadOneExternal(file, availableTextures, true, fManager);
+                        LoadOneExternal(file, true, fManager);
                     }
                 }
             }
 
         }
-        private void LoadOneExternal(string path, List<Texture2D> availableTextures, bool fromWorkshop, FontManager fManager)
+        private void LoadOneExternal(string path, bool fromWorkshop, FontManager fManager)
         {
             try
             {
@@ -156,15 +170,38 @@ namespace ProceduralObjects.Classes
 
                 if (lines.Any(line => line.Contains("externaltype = selection")))
                 {
-                    LoadSelectionExternal(lines, path, availableTextures, fromWorkshop, fManager);
+                    LoadSelectionExternal(lines, path, fromWorkshop, fManager);
                 }
                 else
                 {
                     CacheProceduralObject obj = new CacheProceduralObject();
                     obj.tilingFactor = 8;
+                    obj.m_color = Color.white;
                     string name = "";
+                    var modulesData = new List<Dictionary<string, string>>();
+                    Dictionary<string, string> currentModuleData = null;
+                    bool original = lines.Any(s => s.Contains("ORIGINALMODEL"));
+                    if (original)
+                        obj.meshStatus = 1;
+                    else
+                        obj.meshStatus = 2;
                     for (int i = 0; i < lines.Count(); i++)
                     {
+                        if (currentModuleData != null)
+                        {
+                            if (lines[i].Contains("{"))
+                                continue;
+                            else if (lines[i].Contains("}"))
+                            {
+                                modulesData.Add(currentModuleData);
+                                currentModuleData = null;
+                                continue;
+                            }
+                            else if (lines[i].Contains(" = "))
+                            {
+                                currentModuleData.Add(lines[i].GetUntilOrEmpty(" = ").Trim(), lines[i].GetStringAfter(" = ").Trim());
+                            }
+                        }
                         if (lines[i].Contains("name = "))
                             name = lines[i].Replace("name = ", "").Trim();
                         else if (lines[i].Contains("baseInfoType = "))
@@ -183,14 +220,24 @@ namespace ProceduralObjects.Classes
                             obj.m_rotation = VertexUtils.ParseQuaternion(lines[i].Replace("rotation = ", ""));
                         else if (lines[i].Contains("disableRecalculation = "))
                             obj.disableRecalculation = bool.Parse(lines[i].Replace("disableRecalculation = ", ""));
+                        else if (lines[i].Contains("color = "))
+                            obj.m_color = SerializableColor.Parse(lines[i].Replace("color = ", ""));
+                        else if (lines[i].Contains("flipFaces = "))
+                            obj.flipFaces = bool.Parse(lines[i].Replace("flipFaces = ", ""));
+                        else if (lines[i].Contains("normalsRecalc = "))
+                            obj.normalsRecalculation = (NormalsRecalculation)Enum.Parse(typeof(NormalsRecalculation), lines[i].Replace("normalsRecalc = ", ""), true);
+                        else if (lines[i].Contains("visibility = "))
+                            obj.visibility = (ProceduralObjectVisibility)Enum.Parse(typeof(ProceduralObjectVisibility), lines[i].Replace("visibility = ", ""), true);
                         else if (lines[i].Contains("customTexture = "))
                         {
+                            obj.customTexture = TextureManager.instance.FindTexture(lines[i].Replace("customTexture = ", ""));
+                            /*
                             if (lines[i].Replace("customTexture = ", "") == "null")
                                 obj.customTexture = null;
                             else if (!availableTextures.Any(tex => tex.name == lines[i].Replace("customTexture = ", "")))
                                 Debug.LogError("[ProceduralObjects] A saved object was found with a texture that doesn't exist anymore with the name " + lines[i].Replace("customTexture = ", "") + ", therefore loading the default object texture");
                             else
-                                obj.customTexture = availableTextures.FirstOrDefault(tex => tex.name == lines[i].Replace("customTexture = ", ""));
+                                obj.customTexture = availableTextures.FirstOrDefault(tex => tex.name == lines[i].Replace("customTexture = ", "")); */
                         }
                         else if (lines[i].Contains("textParam: "))
                         {
@@ -204,14 +251,27 @@ namespace ProceduralObjects.Classes
                                 obj.textParam = new TextParameters();
                             obj.textParam.AddField(TextField.ParseColorRect(lines[i]));
                         }
-                        else if (lines[i].Contains("VERTICES "))
-                            obj.allVertices = new Vector3[int.Parse(lines[i].Replace("VERTICES ", ""))];
-                        else if (lines[i].Contains("vertex"))
+                        else if (lines[i].Contains("MODULE"))
                         {
-                            string[] split = lines[i].Replace("vertex ", "").Split(new string[] { " = " }, StringSplitOptions.RemoveEmptyEntries);
-                            obj.allVertices[int.Parse(split[0])] = VertexUtils.ParseVector3(split[1]);
+                            try
+                            {
+                                if (lines[i + 1].Contains("{"))
+                                    currentModuleData = new Dictionary<string, string>();
+                            }
+                            catch { continue; }
+                        }
+                        else if (!original)
+                        {
+                            if (lines[i].Contains("VERTICES "))
+                                obj.allVertices = new Vector3[int.Parse(lines[i].Replace("VERTICES ", ""))];
+                            else if (lines[i].Contains("vertex"))
+                            {
+                                string[] split = lines[i].Replace("vertex ", "").Split(new string[] { " = " }, StringSplitOptions.RemoveEmptyEntries);
+                                obj.allVertices[int.Parse(split[0])] = VertexUtils.ParseVector3(split[1]);
+                            }
                         }
                     }
+                    obj.modules = ModuleManager.LoadModulesFromData(modulesData, false, null);
                     ExternalInfo info = new ExternalInfo(name, path, obj, fromWorkshop);
                     m_externals.Add(info);
                 }
@@ -222,27 +282,50 @@ namespace ProceduralObjects.Classes
             } 
         }
 
-        private void LoadSelectionExternal(string[] fileLines, string path, List<Texture2D> availableTextures, bool fromWorkshop, FontManager fManager)
+        private void LoadSelectionExternal(string[] fileLines, string path,  bool fromWorkshop, FontManager fManager)
         {
             Dictionary<CacheProceduralObject, Vector3> objects = new Dictionary<CacheProceduralObject, Vector3>();
 
             CacheProceduralObject obj = null;
             Vector3 relativePos = Vector3.zero;
+            var modulesData = new List<Dictionary<string, string>>();
+            Dictionary<string, string> currentModuleData = null;
 
             string name = "";
             for (int i = 0; i < fileLines.Count(); i++)
             {
-                if (fileLines[i].Contains("name = "))
+                if (currentModuleData != null)
+                {
+                    if (fileLines[i].Contains("{"))
+                        continue;
+                    else if (fileLines[i].Contains("}"))
+                    {
+                        modulesData.Add(currentModuleData);
+                        currentModuleData = null;
+                        continue;
+                    }
+                    else if (fileLines[i].Contains(" = "))
+                    {
+                        currentModuleData.Add(fileLines[i].GetUntilOrEmpty(" = ").Trim(), fileLines[i].GetStringAfter(" = ").Trim());
+                    }
+                    continue;
+                }
+                else if (fileLines[i].Contains("name = "))
                     name = fileLines[i].Replace("name = ", "").Trim();
                 else if (fileLines[i].Contains("{"))
                 {
                     obj = new CacheProceduralObject();
                     obj.tilingFactor = 8;
+                    obj.m_color = Color.white;
+                    obj.meshStatus = 2;
                     relativePos = Vector3.zero;
+                    modulesData = new List<Dictionary<string, string>>();
                 }
                 else if (fileLines[i].Contains("}"))
                 {
+                    obj.modules = ModuleManager.LoadModulesFromData(modulesData, false, null);
                     objects[obj] = relativePos;
+                    modulesData = null;
                     obj = null;
                     relativePos = Vector3.zero;
                 }
@@ -264,6 +347,16 @@ namespace ProceduralObjects.Classes
                     obj.disableRecalculation = bool.Parse(fileLines[i].Replace("disableRecalculation = ", ""));
                 else if (fileLines[i].Contains("tilingFactor = "))
                     obj.tilingFactor = int.Parse(fileLines[i].Replace("tilingFactor = ", ""));
+                else if (fileLines[i].Contains("disableRecalculation = "))
+                    obj.disableRecalculation = bool.Parse(fileLines[i].Replace("disableRecalculation = ", ""));
+                else if (fileLines[i].Contains("flipFaces = "))
+                    obj.flipFaces = bool.Parse(fileLines[i].Replace("flipFaces = ", ""));
+                else if (fileLines[i].Contains("color = "))
+                    obj.m_color = SerializableColor.Parse(fileLines[i].Replace("color = ", ""));
+                else if (fileLines[i].Contains("normalsRecalc = "))
+                    obj.normalsRecalculation = (NormalsRecalculation)Enum.Parse(typeof(NormalsRecalculation), fileLines[i].Replace("normalsRecalc = ", ""), true);
+                else if (fileLines[i].Contains("visibility = "))
+                    obj.visibility = (ProceduralObjectVisibility)Enum.Parse(typeof(ProceduralObjectVisibility), fileLines[i].Replace("visibility = ", ""), true);
                 else if (fileLines[i].Contains("textParam: "))
                 {
                     if (obj.textParam == null)
@@ -278,12 +371,25 @@ namespace ProceduralObjects.Classes
                 }
                 else if (fileLines[i].Contains("customTexture = "))
                 {
+                    obj.customTexture = TextureManager.instance.FindTexture(fileLines[i].Replace("customTexture = ", ""));
+                    /*
                     if (fileLines[i].Replace("customTexture = ", "") == "null")
                         obj.customTexture = null;
                     else if (!availableTextures.Any(tex => tex.name == fileLines[i].Replace("customTexture = ", "")))
                         Debug.LogError("[ProceduralObjects] A saved object was found with a texture that doesn't exist anymore with the name " + fileLines[i].Replace("customTexture = ", "") + ", therefore loading the default object texture");
                     else
-                        obj.customTexture = availableTextures.FirstOrDefault(tex => tex.name == fileLines[i].Replace("customTexture = ", ""));
+                        obj.customTexture = availableTextures.FirstOrDefault(tex => tex.name == fileLines[i].Replace("customTexture = ", "")); */
+                }
+                else if (fileLines[i].Contains("ORIGINALMODEL"))
+                    obj.meshStatus = 1;
+                else if (fileLines[i].Contains("MODULE"))
+                {
+                    try
+                    {
+                        if (fileLines[i + 1].Contains("{"))
+                            currentModuleData = new Dictionary<string, string>();
+                    }
+                    catch { continue; }
                 }
                 else if (fileLines[i].Contains("VERTICES "))
                     obj.allVertices = new Vector3[int.Parse(fileLines[i].Replace("VERTICES ", ""))];
@@ -298,6 +404,7 @@ namespace ProceduralObjects.Classes
             ExternalInfo info = new ExternalInfo(name, path, selec, fromWorkshop);
             m_externals.Add(info);
         }
+
     }
     public class ExternalInfo
     {
