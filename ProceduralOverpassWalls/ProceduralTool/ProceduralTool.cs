@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using ColossalFramework;
+using ColossalFramework.UI;
 using UnityEngine;
 
 using ProceduralObjects.Classes;
@@ -15,7 +16,7 @@ namespace ProceduralObjects.Tools
     {
         // basically Empty ATM, all the related code is located in /ProceduralObjectsLogic.cs
         public static CursorInfo buildCursor = null, terrainLevel = null, terrainShift = null, moveVertices, rotateVertices, scaleVertices;
-       
+        
         public static void CreateCursors()
         {
             var cursors = Resources.FindObjectsOfTypeAll<CursorInfo>();
@@ -71,6 +72,10 @@ namespace ProceduralObjects.Tools
                                 break;
                         }
                         base.ShowToolInfo(true, toolInfo, toolInfoPos);
+                    }
+                    else if (Gizmos.useLineTool)
+                    {
+                        base.ShowToolInfo(true, LocalizationManager.instance.current["line_copy_locked"], toolInfoPos);
                     }
                     else if (Gizmos.isSnappingPrevMove)
                     {
@@ -201,10 +206,12 @@ namespace ProceduralObjects.Tools
                         LocalizationManager.instance.current["rmb_marquee_vertices"] + "\n" +
                         LocalizationManager.instance.current["lmb_drag_vertices"] +
                         "\nCtrl : " + LocalizationManager.instance.current["disableAxisSnapping"];
+
             GTControls = KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_for_smooth"] + "\n" +
                             KeyBindingsManager.instance.GetBindingFromName("edition_smallMovements").m_fullKeys + " : " + LocalizationManager.instance.current["hold_slow_together"] + "\n\nCtrl : " +
                 //  KeyBindingsManager.instance.GetBindingFromName("switchActionMode").m_fullKeys + " : " + LocalizationManager.instance.current["switch_modes"] + "\n" +
-                            LocalizationManager.instance.current["duplicateWhileMoving"] + "\n" +
+                            LocalizationManager.instance.current["duplicateWhileMoving"] + "\nCtrl+Shift : " +
+                            LocalizationManager.instance.current["line_copy"] + "\n" +
                             KeyBindingsManager.instance.GetBindingFromName("position_moveUp").m_fullKeys + ", " +
                             KeyBindingsManager.instance.GetBindingFromName("position_moveDown").m_fullKeys + ", " +
                             KeyBindingsManager.instance.GetBindingFromName("position_moveRight").m_fullKeys + ", " +

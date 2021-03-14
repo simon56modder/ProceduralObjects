@@ -25,7 +25,7 @@ namespace ProceduralObjects.Classes
         public ProceduralObjectsLogic logic;
         public uint counter_POs, counter_layers, counter_ConvProps, counter_ConvBuildings, counter_Decals, counter_PSrfs, counter_PA, counter_customModels;
         public bool showWindow = false;
-        private Rect window;
+        public Rect window;
         
         public void DrawWindow()
         {
@@ -49,7 +49,8 @@ namespace ProceduralObjects.Classes
                 + "\n" + LocalizationManager.instance.current["stats_convBuildings"]
                 + "\n\n" + LocalizationManager.instance.current["stats_layers"]);
             GUI.skin.label.alignment = TextAnchor.UpperRight;
-            GUI.Label(new Rect(5, 27, 290, 190), counter_POs + "\n" + logic.groups.Count + "\n" + counter_customModels + "\n" + logic.failedToLoadObjects + "\n\n" + counter_ConvProps + "\n" + counter_Decals + "\n" + counter_PSrfs + "\n" + counter_PA + "\n" + counter_ConvBuildings + "\n\n" + counter_layers);
+            try { GUI.Label(new Rect(5, 27, 290, 190), counter_POs + "\n" + logic.groups.Count + "\n" + counter_customModels + "\n" + logic.failedToLoadObjects + "\n\n" + counter_ConvProps + "\n" + counter_Decals + "\n" + counter_PSrfs + "\n" + counter_PA + "\n" + counter_ConvBuildings + "\n\n" + counter_layers); }
+            catch { }
             GUI.skin.label.alignment = TextAnchor.UpperLeft;
         }
 

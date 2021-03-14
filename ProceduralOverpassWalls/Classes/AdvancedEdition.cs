@@ -27,7 +27,7 @@ namespace ProceduralObjects.Classes
 
         public ProceduralObject m_object;
         public Vertex[] m_vertices;
-        private Rect winRect;
+        public Rect winRect;
         private Action undo, redo, apply;
         public bool showWindow;
         private int oldTilingFactor;

@@ -11,6 +11,7 @@ using UnityEngine;
 
 using ProceduralObjects.Localization;
 using ProceduralObjects.UI;
+using ProceduralObjects.ProceduralText;
 
 namespace ProceduralObjects.Classes
 {
@@ -32,7 +33,7 @@ namespace ProceduralObjects.Classes
         public int LocalTexturesCount = 0, TotalTexturesCount = 0;
 
         public bool showWindow;
-        private Rect winrect;
+        public Rect winrect;
 
 
         public void DrawWindow()
@@ -46,16 +47,12 @@ namespace ProceduralObjects.Classes
                 showWindow = false;
             GUI.DragWindow(new Rect(0, 0, 360, 26));
 
-            /*  if (TextureManager.instance.LocalTexturesCount == 0 && TextureManager.instance.TextureResources.Count == 0)
-                    GUI.Label(new Rect(10, 45, 350, 45), LocalizationManager.instance.current["no_tex"] + "\n" + LocalizationManager.instance.current["cant_create_basic"]);
-                else */
             GUI.Label(new Rect(10, 28, 350, 30), LocalizationManager.instance.current["local_tex"] + " : ");
 
             if (GUI.Button(new Rect(150, 27, 75, 28), LocalizationManager.instance.current["refresh"]))
             {
                 ProceduralObjectsLogic.PlaySound();
                 LoadTextures();
-                // basicTextures = basicTextures.LoadTextures();
             }
             if (GUI.Button(new Rect(230, 27, 155, 28), LocalizationManager.instance.current["open_tex"]))
             {
@@ -88,14 +85,12 @@ namespace ProceduralObjects.Classes
             if (GUI.Button(new Rect(5, 284, 380, 40), LocalizationManager.instance.current["prepare_texPackSave"]))
             {
                 ProceduralObjectsLogic.PlaySound();
-                ProceduralObjectsLogic.instance.generalShowUI = false;
-                ConfirmPanel.ShowModal(LocalizationManager.instance.current["prepare_texPackSave_title"],
+                GUIUtils.ShowModal(LocalizationManager.instance.current["prepare_texPackSave_title"],
                     LocalizationManager.instance.current["prepare_texPackSave_confirm"],
-                    delegate(UIComponent comp, int ret)
+                    (bool ok) =>
                     {
-                        if (ret ==1)
+                        if (ok)
                             PrepareTexPackAndSave();
-                        ProceduralObjectsLogic.instance.generalShowUI = true;
                     });
             }
         }
@@ -105,6 +100,8 @@ namespace ProceduralObjects.Classes
             Debug.Log("[ProceduralObjects] Texture Loading : Started local texture loading.");
          //   textures = new List<Texture2D>();
             TextureResources = new List<TextureResourceInfo>();
+            LocalTexturesCount = 0;
+            TotalTexturesCount = 0;
 
             // local textures loading
             LocalTextures = new TextureResourceInfo();
@@ -160,7 +157,7 @@ namespace ProceduralObjects.Classes
                                 var tex = TextureUtils.LoadPNG(path + (ProceduralObjectsMod.IsLinux ? "/" : @"\") + files[i] + ".png");
                            //   textures.Add(tex);
                                 tex.name = texResource.m_name + "/" + files[i];
-                                texResource.m_textures.Add(tex);
+                                texResource.m_textures.Add(TextureUtils.CreateSelectorThumbnail(tex), tex);
                                 TotalTexturesCount += 1;
                             }
                             else
@@ -190,7 +187,7 @@ namespace ProceduralObjects.Classes
                     // textures.Add(tex);
                     int pos = file.LastIndexOf(ProceduralObjectsMod.IsLinux ? "/" : @"\") + 1;
                     tex.name = "LOCALFOLDER/" + file.Substring(pos, file.Length - pos).Replace(".png", "");
-                    LocalTextures.m_textures.Add(tex);
+                    LocalTextures.m_textures.Add(TextureUtils.CreateSelectorThumbnail(tex), tex);
                     TotalTexturesCount += 1;
                     LocalTexturesCount += 1;
                 }
@@ -224,7 +221,7 @@ namespace ProceduralObjects.Classes
             {
                 i += 30;
                 if (!texResInfo.minimized)
-                    i += 80 * texResInfo.TexturesCount;
+                    i += 80 * Mathf.CeilToInt((float)texResInfo.TexturesCount / 3f);
             }
             return i;
         }
@@ -264,7 +261,7 @@ namespace ProceduralObjects.Classes
                 string name = input.Substring(pos, input.Length - pos).Replace(".png", "");
                 foreach (TextureResourceInfo info in TextureResources)
                 {
-                    foreach (Texture tex in info.m_textures)
+                    foreach (Texture tex in info.m_textures.Values.ToList())
                     {
                         if (tex.name.EndsWith(name))
                             return tex;
@@ -272,7 +269,7 @@ namespace ProceduralObjects.Classes
                 }
                 foreach (TextureResourceInfo info in TextureResources)
                 {
-                    foreach (Texture tex in info.m_textures)
+                    foreach (Texture tex in info.m_textures.Values.ToList())
                     {
                         if (tex.name.Contains(name))
                             return tex;
@@ -283,8 +280,8 @@ namespace ProceduralObjects.Classes
             {
                 if (input.StartsWith("LOCALFOLDER/"))
                 {
-                    if (LocalTextures.m_textures.Any(tex => tex.name == input))
-                        return LocalTextures.m_textures.First(tex => tex.name == input);
+                    if (LocalTextures.m_textures.Any(tex => tex.Value.name == input))
+                        return LocalTextures.m_textures.First(tex => tex.Value.name == input).Value;
                 }
                 else
                 {
@@ -294,7 +291,7 @@ namespace ProceduralObjects.Classes
                             continue;
                         if (!input.Contains(info.m_name))
                             continue;
-                        foreach (Texture tex in info.m_textures)
+                        foreach (Texture tex in info.m_textures.Values.ToList())
                         {
                             if (tex.name == input)
                                 return tex;
@@ -392,18 +389,6 @@ namespace ProceduralObjects.Classes
 
             return texture2D;
         }
-        public static Texture2D LoadTextureFromAssembly(string filename, string assemblyName)
-        {
-            Stream manifestResourceStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(assemblyName + ".Icons." + filename + ".png");
-
-            byte[] array = new byte[manifestResourceStream.Length];
-            manifestResourceStream.Read(array, 0, array.Length);
-
-            Texture2D texture2D = new Texture2D(2, 2, TextureFormat.ARGB32, false);
-            texture2D.LoadImage(array);
-
-            return texture2D;
-        }
 
         public static Texture2D RotateRight(Texture2D originalTexture)
         {
@@ -421,11 +406,15 @@ namespace ProceduralObjects.Classes
                     rotated[(i + 1) * h - j - 1] = original[original.Length - 1 - (j * w + i)];
                 }
             }
-
             Texture2D rotatedTexture = new Texture2D(h, w);
             rotatedTexture.SetPixels32(rotated);
             rotatedTexture.Apply();
             return rotatedTexture;
+        }
+        public static void DisposeTexFromMemory(this Texture2D tex)
+        {
+            if (tex != null)
+                UnityEngine.Object.Destroy(tex);
         }
 
         public static Texture2D PlainTexture(int width, int height, Color color)
@@ -441,6 +430,28 @@ namespace ProceduralObjects.Classes
             texture.SetPixels(resetColorArray);
             texture.Apply();
             return texture;
+        }
+
+        public static Texture CreateSelectorThumbnail(Texture tex)
+        {
+            Texture2D thumb = new Texture2D(tex.width, tex.height);
+            var pixels = (tex as Texture2D).GetPixels();
+            thumb.SetPixels(pixels);
+            thumb.Apply();
+            if (tex.width >= tex.height)
+                TextureScale.Bilinear(thumb, 100, (tex.height * 100) / tex.width);
+            else // if (tex.width < tex.height)
+                TextureScale.Bilinear(thumb, (tex.width * 100) / tex.height, 100);
+            for (int x = 0; x < thumb.width; x++)
+            {
+                for (int y = 0; y < thumb.height; y++)
+                {
+                    Color color = thumb.GetPixel(x, y);
+                    thumb.SetPixel(x, y, Color.Lerp(color, Color.white, .32f).KeepAlphaFrom(color));
+                }
+            }
+            thumb.Apply();
+            return thumb as Texture;
         }
 
         public static void PrintRectangle(Texture2D originalTex, int x, int y, int width, int height, Color color)
@@ -499,12 +510,12 @@ namespace ProceduralObjects.Classes
         public TextureResourceInfo()
         {
             minimized = true;
-            m_textures = new List<Texture>();
+            m_textures = new Dictionary<Texture, Texture>();
             m_name = string.Empty;
             m_failedToLoadTextures = 0;
         }
         public string m_name, m_fullPath;
-        public List<Texture> m_textures;
+        public Dictionary<Texture, Texture> m_textures;
         public int m_failedToLoadTextures;
         public bool minimized;
         public int TexturesCount

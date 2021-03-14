@@ -40,6 +40,12 @@ namespace ProceduralObjects.Classes
             guiPosition.y = Screen.height - guiPosition.y;
             return new Vector2(guiPosition.x, guiPosition.y);
         }
+        public static Vector2 WorldToGuiPoint(this Vector3 position, Camera cam)
+        {
+            var guiPosition = cam.WorldToScreenPoint(position);
+            guiPosition.y = Screen.height - guiPosition.y;
+            return new Vector2(guiPosition.x, guiPosition.y);
+        }
         public static Vector3 VertexWorldPosition(Vertex vertex, ProceduralObject obj)
         {
             if (obj.isPloppableAsphalt)
@@ -58,8 +64,6 @@ namespace ProceduralObjects.Classes
             obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, null);
             obj.m_position = NearestGroundPointVertical(obj.m_position);
             obj.historyEditionBuffer.ConfirmNewStep(null);
-            Singleton<EffectManager>.instance.DispatchEffect(Singleton<BuildingManager>.instance.m_properties.m_placementEffect,
-                new EffectInfo.SpawnArea(obj.m_position, Vector3.up, 10f), Vector3.zero, 0f, 1f, Singleton<AudioManager>.instance.DefaultGroup, 0u, true);
         }
         public static Vector3 NearestGroundPointVertical(Vector3 pos, bool andNetBuildings = false)
         {
@@ -108,28 +112,6 @@ namespace ProceduralObjects.Classes
             obj.historyEditionBuffer.ConfirmNewStep(buffer);
         }
 
-
-        public static void MakeUniqueMesh(this ProceduralObject obj)
-        {
-            if (obj.baseInfoType == "BUILDING" || obj.meshStatus == 2)
-                return;
-
-            obj.meshStatus = 2;
-            obj.m_mesh = obj.m_mesh.InstantiateMesh();
-            obj.allVertices = obj.m_mesh.vertices;
-          //  obj.m_mesh.SetVertices(new List<Vector3>(obj.allVertices));
-        } 
-        public static ProceduralObjectContainer[] GetContainerList(this ProceduralObjectsLogic logic)
-        {
-            var list = new List<ProceduralObjectContainer>();
-            if (logic.proceduralObjects == null)
-                return null;
-            foreach (ProceduralObject obj in logic.proceduralObjects)
-            {
-                list.Add(new ProceduralObjectContainer(obj));
-            }
-            return list.ToArray();
-        }
         public static Color GetColor(this BuildingInfo info)
         {
             if (!info.m_useColorVariations)
@@ -149,6 +131,18 @@ namespace ProceduralObjects.Classes
                 }
             }
         }
+
+        public static ProceduralObjectContainer[] GetContainerList(this ProceduralObjectsLogic logic)
+        {
+            var list = new List<ProceduralObjectContainer>();
+            if (logic.proceduralObjects == null)
+                return null;
+            foreach (ProceduralObject obj in logic.proceduralObjects)
+            {
+                list.Add(new ProceduralObjectContainer(obj));
+            }
+            return list.ToArray();
+        }
         public static void LoadContainerData(this ProceduralObjectsLogic logic, ProceduralObjectContainer[] containerArray)
         {
             logic.proceduralObjects = new List<ProceduralObject>();
@@ -167,15 +161,9 @@ namespace ProceduralObjects.Classes
                     if (obj.meshStatus != 1)
                     {
                         if (obj.RequiresUVRecalculation && !obj.disableRecalculation)
-                        {
                             obj.m_mesh.uv = Vertex.RecalculateUVMap(obj, Vertex.CreateVertexList(obj));
-                        }
-                        if (!obj.isPloppableAsphalt)
-                        {
-                            obj.RecalculateNormals();
-                            obj.m_mesh.RecalculateBounds();
-                        }
                     }
+                    obj.RecalculateBoundsNormalsExtras(obj.meshStatus);
                     logic.proceduralObjects.Add(obj);
                     logic.activeIds.Add(obj.id);
                 }
@@ -203,6 +191,11 @@ namespace ProceduralObjects.Classes
                     else
                     {
                         var root = logic.proceduralObjects.GetObjectWithId(po._groupRootIdData);
+                        if (root == null)
+                        {
+                            Debug.LogWarning("[ProceduralObjects] Object #" + po.id + " was supposed to be part of a group but the root could not be found ! Assigning no group.");
+                            continue;
+                        }
                         if (root.group == null)
                             poGroups.Add(POGroup.CreateGroupWithRoot(root));
 
@@ -216,6 +209,26 @@ namespace ProceduralObjects.Classes
             }
             return poGroups;
         }
+
+        private static List<ProceduralObject> prevSelection;
+        public static void UpdateObjectsSelectedState(List<ProceduralObject> selection)
+        {
+            var newSelection = new List<ProceduralObject>();
+            if (prevSelection != null)
+            {
+                foreach (var obj in prevSelection)
+                {
+                    obj._selected = false;
+                }
+            }
+            foreach (var obj in selection)
+            {
+                newSelection.Add(obj);
+                obj._selected = true;
+            }
+            prevSelection = newSelection;
+        }
+
         public static void RecalculateNormals(this ProceduralObject obj)
         {
             if (obj.normalsRecalcMode == NormalsRecalculation.None)
@@ -229,6 +242,16 @@ namespace ProceduralObjects.Classes
             else if (obj.normalsRecalcMode == NormalsRecalculation.Tolerance0)
                 obj.m_mesh.RecalculateNormals(0);
         }
+        public static void MakeUniqueMesh(this ProceduralObject obj)
+        {
+            if (obj.baseInfoType == "BUILDING" || obj.meshStatus == 2)
+                return;
+
+            obj.meshStatus = 2;
+            obj.m_mesh = obj.m_mesh.InstantiateMesh();
+            obj.allVertices = obj.m_mesh.vertices;
+            //  obj.m_mesh.SetVertices(new List<Vector3>(obj.allVertices));
+        } 
         public static Mesh InstantiateMesh(this Mesh source)
         {
             if (source == null)
@@ -248,7 +271,6 @@ namespace ProceduralObjects.Classes
             m.normals = source.normals;
             return m;
         }
-
         public static bool CheckMeshEquivalence(SerializableVector3[] savedVertices, Vector3[] meshVertices)
         {
             // avoid NullRefException, suppose they are different

@@ -15,6 +15,7 @@ namespace ProceduralObjects.Localization
         }
 
         public string identifier, name;
+        public bool wiki_complete;
         public Dictionary<string, string> keys;
 
         public void LoadFromFile(string path)
@@ -27,13 +28,18 @@ namespace ProceduralObjects.Localization
             {
                 if (lines[i].Contains("identifier = "))
                     identifier = lines[i].Replace("identifier = ", "");
+                else if (lines[i].ToLower().Contains("wiki_complete ="))
+                {
+                    if (lines[i].ToLower().Contains("true"))
+                        wiki_complete = true;
+                }
                 else if (lines[i].Contains("locale_name = "))
                     name = lines[i].Replace("locale_name = ", "");
                 else if (lines[i].Contains(" = "))
                 {
                     var kvp = lines[i].Split(new string[] { " = " }, StringSplitOptions.RemoveEmptyEntries);
                     if (kvp.Count() == 2)
-                        keys[kvp[0]] = kvp[1];
+                        keys[kvp[0]] = kvp[1].Replace("\\n", "\n");
                 }
             }
         }
@@ -49,9 +55,9 @@ namespace ProceduralObjects.Localization
                     if (!LocalizationManager.instance.english.keys.ContainsKey(key))
                         return identifier.ToUpper() + ":NOTFOUND[" + key + "]";
                     else
-                        return LocalizationManager.instance.english.keys[key].Replace("\\n", "\n");
+                        return LocalizationManager.instance.english.keys[key];
                 }
-                return keys[key].Replace("\\n", "\n");
+                return keys[key];
             }
             set
             {
@@ -85,6 +91,13 @@ namespace ProceduralObjects.Localization
             else if (recalc == NormalsRecalculation.Tolerance60)
                 s += string.Format(this["normalsRecalc_degTolerance"], "60");
             return s;
+        }
+
+        public string LocalizedWikiLink(string url)
+        {
+            if (wiki_complete)
+                return url + "/" + identifier;
+            return url;
         }
     }
 }

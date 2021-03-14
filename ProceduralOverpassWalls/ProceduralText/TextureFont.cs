@@ -93,11 +93,14 @@ namespace ProceduralObjects.ProceduralText
             if (rotation > 0)
             {
                 for (byte b = 0; b <= rotation; b++)
+                {
+                    var dumpTex = stringTex;
                     stringTex = TextureUtils.RotateRight(stringTex);
+                    dumpTex.DisposeTexFromMemory();
+                }
             }
             width = stringTex.width;
             height = stringTex.height;
-        //  position.y = Mathf.Abs(position.y - originalTex.height) - stringTex.height;
             position.y = originalTex.height - position.y - height;
             for (int x = 0; x < stringTex.width; x++)
             {
@@ -122,7 +125,8 @@ namespace ProceduralObjects.ProceduralText
                 }
             }
             originalTex.Apply();
-          //  return originalTex;
+            // attempt to reduce RAM usage (1.7.1)
+            stringTex.DisposeTexFromMemory();
         }
         private int kerning(int i, string s, FontStyle style)
         {

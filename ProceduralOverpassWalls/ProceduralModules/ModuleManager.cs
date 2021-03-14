@@ -55,7 +55,7 @@ namespace ProceduralObjects
             }
             GUI.DragWindow(new Rect(0, 0, 344, 23));
 
-            GUI.Label(new Rect(10, 25, 380, 25), "<b><size=13>" + LocalizationManager.instance.current["MT_installed"] + " :</size></b>");
+            GUI.Label(new Rect(10, 25, 380, 25), "<size=13><b>" + LocalizationManager.instance.current["MT_installed"] + "</b> (" + ProceduralObjectsMod.ModuleTypes.Count + ") :</size>");
 
             GUI.Box(new Rect(10, 52, 355, 200), string.Empty);
             scrollModuleTypes = GUI.BeginScrollView(new Rect(12, 54, 376, 196), scrollModuleTypes, new Rect(0, 0, 354, ProceduralObjectsMod.ModuleTypes.Count * 28 + 2));
@@ -68,7 +68,7 @@ namespace ProceduralObjects
                     selectedModuleType = module;
                     moduleCountMap = modules.Count(m => m.ModuleType == selectedModuleType);
                 }
-                GUI.DrawTexture(new Rect(2, i * 28 + 1, 21, 21), ProceduralObjectsMod.Icons[module.hide_all ? 3 : 4]);
+                GUI.DrawTexture(new Rect(2, i * 28 + 2, 20, 20), ProceduralObjectsMod.Icons[module.hide_all ? 3 : 4]);
             }
             GUI.EndScrollView();
 
@@ -266,6 +266,7 @@ namespace ProceduralObjects
                 if (enabledModules.Contains(m))
                     enabledModules.Remove(m);
             }
+            obj.m_modules.Clear();
         }
         public POModule AddModule(POModuleType type, ProceduralObject obj)
         {

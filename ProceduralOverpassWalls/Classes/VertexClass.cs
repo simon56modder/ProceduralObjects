@@ -24,6 +24,7 @@ namespace ProceduralObjects.Classes
         public static Vertex[] CreateVertexList(ProceduralObject source)
         {
             var list = new List<Vertex>();
+            var tempDictVPos = new Dictionary<Vector3, Vertex>();
             var sourceVertices = source.m_mesh.vertices;
             var dependencyData = source.m_material.name;
             bool loadDependencyData = false;
@@ -31,7 +32,6 @@ namespace ProceduralObjects.Classes
             {
                 dependencyData = dependencyData.Replace("[ProceduralObj]", "");
                 loadDependencyData = true;
-               // Debug.Log("data found for object " + source.basePrefabName + " : " + dependencyData);
             }
             for (int i = 0; i < sourceVertices.Count(); i++)
             {
@@ -40,14 +40,16 @@ namespace ProceduralObjects.Classes
                 v.Position = _vertex;
                 v.Index = i;
                 v.Locked = false;
-                List<Vertex> depV = list.Where(vertex => vertex.Position == _vertex).ToList();
-                if (depV.Count > 0)
+                if (tempDictVPos.ContainsKey(_vertex))
                 {
                     v.IsDependent = true;
-                    v.DependencyIndex = depV.First().Index;
+                    v.DependencyIndex = tempDictVPos[_vertex].Index;
                 }
                 else
+                {
                     v.IsDependent = false;
+                    tempDictVPos.Add(_vertex, v);
+                }
 
                 list.Add(v);
             }
@@ -55,10 +57,11 @@ namespace ProceduralObjects.Classes
                 ProceduralObjectAssetUtils.LoadDependencies(list, dependencyData);
             return list.ToArray();
         }
-        
+
         public static Vertex[] CreateVertexList(PropInfo source)
         {
             var list = new List<Vertex>();
+            var tempDictVPos = new Dictionary<Vector3, Vertex>();
             var sourceVertices = source.m_mesh.vertices;
             var dependencyData = source.m_material.name;
             bool loadDependencyData = false;
@@ -75,13 +78,16 @@ namespace ProceduralObjects.Classes
                 v.Position = _vertex;
                 v.Index = i;
                 v.Locked = false;
-                if (list.Any(vertex => vertex.Position == _vertex))
+                if (tempDictVPos.ContainsKey(_vertex))
                 {
                     v.IsDependent = true;
-                    v.DependencyIndex = list.First(vertex => vertex.Position == _vertex).Index;
+                    v.DependencyIndex = tempDictVPos[_vertex].Index;
                 }
                 else
+                {
                     v.IsDependent = false;
+                    tempDictVPos.Add(_vertex, v);
+                }
 
                 list.Add(v);
             }
@@ -92,6 +98,7 @@ namespace ProceduralObjects.Classes
         public static Vertex[] CreateVertexList(BuildingInfo source)
         {
             var list = new List<Vertex>();
+            var tempDictVPos = new Dictionary<Vector3, Vertex>();
             var sourceVertices = source.m_mesh.vertices;
             var dependencyData = source.m_material.name;
             bool loadDependencyData = false;
@@ -99,7 +106,6 @@ namespace ProceduralObjects.Classes
             {
                 dependencyData = dependencyData.Replace("[ProceduralObj]", "");
                 loadDependencyData = true;
-                Debug.Log("data found for object " + source.name + " : " + dependencyData);
             }
             for (int i = 0; i < sourceVertices.Count(); i++)
             {
@@ -108,14 +114,16 @@ namespace ProceduralObjects.Classes
                 v.Position = _vertex;
                 v.Index = i;
                 v.Locked = false;
-                if (list.Any(vertex => vertex.Position == _vertex))
+                if (tempDictVPos.ContainsKey(_vertex))
                 {
                     v.IsDependent = true;
-                    v.DependencyIndex = list.First(vertex => vertex.Position == _vertex).Index;
+                    v.DependencyIndex = tempDictVPos[_vertex].Index;
                 }
                 else
+                {
                     v.IsDependent = false;
-
+                    tempDictVPos.Add(_vertex, v);
+                }
                 list.Add(v);
             }
             if (loadDependencyData)
@@ -127,7 +135,6 @@ namespace ProceduralObjects.Classes
         {
             if (po.basePrefabName.Contains("Cube"))
             {
-                // works all good
                 Vector2[] uvmap = new Vector2[] {
                     Vector2.zero,
                     new Vector2(Vector3.Distance(vertices[2].Position, vertices[1].Position) / po.tilingFactor, Vector3.Distance(vertices[3].Position, vertices[1].Position) / po.tilingFactor),
@@ -158,7 +165,6 @@ namespace ProceduralObjects.Classes
             }
             else
             {
-                // not really the best thing ever made
                 Vector2[] uvmap = new Vector2[] {
                     Vector2.zero,
                     new Vector2(Vector3.Distance(vertices[2].Position, vertices[1].Position) / po.tilingFactor, Vector3.Distance(vertices[3].Position, vertices[1].Position) / po.tilingFactor),
@@ -211,6 +217,18 @@ namespace ProceduralObjects.Classes
             foreach (Vertex v in vertices)
             {
                 v.Position = bounds.center;
+            }
+            obj.historyEditionBuffer.ConfirmNewStep(buffer);
+        }
+        public static void AlignVertices(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer)
+        {
+            obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, buffer);
+            var vertices = buffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex))));
+            var outmost = OutmostPoints(vertices.ToArray());
+            Vector3 diffVector = outmost.Value - outmost.Key;
+            foreach (var v in vertices)
+            {
+                v.Position = outmost.Key + Vector3.Project(v.Position - outmost.Key, diffVector);
             }
             obj.historyEditionBuffer.ConfirmNewStep(buffer);
         }
@@ -333,6 +351,25 @@ namespace ProceduralObjects.Classes
                 vertices[i].Position.z = originalPositions[i].z * factor;
         }
 
+        public static Mesh GetCorrectedMeshPloppableAsph(Mesh originalMesh, Mesh correctedInstance, out Bounds realBounds)
+        {
+            if (correctedInstance == null)
+                correctedInstance = originalMesh.InstantiateMesh();
+            Bounds b = new Bounds();
+            Vector3 noZFightingSurplus = new Vector3(0, 0.01f, 0);
+            var vertices = new List<Vector3>();
+            for (int i = 0; i < correctedInstance.vertices.Length; i++)
+            {
+                var vertex = originalMesh.vertices[i].PloppableAsphaltPosition() + noZFightingSurplus;
+                vertices.Add(vertex);
+                if (i == 0)
+                    b = new Bounds(vertex, Vector3.zero);
+                b.Encapsulate(vertex);
+            }
+            correctedInstance.SetVertices(vertices);
+            realBounds = b;
+            return correctedInstance;
+        }
         public static void flipFaces(ProceduralObject obj)
         {
             for (int m = 0; m < obj.m_mesh.subMeshCount; m++)
@@ -361,6 +398,21 @@ namespace ProceduralObjects.Classes
             for (int i = 0; i < vertexArray.Length; i++)
                 array[i] = vertexArray[i].Position;
             return array;
+        }
+        public static Vector3[] GetPositionsArray(this ProceduralObject[] objArray)
+        {
+            var array = new Vector3[objArray.Length];
+            for (int i = 0; i < objArray.Length; i++)
+                array[i] = objArray[i].m_position;
+            return array;
+        }
+        public static Vector2 AsXZVector2(this Vector3 v)
+        {
+            return new Vector2(v.x, v.z);
+        }
+        public static Vector3 NullY(this Vector3 v)
+        {
+            return new Vector3(v.x, 0, v.z);
         }
         public static List<Vector3> ResizeDecal(this Vector3[] list)
         {
@@ -437,6 +489,63 @@ namespace ProceduralObjects.Classes
         public static Vector3 RotatePointAroundPivot(Vector3 point, Vector3 pivot, Quaternion rotation)
         {
             return rotation * (point - pivot) + pivot;
+        }
+        public static KeyValuePair<Vector3, Vector3> OutmostPoints(params Vector3[] points)
+        {
+            float longest = 0f;
+            KeyValuePair<Vector3, Vector3> outmost = new KeyValuePair<Vector3, Vector3>();
+            for (int i = 0; i < (points.Length - 1); i++)
+            {
+                for (int j = i + 1; j < points.Length; j++)
+                {
+                    float distance = Math.Abs((points[i] - points[j]).sqrMagnitude);
+
+                    if (distance > longest)
+                    {
+                        outmost = new KeyValuePair<Vector3, Vector3>(points[i], points[j]);
+                        longest = distance;
+                    }
+                }
+            }
+            return outmost;
+        }
+        public static KeyValuePair<ProceduralObject, ProceduralObject> OutmostPoints(params ProceduralObject[] points)
+        {
+            float longest = 0f;
+            KeyValuePair<ProceduralObject, ProceduralObject> outmost = new KeyValuePair<ProceduralObject, ProceduralObject>();
+            for (int i = 0; i < (points.Length - 1); i++)
+            {
+                for (int j = i + 1; j < points.Length; j++)
+                {
+                    float distance = Math.Abs((points[i].m_position - points[j].m_position).sqrMagnitude);
+
+                    if (distance > longest)
+                    {
+                        outmost = new KeyValuePair<ProceduralObject, ProceduralObject>(points[i], points[j]);
+                        longest = distance;
+                    }
+                }
+            }
+            return outmost;
+        }
+        public static KeyValuePair<Vector3, Vector3> OutmostPoints(params Vertex[] points)
+        {
+            float longest = 0f;
+            KeyValuePair<Vector3, Vector3> outmost = new KeyValuePair<Vector3, Vector3>();
+            for (int i = 0; i < (points.Length - 1); i++)
+            {
+                for (int j = i + 1; j < points.Length; j++)
+                {
+                    float distance = Math.Abs((points[i].Position - points[j].Position).sqrMagnitude);
+
+                    if (distance > longest)
+                    {
+                        outmost = new KeyValuePair<Vector3, Vector3>(points[i].Position, points[j].Position);
+                        longest = distance;
+                    }
+                }
+            }
+            return outmost;
         }
     }
 }

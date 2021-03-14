@@ -211,7 +211,7 @@ namespace ProceduralObjects.UI
             painter.samplePosition = samplePosition;
             return painter;
         }
-        public  static void DrawPicker(GUIPainter painter, Color color)
+        public static void DrawPicker(GUIPainter painter, Color color)
         {
             GUI.BeginGroup(painter.pickerRect);
             GUI.Box(new Rect(0, 0, 225, 190), string.Empty);
@@ -274,7 +274,9 @@ namespace ProceduralObjects.UI
         public void GenerateSVPicker()
         {
             //Color hueSelected = new Color(.3f, .2f, .9f, 1f);
-
+            Texture2D oldTex = null;
+            if (SVPicker != null)
+                oldTex = SVPicker;
             SVPicker = new Texture2D(180, 180);
             for (int x = 0; x < 180; x++)
             {
@@ -288,6 +290,8 @@ namespace ProceduralObjects.UI
                 }
             }
             SVPicker.Apply();
+            if (oldTex != null)
+                oldTex.DisposeTexFromMemory();
         }
 
         public void PickupHueApply()

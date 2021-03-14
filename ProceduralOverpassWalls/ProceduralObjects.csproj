@@ -61,10 +61,23 @@
     <Compile Include="Classes\ClipboardProceduralObjects.cs" />
     <Compile Include="Classes\ExternalProceduralObjectsManager.cs" />
     <Compile Include="Classes\POGroup.cs" />
+    <Compile Include="Classes\RenderOptions.cs" />
     <Compile Include="Classes\StatisticsManager.cs" />
     <Compile Include="ProceduralModules\ModuleManager.cs" />
     <Compile Include="ProceduralModules\POModule.cs" />
     <Compile Include="ProceduralTool\POToolAction.cs" />
+    <Compile Include="SelectionMode\AlignBetween2.cs" />
+    <Compile Include="SelectionMode\AlignHeights.cs" />
+    <Compile Include="SelectionMode\AlignRotations.cs" />
+    <Compile Include="SelectionMode\ColorGradient.cs" />
+    <Compile Include="SelectionMode\SnapToGround.cs" />
+    <Compile Include="SelectionMode\EqualSlope.cs" />
+    <Compile Include="SelectionMode\ExportSelection.cs" />
+    <Compile Include="SelectionMode\ReplaceByCopy.cs" />
+    <Compile Include="SelectionMode\SelectionFilters.cs" />
+    <Compile Include="SelectionMode\SelectionModeAction.cs" />
+    <Compile Include="SelectionMode\SelectionModeTabs.cs" />
+    <Compile Include="SelectionMode\SetRenderDistance.cs" />
     <Compile Include="UI\GUIUtils.cs" />
     <Compile Include="Classes\ProceduralUtils.cs" />
     <Compile Include="Classes\KeyBindings.cs" />
@@ -160,6 +173,15 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Icons\main_modules.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\main_render.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\picker.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\CTA_alignVertices.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

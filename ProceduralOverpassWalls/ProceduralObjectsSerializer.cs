@@ -193,8 +193,9 @@ namespace ProceduralObjects
         public int id, tilingFactor;
         public byte meshStatus;
         public string basePrefabName, objectType, customTextureName;
-        public float scale, renderDistance;
-        public bool hasCustomTexture, disableRecalculation, flipFaces;
+        public float renderDistance;
+        public float scale;
+        public bool hasCustomTexture, disableRecalculation, flipFaces, renderDistLocked;
         public uint layerId;
         public int groupRootId;
         public bool belongsToGroup;
@@ -214,6 +215,7 @@ namespace ProceduralObjects
             basePrefabName = baseObject.basePrefabName;
             objectType = baseObject.baseInfoType;
             renderDistance = baseObject.renderDistance;
+            renderDistLocked = baseObject.renderDistLocked;
             position = new SerializableVector3(baseObject.m_position);
             rotation = new SerializableQuaternion(baseObject.m_rotation);
             scale = 1f;

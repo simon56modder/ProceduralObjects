@@ -35,12 +35,12 @@ namespace ProceduralObjects.Classes
                     logic.selectedGroup = null;
                 return;
             }
+            if (objects.Contains(po))
+                objects.Remove(po);
             if (root == po)
             {
                 ChooseFirstAsRoot();
             }
-            if (objects.Contains(po))
-                objects.Remove(po);
         }
         public void ChooseFirstAsRoot()
         {
@@ -81,11 +81,13 @@ namespace ProceduralObjects.Classes
         }
         public static POGroup MakeGroup(ProceduralObjectsLogic logic, List<ProceduralObject> objects, ProceduralObject root)
         {
-            var group =  (root.group == null) ? CreateGroupWithRoot(root) : root.group;
+            var group = (root.group == null) ? CreateGroupWithRoot(root) : root.group;
             foreach (var obj in objects)
             {
                 if (obj.isRootOfGroup && obj.group != null)
                 {
+                    if (logic.groups.Contains(obj.group))
+                        logic.groups.Remove(obj.group);
                     foreach (var pObj in obj.group.objects)
                     {
                         pObj.group = group;
@@ -126,7 +128,9 @@ namespace ProceduralObjects.Classes
                 if (obj.isRootOfGroup)
                     list.AddRange(obj.group.objects);
                 else
+                {
                     list.Add(obj);
+                }
             }
             return list;
         }

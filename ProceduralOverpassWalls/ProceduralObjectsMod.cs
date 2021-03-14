@@ -33,7 +33,7 @@ namespace ProceduralObjects
         }
 
 
-        public static readonly string VERSION = "1.7";
+        public static readonly string VERSION = "1.7.2";
         public static readonly string DOCUMENTATION_URL = "http://proceduralobjects.shoutwiki.com/wiki/";
         public static readonly string OTHER_SETTINGS_FILENAME = "ProceduralObjectsSettings";
 
@@ -92,6 +92,7 @@ namespace ProceduralObjects
                 return DataLocation.localApplicationData + @"\ModConfig\SavedProceduralObjects\";
             }
         }
+
         public static bool IsLinux
         {
             get
@@ -99,6 +100,7 @@ namespace ProceduralObjects
                 return Application.platform == RuntimePlatform.LinuxEditor || Application.platform == RuntimePlatform.LinuxPlayer || Application.platform == RuntimePlatform.OSXEditor || Application.platform == RuntimePlatform.OSXPlayer;
             }
         }
+
         public static GameObject gameLogicObject, editorHelperObject;
         public static Texture2D[] Icons = null, SelectionModeIcons = null;
         public static System.Random randomizer;
@@ -136,12 +138,14 @@ namespace ProceduralObjects
                             TextureUtils.LoadTextureFromAssembly("locked"),
                             TextureUtils.LoadTextureFromAssembly("unlocked"),
                             TextureUtils.LoadTextureFromAssembly("painterPicker"),
-                            TextureUtils.LoadTextureFromAssembly("painterSlider") };
+                            TextureUtils.LoadTextureFromAssembly("painterSlider"),
+                            TextureUtils.LoadTextureFromAssembly("picker") };
                         SelectionModeIcons = new Texture2D[] { TextureUtils.LoadTextureFromAssembly("main_layers"),
                             TextureUtils.LoadTextureFromAssembly("main_exported"),
                             TextureUtils.LoadTextureFromAssembly("main_textures"),
                             TextureUtils.LoadTextureFromAssembly("main_fonts"),
                             TextureUtils.LoadTextureFromAssembly("main_modules"),
+                            TextureUtils.LoadTextureFromAssembly("main_render"),
                             TextureUtils.LoadTextureFromAssembly("main_stats") };
                     }
                     gameLogicObject = new GameObject("Logic_ProceduralObjects");
@@ -178,40 +182,40 @@ namespace ProceduralObjects
 
         public ProceduralObjectsMod()
         {
-            try
-            {
-                GameSettings.AddSettingsFile(new SettingsFile[] { new SettingsFile() { fileName = OTHER_SETTINGS_FILENAME } });
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("[Procedural Objects] Failed to add the settings file :");
-                Debug.LogException(e);
-            }
+            try { GameSettings.AddSettingsFile(new SettingsFile() { fileName = OTHER_SETTINGS_FILENAME } ); }
+            catch (Exception e) { Debug.LogError("[Procedural Objects] Failed to add the settings file :" + e); }
         }
-
 
         // Settings panel
 
+        public static SavedFloat GlobalRDMultiplier = new SavedFloat("RDGlobalMult", OTHER_SETTINGS_FILENAME, 1f, true);
+        public static SavedBool UseDynamicRenderDist = new SavedBool("dynamicRenderDist", OTHER_SETTINGS_FILENAME, true, true);
+        public static SavedFloat DynamicRDMultiplier = new SavedFloat("dynRDmultiplier", OTHER_SETTINGS_FILENAME, 70f, true);
+        public static SavedFloat DynamicRDMinThreshold = new SavedFloat("dynRDminThreshold", OTHER_SETTINGS_FILENAME, 250f, true);
         public static SavedFloat PropRenderDistance = new SavedFloat("propRenderDist", OTHER_SETTINGS_FILENAME, 1400f, true);
         public static SavedFloat BuildingRenderDistance = new SavedFloat("buildingRenderDist", OTHER_SETTINGS_FILENAME, 2000f, true);
         public static SavedFloat GizmoSize = new SavedFloat("gizmoSize", OTHER_SETTINGS_FILENAME, 1.2f, true);
-        public static SavedBool HideDisabledLayersIcon = new SavedBool("hideIconLayerHidden", OTHER_SETTINGS_FILENAME, true, true);
-        public static SavedBool AutoResizeDecals = new SavedBool("autoResizeDecals", OTHER_SETTINGS_FILENAME, true, true);
-        public static SavedBool UseColorVariation = new SavedBool("useColorVar", OTHER_SETTINGS_FILENAME, true, true);
-        public static SavedInt ConfirmDeletionThreshold = new SavedInt("confirmDeletionPanelThreshold", OTHER_SETTINGS_FILENAME, 2, true);
-        public static SavedBool ShowConfirmDeletion = new SavedBool("showConfirmDeletion", OTHER_SETTINGS_FILENAME, true, true);
-        public static SavedBool ShowDeveloperTools = new SavedBool("showDevTools", OTHER_SETTINGS_FILENAME, false, true);
-        public static SavedString LanguageUsed = new SavedString("languageUsed", OTHER_SETTINGS_FILENAME, "default", true);
+
         public static SavedInt DistanceUnits = new SavedInt("distanceUnits", OTHER_SETTINGS_FILENAME, 0, true);
         public static SavedInt AngleUnits = new SavedInt("angleUnits", OTHER_SETTINGS_FILENAME, 0, true);
+
+        public static SavedBool HideDisabledLayersIcon = new SavedBool("hideIconLayerHidden", OTHER_SETTINGS_FILENAME, true, true);
         public static SavedBool UseUINightMode = new SavedBool("useNightMode", OTHER_SETTINGS_FILENAME, false, true);
         public static SavedBool UsePasteInto = new SavedBool("usePasteInto", OTHER_SETTINGS_FILENAME, false, true);
+        public static SavedBool AutoResizeDecals = new SavedBool("autoResizeDecals", OTHER_SETTINGS_FILENAME, true, true);
+        public static SavedBool UseColorVariation = new SavedBool("useColorVar", OTHER_SETTINGS_FILENAME, true, true);
+
+        public static SavedInt ConfirmDeletionThreshold = new SavedInt("confirmDeletionPanelThreshold", OTHER_SETTINGS_FILENAME, 2, true);
+        public static SavedBool ShowConfirmDeletion = new SavedBool("showConfirmDeletion", OTHER_SETTINGS_FILENAME, true, true);
+        public static SavedString LanguageUsed = new SavedString("languageUsed", OTHER_SETTINGS_FILENAME, "default", true);
+        public static SavedBool ShowDeveloperTools = new SavedBool("showDevTools", OTHER_SETTINGS_FILENAME, false, true);
 
         public static SavedBool ShowToolsControls = new SavedBool("showToolsControls", OTHER_SETTINGS_FILENAME, true, true);
 
-        private UISlider propRenderSlider, buildingRenderSlider, confirmDelThresholdSlider, gizmoSizeSlider;
-        private UILabel propRenderLabel, buildingRenderLabel, confirmDelThresholdLabel, gizmoSizeLabel;
-        private UICheckBox confirmDelCheckbox, showDevCheckbox, hideDisLayerIconCheckbox, useUINightModeCheckbox, usePasteIntoCheckbox, autoResizeDecalsCheckbox, useColorVariationCheckbox;
+        private UISlider confirmDelThresholdSlider, gizmoSizeSlider;  // propRenderSlider, buildingRenderSlider 
+        private UILabel confirmDelThresholdLabel, gizmoSizeLabel; // propRenderLabel, buildingRenderLabel
+        private UICheckBox confirmDelCheckbox, showDevCheckbox, hideDisLayerIconCheckbox, useUINightModeCheckbox, autoResizeDecalsCheckbox, useColorVariationCheckbox;
+        private UIButton openKeybindingsButton;
 
         public void OnSettingsUI(UIHelperBase helper)
         {
@@ -222,36 +226,14 @@ namespace ProceduralObjects
             UIHelperBase group = helper.AddGroup("    Procedural Objects");
             UIPanel globalPanel = ((UIPanel)((UIHelper)group).self);
 
-            propRenderSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"], Gizmos.ConvertRoundToDistanceUnit(PropRenderDistance.value).ToString()) + distanceUnit, 0f, 16000f, 10f, PropRenderDistance.value, propRenderDistanceChanged);
-            propRenderSlider.width = 715;
-            propRenderSlider.height = 16;
-            propRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_PROP_tooltip"];
-
-            var propRenderPanel = globalPanel.Find<UIPanel>("OptionsSliderTemplate(Clone)");
-            propRenderPanel.name = "PropRenderSliderPanel";
-            propRenderLabel = propRenderPanel.Find<UILabel>("Label");
-            propRenderLabel.width *= 3.5f;
-
-            //  group.AddSpace(10);
-
-            buildingRenderSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"], Gizmos.ConvertRoundToDistanceUnit(BuildingRenderDistance.value).ToString()) + distanceUnit, 0f, 16000f, 10f, BuildingRenderDistance.value, buildingRenderDistanceChanged);
-            buildingRenderSlider.width = 715;
-            buildingRenderSlider.height = 16;
-            buildingRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_BUILDING_tooltip"];
-
-            var buildingRenderPanel = globalPanel.components.First(c => c.GetType() == typeof(UIPanel) && c != propRenderPanel);
-            buildingRenderPanel.name = "BuildingRenderSliderPanel";
-            buildingRenderLabel = buildingRenderPanel.Find<UILabel>("Label");
-            buildingRenderLabel.width *= 3.5f;
-            
-            //  group.AddSpace(10);
+            openKeybindingsButton = (UIButton)group.AddButton(LocalizationManager.instance.current["open_kbd_cfg"], openKeybindings);
 
             gizmoSizeSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], (GizmoSize.value * 100).ToString()), 0.2f, 3f, 0.1f, GizmoSize.value, gizmoSizeChanged);
             gizmoSizeSlider.width = 715;
             gizmoSizeSlider.height = 16;
             gizmoSizeSlider.tooltip = LocalizationManager.instance.current["settings_GIZMO_tooltip"];
 
-            var gizmoPanel = globalPanel.components.First(c => c.GetType() == typeof(UIPanel) && c != propRenderPanel && c != buildingRenderPanel);
+            var gizmoPanel = globalPanel.Find<UIPanel>("OptionsSliderTemplate(Clone)");
             gizmoPanel.name = "GizmoSizePanel";
             gizmoSizeLabel = gizmoPanel.Find<UILabel>("Label");
             gizmoSizeLabel.width *= 3.5f;
@@ -263,8 +245,8 @@ namespace ProceduralObjects
                     (int value) => { 
                         DistanceUnits.value = value; 
                         SetUnits();
-                        propRenderDistanceChanged(PropRenderDistance.value);
-                        buildingRenderDistanceChanged(BuildingRenderDistance.value);
+                      // propRenderDistanceChanged(PropRenderDistance.value);
+                      // buildingRenderDistanceChanged(BuildingRenderDistance.value);
                     });
 
             group.AddDropdown(LocalizationManager.instance.current["settings_ANGUNITS_label"],
@@ -275,7 +257,7 @@ namespace ProceduralObjects
 
             hideDisLayerIconCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_HIDEDISABLEDLAYERSICON_toggle"], HideDisabledLayersIcon.value, hideDisabledLayersIconChanged);
 
-            usePasteIntoCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_USEPASTEINTO_toggle"], UsePasteInto.value, usePasteIntoChanged);
+          // usePasteIntoCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_USEPASTEINTO_toggle"], UsePasteInto.value, usePasteIntoChanged);
 
             autoResizeDecalsCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_AUTORESIZEDECALS_toggle"], AutoResizeDecals.value, autoResizeDecalsChanged);
 
@@ -311,6 +293,7 @@ namespace ProceduralObjects
             });
             showDevCheckbox.tooltip = LocalizationManager.instance.current["settings_DEVTOOLS_tooltip"];
         }
+        /*
         private void propRenderDistanceChanged(float value)
         {
             PropRenderDistance.value = value;
@@ -320,6 +303,11 @@ namespace ProceduralObjects
         {
             BuildingRenderDistance.value = value;
             buildingRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"], Gizmos.ConvertRoundToDistanceUnit(value).ToString()) + distanceUnit;
+        } */
+        private void openKeybindings()
+        {
+            if (File.Exists(KeyBindingsManager.BindingsConfigPath))
+                Application.OpenURL("file://" + KeyBindingsManager.BindingsConfigPath);
         }
         private void gizmoSizeChanged(float value)
         {
@@ -359,12 +347,13 @@ namespace ProceduralObjects
         {
             LocalizationManager.instance.SetCurrent(value);
             LanguageUsed.value = LocalizationManager.instance.current.identifier;
-            propRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"], Gizmos.ConvertRoundToDistanceUnit(PropRenderDistance.value).ToString()) + distanceUnit;
+            openKeybindingsButton.text = LocalizationManager.instance.current["open_kbd_cfg"];
+         // propRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"], Gizmos.ConvertRoundToDistanceUnit(PropRenderDistance.value).ToString()) + distanceUnit;
             confirmDelThresholdLabel.text = string.Format(LocalizationManager.instance.current["settings_CONFDEL_SLIDER_label"], ConfirmDeletionThreshold.value.ToString());
-            buildingRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"], Gizmos.ConvertRoundToDistanceUnit(BuildingRenderDistance.value).ToString()) + distanceUnit;
+         // buildingRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"], Gizmos.ConvertRoundToDistanceUnit(BuildingRenderDistance.value).ToString()) + distanceUnit;
             confirmDelThresholdSlider.tooltip = LocalizationManager.instance.current["settings_CONFDEL_SLIDER_tooltip"];
-            buildingRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_BUILDING_tooltip"];
-            propRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_PROP_tooltip"];
+         // buildingRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_BUILDING_tooltip"];
+         // propRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_PROP_tooltip"];
             gizmoSizeLabel.text = string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], (GizmoSize.value * 100).ToString());
             gizmoSizeSlider.tooltip = LocalizationManager.instance.current["settings_GIZMO_tooltip"];
             confirmDelCheckbox.text = LocalizationManager.instance.current["settings_CONFDEL_toggle"];
@@ -374,7 +363,7 @@ namespace ProceduralObjects
             useUINightModeCheckbox.text = LocalizationManager.instance.current["settings_USEUINIGHTMODE_toggle"];
             autoResizeDecalsCheckbox.text = LocalizationManager.instance.current["settings_AUTORESIZEDECALS_toggle"];
             useColorVariationCheckbox.text = LocalizationManager.instance.current["settings_USECOLORVAR_toggle"];
-            usePasteIntoCheckbox.text = LocalizationManager.instance.current["settings_USEPASTEINTO_toggle"];
+         // usePasteIntoCheckbox.text = LocalizationManager.instance.current["settings_USEPASTEINTO_toggle"];
             if (ProceduralObjectsLogic.instance != null)
                 ProceduralObjectsLogic.instance.SetupLocalizationInternally();
         }

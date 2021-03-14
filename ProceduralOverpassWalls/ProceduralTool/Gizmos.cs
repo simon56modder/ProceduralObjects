@@ -334,17 +334,16 @@ namespace ProceduralObjects
         }
 
 
-        public static void Update(byte actionMode, float distance, Vector3 position, Quaternion rotation/*, LineRenderer xLineComp, LineRenderer yLineComp, LineRenderer zLineComp */)
+        public static void Update(byte actionMode, float distance, Vector3 position, Quaternion rotation, Camera cam/*, LineRenderer xLineComp, LineRenderer yLineComp, LineRenderer zLineComp */)
         {
-            var factor = 1f;
+            /*
             if (distance < 30)
                 factor = .25f;
             else if (distance > 250)
                 factor = 1.8f;
-            else
-                factor = 0.0070455f * distance + 0.0386363f;
-            factor *= ProceduralObjectsMod.GizmoSize.value;
-            float halfFactor = 0.5f * factor;
+            else*/
+            float factor = (0.0070455f * distance + 0.0386363f) * ProceduralObjectsMod.GizmoSize.value;
+            float halfFactor = factor / 2f;
 
             renderers[0].widthMultiplier = factor;
             renderers[1].widthMultiplier = factor;
@@ -393,14 +392,8 @@ namespace ProceduralObjects
                 zPos[1] = rot * (new Vector3(0, 0, (actionMode == 1 ? 19 : 20) * factor)) + position;
                 renderers[2].SetPositions(zPos);
 
-                /*
-                if (actionMode == 1)
-                {
-                    _scaleCubes[0].transform.position = xPos[1];
-                    _scaleCubes[1].transform.position = yPos[1];
-                    _scaleCubes[2].transform.position = zPos[1];
-                }
-                 * */
+                var objPos = position.WorldToGuiPoint(cam);
+                RightMostGUIPosGizmo = new Vector2(GUIUtils.RightMostPosition(objPos, xPos[1].WorldToGuiPoint(cam), yPos[1].WorldToGuiPoint(cam), zPos[1].WorldToGuiPoint(cam)).x + 5, objPos.y);
             }
             else if (actionMode == 2)
             {
@@ -408,6 +401,9 @@ namespace ProceduralObjects
                 _gizmo[0].transform.localScale = new Vector3(factor4, halfFactor, factor4);
                 _gizmo[1].transform.localScale = new Vector3(factor4, factor4, halfFactor);
                 _gizmo[2].transform.localScale = new Vector3(halfFactor, factor4, factor4);
+
+                var rightPos = position + (cam.transform.rotation * Vector3.right) * 3 * factor4;
+                RightMostGUIPosGizmo = new Vector2(rightPos.WorldToGuiPoint().x + 5, position.WorldToGuiPoint().y);
             }
         }
         
@@ -447,7 +443,7 @@ namespace ProceduralObjects
             _scaleCubes[0].GetComponent<MeshRenderer>().enabled = true;
             _scaleCubes[1].GetComponent<MeshRenderer>().enabled = true;
             _scaleCubes[2].GetComponent<MeshRenderer>().enabled = true;
-        } 
+        }
         public static void DestroyGizmo()
         {
             DisableKeyTyping();
@@ -464,6 +460,8 @@ namespace ProceduralObjects
             _gizmo = null;
             renderers = null;
             _scaleCubes = null;
+            posDiffSaved = Vector3.zero;
+            useLineTool = false;
         }
         public static bool Exists
         {
@@ -471,14 +469,19 @@ namespace ProceduralObjects
         }
 
         private static GameObject[] _gizmo, _scaleCubes;
+        public static Vector2 RightMostGUIPosGizmo = Vector2.zero;
         public static LineRenderer[] renderers;
         public static Quaternion initialRotationTemp = Quaternion.identity;
         public static Vector3[] tempBuffer = null;
         public static SpaceReferential referential = SpaceReferential.Local;
         public static float recordingStretch;
 
+        public static Vector3 posDiffSaved = Vector3.zero;
+        public static bool useLineTool = false;
+
         public static Material spriteMat = new Material(Shader.Find("GUI/Text Shader"));
 
+        // keyboard typed movements
         public static void EnableKeyTyping()
         {
             registeredString = "";
@@ -495,7 +498,6 @@ namespace ProceduralObjects
             screenPos = Vector2.zero;
             isSnappingPrevMove = false;
         }
-        // keyboard typed movements
         public static void RegisterKeyTyping()
         {
             if (registeredString.Length == 0)
@@ -601,6 +603,50 @@ namespace ProceduralObjects
         public static string registeredString = "";
         public static float registeredFloat;
 
+        // line copy tool
+        public static void DetectRotationKeyboard()
+        {
+            var logic = ProceduralObjectsLogic.instance;
+            if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveUp").GetBinding())
+            {
+                var rot = Quaternion.Euler(2 * TimeUtils.deltaTime, 0, 0);
+                ApplyRotationLineTool(rot, logic);
+            }
+            if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveDown").GetBinding())
+            {
+                var rot = Quaternion.Euler(-2 * TimeUtils.deltaTime, 0, 0);
+                ApplyRotationLineTool(rot, logic);
+            }
+            if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveLeft").GetBinding())
+            {
+                var rot = Quaternion.Euler(0, 2 * TimeUtils.deltaTime, 0);
+                ApplyRotationLineTool(rot, logic);
+            }
+            if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveRight").GetBinding())
+            {
+                var rot = Quaternion.Euler(0, -2 * TimeUtils.deltaTime, 0);
+                ApplyRotationLineTool(rot, logic);
+            }
+            if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveForward").GetBinding())
+            {
+                var rot = Quaternion.Euler(0, 0, 2 * TimeUtils.deltaTime);
+                ApplyRotationLineTool(rot, logic);
+            }
+            if (KeyBindingsManager.instance.GetBindingFromName("rotation_moveBackward").GetBinding())
+            {
+                var rot = Quaternion.Euler(0, 0, -2 * TimeUtils.deltaTime);
+                ApplyRotationLineTool(rot, logic);
+            }
+        }
+        private static void ApplyRotationLineTool(Quaternion rot, ProceduralObjectsLogic logic)
+        {
+            logic.currentlyEditingObject.m_rotation = rot * logic.currentlyEditingObject.m_rotation;
+            Gizmos.posDiffSaved = rot * Gizmos.posDiffSaved;
+            logic.gizmoOffset = rot * logic.gizmoOffset;
+            logic.axisHitPoint = VertexUtils.RotatePointAroundPivot(logic.axisHitPoint, logic.currentlyEditingObject.historyEditionBuffer.prevTempPos, rot);
+            logic.currentlyEditingObject.m_position = VertexUtils.RotatePointAroundPivot(logic.currentlyEditingObject.m_position, logic.currentlyEditingObject.historyEditionBuffer.prevTempPos, rot);
+        }
+
         public static float ConvertRoundToDistanceUnit(float meters)
         {
             switch (ProceduralObjectsMod.DistanceUnits.value)
@@ -611,6 +657,18 @@ namespace ProceduralObjects
                     return Mathf.Round(meters * 1.0936f);
                 default: //m
                     return Mathf.Round(meters);
+            }
+        }
+        public static float ConvertRoundBackToMeters(float value)
+        {
+            switch (ProceduralObjectsMod.DistanceUnits.value)
+            {
+                case 1: //ft
+                    return Mathf.Round(value / 3.2808f);
+                case 2: //yd
+                    return Mathf.Round(value / 1.0936f);
+                default: //m
+                    return Mathf.Round(value);
             }
         }
 

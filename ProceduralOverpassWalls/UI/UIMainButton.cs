@@ -36,6 +36,7 @@ namespace ProceduralObjects.UI
             focusedTextColor = new Color32(255, 255, 255, 255);
             pressedTextColor = new Color32(30, 30, 44, 255);
             eventClick += mainButton_eventClick;
+            this.gameObject.AddComponent<CustomKeyHandler>();
             playAudioEvents = true;
             if (savedX.value == -1000)
             {
@@ -74,7 +75,6 @@ namespace ProceduralObjects.UI
             }
         }
 
-
         protected override void OnMouseMove(UIMouseEventParameter p)
         {
             if (p.buttons.IsFlagSet(UIMouseButton.Right))
@@ -87,6 +87,20 @@ namespace ProceduralObjects.UI
                 savedY.value = (int)absolutePosition.y;
             }
         }
-
+    }
+    // The following code is derived from Traffic Manager:President Edition
+    // Special thanks to krzychu124 for the help
+    // https://github.com/VictorPhilipp/Cities-Skylines-Traffic-Manager-President-Edition/blob/9d281aebc56e60ede65bc138e1ae02a72df716cd/TLM/TLM/UI/CustomKeyHandler.cs
+    public class CustomKeyHandler : UICustomControl
+    {
+        public void OnKeyDown(UIComponent comp, UIKeyEventParameter p)
+        {
+            if (p.used || p.keycode != KeyCode.Escape)
+                return;
+            if (ProceduralObjectsLogic.instance != null)
+                ProceduralObjectsLogic.instance.EscapePressed();
+            p.Use();
+        }
+        
     }
 }

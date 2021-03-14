@@ -65,10 +65,6 @@ namespace ProceduralObjects.ProceduralText
             }
             return tex;
         }
-        public static bool CanHaveTextParameters(ProceduralObject obj)
-        {
-            return !obj.isPloppableAsphalt;
-        }
         public int Count()
         {
             if (m_textFields == null)
@@ -130,7 +126,10 @@ namespace ProceduralObjects.ProceduralText
             }
         }
 
-
+        public static bool CanHaveTextParameters(ProceduralObject obj)
+        {
+            return !obj.isPloppableAsphalt;
+        }
         public static TextParameters Clone(TextParameters paramSource, bool useFontname)
         {
             if (paramSource == null)
@@ -153,6 +152,14 @@ namespace ProceduralObjects.ProceduralText
             }
             return false;
         }
+        public static bool IsEmpty(TextParameters param)
+        {
+            if (param == null)
+                return true;
+            if (param.Count() == 0)
+                return true;
+            return false;
+        }
     }
 
     [Serializable]
@@ -170,7 +177,6 @@ namespace ProceduralObjects.ProceduralText
             y = 0f;
             m_scaleX = 1f;
             m_scaleY = 1f;
-            minimized = false;
             locked = false;
         }
 
@@ -189,18 +195,89 @@ namespace ProceduralObjects.ProceduralText
         [NonSerialized]
         public int texHeight;
         [NonSerialized]
-        public bool minimized;
-        [NonSerialized]
         public bool locked;
         [NonSerialized]
         public GUIPainter painter;
         [NonSerialized]
         public GUIUtils.FloatInputField posXfield, posYfield, sizeField, heightField, widthField;
+        [NonSerialized]
+        public Vector2 scrollFontsPos;
+        [NonSerialized]
+        public bool expandFontsSelector;
 
-        public void DrawUI(Vector2 position, TextCustomizationManager textManager, Action<TextureFont> openCharTable, bool showDelete)
+        public bool UIButton(Vector2 pos, TextCustomizationManager textManager, bool showDelete)
         {
-            Rect rect = new Rect(position.x, position.y, 350, minimized ? 31 : 123);
-            GUI.Box(rect, string.Empty);
+            var rect = new Rect(pos, new Vector2(235, 31));
+            if (GUI.Button(new Rect(pos.x, pos.y, textManager.parameters.Count() == 1 ? 156 : 130, 31), string.Empty))
+            {
+                ProceduralObjectsLogic.PlaySound();
+                expandFontsSelector = false;
+                scrollFontsPos = Vector2.zero;
+                return true;
+            }
+            GUI.BeginGroup(rect);
+            if (m_type == 0)
+            {
+                GUI.Label(new Rect(3, 5, textManager.parameters.Count() == 1 ? 153 : 127, 23), m_text);
+            }
+            else // if m_type == 1
+            {
+                GUI.color = m_fontColor;
+                GUI.Label(new Rect(2, 4, 25, 24), "██");
+                GUI.color = Color.white;
+                GUI.Label(new Rect(26, 5, textManager.parameters.Count() == 1 ? 130 : 104, 23), "<i>" + LocalizationManager.instance.current["colorRect"] + "</i>");
+            }
+            if (GUI.Button(new Rect(textManager.parameters.Count() == 1 ? 158 : 132, 3, 25, 25), ProceduralObjectsMod.Icons[locked ? 8 : 9]))
+            {
+                ProceduralObjectsLogic.PlaySound();
+                locked = !locked;
+            }
+            if (textManager.parameters.CanFieldMoveUp(this))
+            {
+                if (GUI.Button(new Rect(158, 3, 25, 12), ProceduralObjectsMod.Icons[6]))
+                {
+                    ProceduralObjectsLogic.PlaySound();
+                    textManager.parameters.MoveFieldUp(this);
+                }
+            }
+            if (textManager.parameters.CanFieldMoveDown(this))
+            {
+                if (GUI.Button(new Rect(158, 15.5f, 25, 12), ProceduralObjectsMod.Icons[7]))
+                {
+                    ProceduralObjectsLogic.PlaySound();
+                    textManager.parameters.MoveFieldDown(this);
+                }
+            }
+            if (GUI.Button(new Rect(184, 3, 25, 25), ProceduralObjectsMod.Icons[0]))
+            {
+                ProceduralObjectsLogic.PlaySound();
+                textManager.parameters.AddField(TextField.Clone(this, false));
+            }
+            /*
+            if (GUI.Button(new Rect(298, 3, 25, 25), ProceduralObjectsMod.Icons[minimized ? 1 : 2]))
+            {
+                ProceduralObjectsLogic.PlaySound();
+                minimized = !minimized;
+            }
+             * */
+            if (showDelete)
+            {
+                GUI.color = Color.red;
+                if (GUI.Button(new Rect(210, 3, 25, 25), "X"))
+                {
+                    ProceduralObjectsLogic.PlaySound();
+                    if (textManager.selectedField == this)
+                        textManager.selectedField = null;
+                    textManager.parameters.RemoveField(this);
+                }
+                GUI.color = Color.white;
+            }
+            GUI.EndGroup();
+            return false;
+        }
+        public void DrawUI(Rect rect, TextCustomizationManager textManager, Action<TextureFont> openCharTable)
+        {
+            // GUI.Box(rect, string.Empty);
             GUI.BeginGroup(rect);
             if (m_type == 0)
             {
@@ -216,7 +293,7 @@ namespace ProceduralObjects.ProceduralText
                                 textManager.colorPickerSelected = painter;
                         });
                 }
-                m_text = GUI.TextField(new Rect(m_font.m_disableColorOverwriting ? 3 : 31, 3, (textManager.parameters.m_textFields.Count == 1 ? 212 : 188) + (m_font.m_disableColorOverwriting ? 25 : 0), 25), m_text);
+                m_text = GUI.TextField(new Rect(m_font.m_disableColorOverwriting ? 3 : 31, 3, m_font.m_disableColorOverwriting ? 240 : 212, 25), m_text);
             }
             else // if m_type == 1
             {
@@ -237,190 +314,154 @@ namespace ProceduralObjects.ProceduralText
             }
 
 
-            if (!minimized)
+            GUIUtils.DrawSeparator(new Vector2(3, 75), 241);
+
+            if (m_type == 0) // TEXT FIELD
             {
-                if (m_type == 0) // TEXT FIELD
+                //size
+                GUI.Label(new Rect(3, 80, 95, 22), "<size=12>" + LocalizationManager.instance.current["font_size"] + " : " + m_fontSize.ToString() + "</size>");
+                m_fontSize = (uint)Mathf.FloorToInt(GUI.HorizontalSlider(new Rect(100, 85, 140, 25), m_fontSize, 5, 150));
+
+                //spacing
+                GUI.Label(new Rect(3, 105, 95, 22), "<size=12>" + LocalizationManager.instance.current["font_spacing"] + " : " + m_spacing.ToString() + "</size>");
+                m_spacing = (uint)Mathf.FloorToInt(GUI.HorizontalSlider(new Rect(100, 110, 140, 25), m_spacing, 0, 9));
+
+                //scale
+                GUI.Label(new Rect(3, 130, 120, 26), LocalizationManager.instance.current["scale_txt"] + " :");
+                if (GUI.Button(new Rect(3, 155, 24, 26), "X :", GUI.skin.label))
+                    m_scaleX = 1f;
+                m_scaleX = GUI.HorizontalSlider(new Rect(30, 158, 90, 18), m_scaleX, 0.1f, 5f);
+                if (GUI.Button(new Rect(125, 155, 24, 26), "Y :", GUI.skin.label))
+                    m_scaleY = 1f;
+                m_scaleY = GUI.HorizontalSlider(new Rect(150, 158, 90, 18), m_scaleY, 0.1f, 5f);
+
+                //font
+                bool supportStyles = m_font.m_boldExists && m_font.m_italicExists;
+                if (GUI.Button(new Rect(3, 180, (supportStyles ? 126 : 213), 25), m_fontName))
                 {
-                    GUI.Label(new Rect(4, 26, 75, 22), "<size=12>" + LocalizationManager.instance.current["font_size"] + " : " + m_fontSize.ToString() + "</size>");
-                    m_fontSize = (uint)Mathf.FloorToInt(GUI.HorizontalSlider(new Rect(80, 32, 113, 25), m_fontSize, 5, 150));
-
-                    GUI.Label(new Rect(4, 47, 90, 22), "<size=12>" + LocalizationManager.instance.current["font_spacing"] + " : " + m_spacing.ToString() + "</size>");
-                    m_spacing = (uint)Mathf.FloorToInt(GUI.HorizontalSlider(new Rect(95, 53, 98, 25), m_spacing, 0, 9));
-
-                        /*
-                    if (!m_font.m_disableColorOverwriting)
+                    ProceduralObjectsLogic.PlaySound();
+                    openCharTable.Invoke(m_font);
+                }
+                if (GUI.Button(new Rect((supportStyles ? 128 : 215), 180, 26, 25), "▼"))
+                {
+                    ProceduralObjectsLogic.PlaySound();
+                    // SetFont(textManager.fontManager.GetNextFont(m_font));
+                    scrollFontsPos = Vector2.zero;
+                    expandFontsSelector = !expandFontsSelector;
+                }
+                if (supportStyles)
+                {
+                    string[] styles = new string[] { LocalizationManager.instance.current["textStyle_normal"], "<b>" + LocalizationManager.instance.current["textStyle_bold"] + "</b>", "<i>" + LocalizationManager.instance.current["textStyle_italic"] + "</i>" };
+                    if (m_font.m_stylesNames != null)
                     {
-                        m_fontColor.r = GUI.HorizontalSlider(new Rect(205, 52, 80, 18), m_fontColor.r, 0f, 1f);
-                        m_fontColor.g = GUI.HorizontalSlider(new Rect(205, 69, 80, 18), m_fontColor.g, 0f, 1f);
-                        m_fontColor.b = GUI.HorizontalSlider(new Rect(205, 86, 80, 18), m_fontColor.b, 0f, 1f);
-                        GUI.Label(new Rect(289, 48, 75, 22), "<size=12>" + LocalizationManager.instance.current["rgb_r"] + " : " + (int)(m_fontColor.r * 255f) + "</size>");
-                        GUI.Label(new Rect(289, 65, 75, 22), "<size=12>" + LocalizationManager.instance.current["rgb_g"] + " : " + (int)(m_fontColor.g * 255f) + "</size>");
-                        GUI.Label(new Rect(289, 82, 75, 22), "<size=12>" + LocalizationManager.instance.current["rgb_b"] + " : " + (int)(m_fontColor.b * 255f) + "</size>");
+                        if (m_font.m_stylesNames.Length == 3)
+                            styles = m_font.m_stylesNames;
                     }
-                         * */
-
-                    if (textManager.fontManager.previousFontExists(m_font))
+                    m_style = TextCustomizationManager.IntToStyle(GUI.Toolbar(new Rect(158, 180, 85, 25), TextCustomizationManager.SelectedStyle(m_style), styles));
+                }
+                if (expandFontsSelector)
+                {
+                    TextureFont fontSelected;
+                    if (FontManager.instance.FontSelector(new Rect(3, 207, 240, 160), scrollFontsPos, out fontSelected, out scrollFontsPos))
                     {
-                        if (GUI.Button(new Rect(4, 68, 26, 25), "◄"))
-                        {
-                            ProceduralObjectsLogic.PlaySound();
-                            SetFont(textManager.fontManager.GetPreviousFont(m_font));
-                        }
+                        SetFont(fontSelected);
+                        expandFontsSelector = false;
+                        scrollFontsPos = Vector2.zero;
                     }
-                    else
-                    {
-                        GUI.skin.box.normal.textColor = TextCustomizationManager.inactiveGrey;
-                        GUI.Label(new Rect(4, 68, 26, 25), "◄", GUI.skin.box);
-                        GUI.skin.box.normal.textColor = Color.white;
-                    }
-                    if (GUI.Button(new Rect(30, 68, 147, 25), m_fontName))
+                }
+                /*
+                if (textManager.fontManager.previousFontExists(m_font))
+                {
+                    if (GUI.Button(new Rect(4, 145, 26, 25), "◄"))
                     {
                         ProceduralObjectsLogic.PlaySound();
-                        openCharTable.Invoke(m_font);
+                        SetFont(textManager.fontManager.GetPreviousFont(m_font));
                     }
-                    if (textManager.fontManager.nextFontExists(m_font))
-                    {
-                        if (GUI.Button(new Rect(177, 68, 26, 25), "►"))
-                        {
-                            ProceduralObjectsLogic.PlaySound();
-                            SetFont(textManager.fontManager.GetNextFont(m_font));
-                        }
-                    }
-                    else
-                    {
-                        GUI.skin.box.normal.textColor = TextCustomizationManager.inactiveGrey;
-                        GUI.Label(new Rect(177, 68, 26, 25), "►", GUI.skin.box);
-                        GUI.skin.box.normal.textColor = Color.white;
-                    }
-                    if (m_font.m_boldExists && m_font.m_italicExists)
-                    {
-                        string[] styles =  new string[] { LocalizationManager.instance.current["textStyle_normal"], "<b>" + LocalizationManager.instance.current["textStyle_bold"] + "</b>", "<i>" + LocalizationManager.instance.current["textStyle_italic"] + "</i>" };
-                        if (m_font.m_stylesNames != null)
-                        {
-                            if (m_font.m_stylesNames.Length == 3)
-                                styles = m_font.m_stylesNames;
-                        }
-                        m_style = TextCustomizationManager.IntToStyle(GUI.Toolbar(new Rect(4, 95, 91, 25), TextCustomizationManager.SelectedStyle(m_style), styles));
-                    }
-                    GUI.Label(new Rect(98, 99, 67, 26), LocalizationManager.instance.current["scale_txt"] + " :");
-
-                    if (GUI.Button(new Rect(165, 99, 10, 26), "X", GUI.skin.label))
-                        m_scaleX = 1f;
-                    m_scaleX = GUI.HorizontalSlider(new Rect(176, 103, 78, 18), m_scaleX, 0.1f, 5f);
-                    if (GUI.Button(new Rect(255, 99, 10, 26), "Y", GUI.skin.label))
-                        m_scaleY = 1f;
-                    m_scaleY = GUI.HorizontalSlider(new Rect(266, 103, 78, 18), m_scaleY, 0.1f, 5f);
                 }
-                else if (m_type == 1) // COLOR RECT
+                else
                 {
-                    GUI.Label(new Rect(4, 30, 100, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_width"] + " :</size>");
-                 //   m_width = (uint)Mathf.FloorToInt(GUI.HorizontalSlider(new Rect(4, 44, 200, 25), m_width, 1, 2048));
-                    if (widthField == null)
-                        widthField = new GUIUtils.FloatInputField(m_width);
-                    m_width = (uint)widthField.DrawField(new Rect(74, 30, 130, 22), m_width, false).returnValue;
-
-                    GUI.Label(new Rect(4, 56, 100, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_height"] + " :</size>");
-                    if (heightField == null)
-                        heightField = new GUIUtils.FloatInputField(m_height);
-                    m_height = (uint)heightField.DrawField(new Rect(74, 56, 130, 22), m_height, false).returnValue;
-
-                    GUI.Label(new Rect(4, 85, 100, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_opacity"] + " : " + ((int)(m_fontColor.a * 100)).ToString() + "%</size>");
-                    m_fontColor.a = GUI.HorizontalSlider(new Rect(4, 103, 200, 25), m_fontColor.a, 0f, 1f);
-
-                    /*
-                    GUI.Label(new Rect(217, 36, 75, 22), "<size=12>" + LocalizationManager.instance.current["font_color"] + " :</size>");
-                    m_fontColor.r = GUI.HorizontalSlider(new Rect(217, 59, 80, 18), m_fontColor.r, 0f, 1f);
-                    m_fontColor.g = GUI.HorizontalSlider(new Rect(217, 76, 80, 18), m_fontColor.g, 0f, 1f);
-                    m_fontColor.b = GUI.HorizontalSlider(new Rect(217, 93, 80, 18), m_fontColor.b, 0f, 1f);
-                    GUI.Label(new Rect(301, 55, 75, 22), "<size=12>" + LocalizationManager.instance.current["rgb_r"] + " : " + (int)(m_fontColor.r * 255f) + "</size>");
-                    GUI.Label(new Rect(301, 72, 75, 22), "<size=12>" + LocalizationManager.instance.current["rgb_g"] + " : " + (int)(m_fontColor.g * 255f) + "</size>");
-                    GUI.Label(new Rect(301, 89, 75, 22), "<size=12>" + LocalizationManager.instance.current["rgb_b"] + " : " + (int)(m_fontColor.b * 255f) + "</size>"); */
+              //    GUI.skin.box.normal.textColor = TextCustomizationManager.inactiveGrey;
+                    GUI.Label(new Rect(4, 145, 26, 25), "◄", GUI.skin.box);
+                    GUI.skin.box.normal.textColor = Color.white;
                 }
-
-                // POSITION
-
-                GUI.Label(new Rect(209, 29, 75, 22), "<size=12>" + LocalizationManager.instance.current["position"] + " :</size>");
-              //  float newX, newY;
-                GUI.Label(new Rect(209, 49, 24, 22), "<size=12>X :</size>");
-                if (posXfield == null)
-                {
-                    posXfield = new GUIUtils.FloatInputField(x);
-                    posYfield = new GUIUtils.FloatInputField(y);
-                }
-                x = posXfield.DrawField(new Rect(232, 48, 75, 22), x, false).returnValue;
-              //  if (float.TryParse(GUI.TextField(new Rect(232, 48, 75, 22), x.ToString()), out newX))
-              //      x = newX;
-                GUI.Label(new Rect(209, 75, 24, 22), "<size=12>Y :</size>");
-                y = posYfield.DrawField(new Rect(232, 74, 75, 22), y, false).returnValue;
-              //  if (float.TryParse(GUI.TextField(new Rect(232, 74, 75, 22), y.ToString()), out newY))
-              //      y = newY;
-
-                // rotation
-                if (GUI.Button(new Rect(324, 28.6f, 25, 23), ProceduralObjectsMod.Icons[5]))
+                if (GUI.Button(new Rect(30, 145, 147, 25), m_fontName))
                 {
                     ProceduralObjectsLogic.PlaySound();
-                    if (m_type == 0)
+                    openCharTable.Invoke(m_font);
+                }
+                if (textManager.fontManager.nextFontExists(m_font))
+                {
+                    if (GUI.Button(new Rect(177, 145, 26, 25), "►"))
                     {
-                        if (m_rotation == 0)
-                            m_rotation = 4;
-                        else if (m_rotation == 4)
-                            m_rotation = 1;
-                        else if (m_rotation == 1)
-                            m_rotation = 2;
-                        else if (m_rotation == 2)
-                            m_rotation = 0;
-                    }
-                    else if (m_type == 1)
-                    {
-                        var h = m_height;
-                        m_height = m_width;
-                        m_width = h;
+                        ProceduralObjectsLogic.PlaySound();
+                        SetFont(textManager.fontManager.GetNextFont(m_font));
                     }
                 }
+                else
+                {
+              //    GUI.skin.box.normal.textColor = TextCustomizationManager.inactiveGrey;
+                    GUI.Label(new Rect(177, 145, 26, 25), "►", GUI.skin.box);
+                    GUI.skin.box.normal.textColor = Color.white;
+                }
+                 * */
             }
-            if (GUI.Button(new Rect(textManager.parameters.Count() == 1 ? 246 : 220, 3, 25, 25), ProceduralObjectsMod.Icons[locked ? 8 : 9]))
+            else if (m_type == 1) // COLOR RECT
+            {
+                GUI.Label(new Rect(4, 80, 100, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_width"] + " :</size>");
+                //   m_width = (uint)Mathf.FloorToInt(GUI.HorizontalSlider(new Rect(4, 44, 200, 25), m_width, 1, 2048));
+                if (widthField == null)
+                    widthField = new GUIUtils.FloatInputField(m_width);
+                m_width = (uint)widthField.DrawField(new Rect(74, 79, 170, 35), m_width, false, 0f, 1024f, true, Mathf.Abs(Mathf.Round(textManager.windowTex.width - x))).returnValue;
+
+                GUI.Label(new Rect(4, 115, 100, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_height"] + " :</size>");
+                if (heightField == null)
+                    heightField = new GUIUtils.FloatInputField(m_height);
+                m_height = (uint)heightField.DrawField(new Rect(74, 117, 170, 35), m_height, false, 0f, 1024f, true, Mathf.Abs(Mathf.Round(textManager.windowTex.height - y))).returnValue;
+
+                GUI.Label(new Rect(4, 154, 100, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_opacity"] + " : " + ((int)(m_fontColor.a * 100)).ToString() + "%</size>");
+                m_fontColor.a = GUI.HorizontalSlider(new Rect(4, 176, 200, 25), m_fontColor.a, 0f, 1f);
+            }
+
+            // POSITION
+
+            GUIUtils.DrawSeparator(new Vector2(3, 29), 241);
+
+            GUI.Label(new Rect(3, 30, 75, 21), "<size=12>" + LocalizationManager.instance.current["position"] + " :</size>");
+            //  float newX, newY;
+            if (posXfield == null)
+            {
+                posXfield = new GUIUtils.FloatInputField(x);
+                posYfield = new GUIUtils.FloatInputField(y);
+            }
+            GUI.Label(new Rect(3, 51, 24, 22), "<size=12>X :</size>");
+            x = posXfield.DrawField(new Rect(27, 50, 83, 22), x, true).returnValue;
+            GUI.Label(new Rect(111, 51, 24, 22), "<size=12>Y :</size>");
+            y = posYfield.DrawField(new Rect(135, 50, 83, 22), y, true).returnValue;
+
+            // rotation
+            if (GUI.Button(new Rect(220, 50, 25, 23), ProceduralObjectsMod.Icons[5]))
             {
                 ProceduralObjectsLogic.PlaySound();
-                locked = !locked;
-                if (locked)
-                    minimized = true;
-            }
-            if (textManager.parameters.CanFieldMoveUp(this))
-            {
-                if (GUI.Button(new Rect(246, 3, 25, 12), ProceduralObjectsMod.Icons[6]))
+                if (m_type == 0)
                 {
-                    ProceduralObjectsLogic.PlaySound();
-                    textManager.parameters.MoveFieldUp(this);
+                    if (m_rotation == 0)
+                        m_rotation = 4;
+                    else if (m_rotation == 4)
+                        m_rotation = 1;
+                    else if (m_rotation == 1)
+                        m_rotation = 2;
+                    else if (m_rotation == 2)
+                        m_rotation = 0;
+                }
+                else if (m_type == 1)
+                {
+                    var h = m_height;
+                    m_height = m_width;
+                    m_width = h;
                 }
             }
-            if (textManager.parameters.CanFieldMoveDown(this))
-            {
-                if (GUI.Button(new Rect(246, 15.5f, 25, 12), ProceduralObjectsMod.Icons[7]))
-                {
-                    ProceduralObjectsLogic.PlaySound();
-                    textManager.parameters.MoveFieldDown(this);
-                }
-            }
-            if (GUI.Button(new Rect(272, 3, 25, 25), ProceduralObjectsMod.Icons[0]))
-            {
-                ProceduralObjectsLogic.PlaySound();
-                textManager.parameters.AddField(TextField.Clone(this, false));
-            }
-            if (GUI.Button(new Rect(298, 3, 25, 25), ProceduralObjectsMod.Icons[minimized ? 1 : 2]))
-            {
-                ProceduralObjectsLogic.PlaySound();
-                minimized = !minimized;
-            }
-            if (showDelete)
-            {
-                GUI.color = Color.red;
-                if (GUI.Button(new Rect(324, 3, 25, 25), "X"))
-                {
-                    ProceduralObjectsLogic.PlaySound();
-                    textManager.parameters.RemoveField(this);
-                }
-                GUI.color = Color.white;
-            }
+
+
             GUI.EndGroup();
         }
         public void SetFont(TextureFont font)
@@ -454,7 +495,6 @@ namespace ProceduralObjects.ProceduralText
             field.y = fieldSource.y;
             field.m_rotation = fieldSource.m_rotation;
             field.m_fontColor = new SerializableColor(fieldSource.m_fontColor);
-            field.minimized = fieldSource.minimized;
             field.m_scaleX = fieldSource.m_scaleX;
             field.m_scaleY = fieldSource.m_scaleY;
             field.m_width = fieldSource.m_width;

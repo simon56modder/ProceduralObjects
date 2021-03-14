@@ -155,10 +155,10 @@ namespace ProceduralObjects.Classes
         public ProceduralObject obj;
 
         private Vertex[] prevTempBuffer;
-        private EditingStep.StepType currentStepType;
+        public EditingStep.StepType currentStepType;
         public AxisEditionState axisUsed;
         public Vector3 prevTempPos;
-        private Quaternion prevTempRot;
+        public Quaternion prevTempRot;
         public float currentStretchFactor;
 
         public bool CanUndo

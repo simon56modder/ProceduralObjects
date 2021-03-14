@@ -33,12 +33,12 @@ namespace ProceduralObjects.ProceduralText
         private TextureFont arial;
         public List<TextureFont> m_fonts;
         public bool showWindow = false;
-        private Rect window;
+        public Rect window;
         private Vector2 scrollFonts;
         private TextureFont selectedFont;
         private Texture2D previewTex;
         private string previewField;
-        
+
         public void DrawWindow()
         {
             if (showWindow)
@@ -50,7 +50,7 @@ namespace ProceduralObjects.ProceduralText
                 showWindow = false;
             GUI.DragWindow(new Rect(0, 0, 344, 23));
 
-            GUI.Label(new Rect(10, 25, 380, 25), "<b><size=13>" + LocalizationManager.instance.current["installed_fonts"] + " :</size></b>");
+            GUI.Label(new Rect(10, 25, 380, 25), "<size=13><b>" + LocalizationManager.instance.current["installed_fonts"] + "</b> (" + m_fonts.Count + ") :</size>");
 
             GUI.Box(new Rect(10, 52, 355, 200), string.Empty);
             scrollFonts = GUI.BeginScrollView(new Rect(12, 54, 376, 196), scrollFonts, new Rect(0, 0, 354, m_fonts.Count * 28 + 2));
@@ -98,7 +98,7 @@ namespace ProceduralObjects.ProceduralText
                 }
 
                 var newTextField = GUI.TextField(new Rect(3, 60, 220, 22), previewField);
-                if (previewField != newTextField)
+                if (previewField != newTextField && newTextField != "")
                 {
                     previewField = newTextField;
                     previewTex = GetPreviewTex();
@@ -120,11 +120,30 @@ namespace ProceduralObjects.ProceduralText
         private Texture2D GetPreviewTex()
         {
             var tex = selectedFont.GetString(previewField, FontStyle.Normal, selectedFont.m_defaultSpacing);
-         //   if (selectedFont.m_charSize != 50)
-         //       TextureScale.Bilinear(tex, (int)(tex.width * 50 / selectedFont.m_charSize), (int)50);
+            //   if (selectedFont.m_charSize != 50)
+            //       TextureScale.Bilinear(tex, (int)(tex.width * 50 / selectedFont.m_charSize), (int)50);
             return tex;
         }
 
+        public bool FontSelector(Rect rect, Vector2 scroll, out TextureFont selected, out Vector2 setScroll)
+        {
+            setScroll = GUI.BeginScrollView(rect, scroll, new Rect(0, 0, rect.width - 20, m_fonts.Count * 27));
+            for (int i = 0; i < m_fonts.Count; i++)
+            {
+                if (GUI.Button(new Rect(2, i * 27 + 1, rect.width - 22, 25), m_fonts[i].m_fontName))
+                {
+                    ProceduralObjectsLogic.PlaySound();
+                    GUI.EndScrollView();
+                    selected = m_fonts[i];
+                    return true;
+                }
+            }
+            GUI.EndScrollView();
+            selected = null;
+            return false;
+        }
+
+        /*
         public TextureFont GetNextFont(TextureFont f)
         {
             if (m_fonts == null)
@@ -157,6 +176,7 @@ namespace ProceduralObjects.ProceduralText
                 return false;
             return true;
         }
+        */
 
         public void LoadFonts()
         {
@@ -178,27 +198,32 @@ namespace ProceduralObjects.ProceduralText
                     }
                 }
             }
-            foreach (PublishedFileId fileId in PlatformService.workshop.GetSubscribedItems())
+            try
             {
-                string path = PlatformService.workshop.GetSubscribedItemPath(fileId);
-                if (!Directory.Exists(path))
-                    continue;
-                var wkFiles = Directory.GetFiles(path, "*.pofont", SearchOption.AllDirectories);
-                if (wkFiles.Any())
+                foreach (PublishedFileId fileId in PlatformService.workshop.GetSubscribedItems())
                 {
-                    for (int i = 0; i < wkFiles.Count(); i++)
+                    string path = PlatformService.workshop.GetSubscribedItemPath(fileId);
+                    if (!Directory.Exists(path))
+                        continue;
+                    var wkFiles = Directory.GetFiles(path, "*.pofont", SearchOption.AllDirectories);
+                    if (wkFiles.Any())
                     {
-                        if (!File.Exists(wkFiles[i]))
-                            continue;
-                        TextureFont _font = new TextureFont(wkFiles[i]);
-                        if (LoadSingleFont(wkFiles[i], _font))
+                        for (int i = 0; i < wkFiles.Count(); i++)
                         {
-                            _font.file_id = fileId;
-                            m_fonts.Add(_font);
+                            if (!File.Exists(wkFiles[i]))
+                                continue;
+                            TextureFont _font = new TextureFont(wkFiles[i]);
+                            if (LoadSingleFont(wkFiles[i], _font))
+                            {
+                                _font.file_id = fileId;
+                                m_fonts.Add(_font);
+                            }
                         }
                     }
                 }
             }
+            catch { Debug.LogWarning("[ProceduralObjects] Could not load fonts from the Workshop !"); }
+            m_fonts.Sort((a, b) => a.m_fontName.CompareTo(b.m_fontName));
         }
         public bool LoadSingleFont(string infoFilePath, TextureFont font)
         {

@@ -15,7 +15,7 @@ namespace ProceduralObjects.Classes
             this.type = type;
         }
 
-        public void MakeSelectionList(List<ProceduralObject> list)
+        public void MakeSelectionList(List<ProceduralObject> list, POGroup selectedGroup)
         {
             this.selection_objects = new Dictionary<CacheProceduralObject, Vector3>();
             for (int i = 0; i < list.Count; i++)
@@ -27,13 +27,58 @@ namespace ProceduralObjects.Classes
                     relativePos = list[i].m_position - list[0].m_position;
                 this.selection_objects.Add(new CacheProceduralObject(list[i]), relativePos);
             }
+            if (selectedGroup != null)
+            {
+                groupInformation = null;
+                return;
+            }
+            else
+            {
+                groupInformation = new Dictionary<CacheProceduralObject, CacheProceduralObject>();
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var obj = list[i];
+                    if (obj.group != null)
+                    {
+                        if (obj.isRootOfGroup)
+                            continue;
+                        if (!list.Contains(obj.group.root))
+                            continue;
+                        groupInformation.Add(selection_objects.Keys.ToList()[i], 
+                            selection_objects.Keys.ToList()[list.IndexOf(obj.group.root)]);
+                    }
+                }
+            }
         }
 
         public CacheProceduralObject single_object;
         public Dictionary<CacheProceduralObject, Vector3> selection_objects;
         public ClipboardType type;
+        public Dictionary<CacheProceduralObject, CacheProceduralObject> groupInformation;
 
-        public void ExportSelection(string name, ExternalProceduralObjectsManager manager)
+        public void RecreateGroups(Dictionary<CacheProceduralObject, ProceduralObject> createdObjects)
+        {
+            if (groupInformation == null)
+                return;
+            if (groupInformation.Count == 0)
+                return;
+
+            foreach (var kvp in createdObjects)
+            {
+                if (!groupInformation.ContainsKey(kvp.Key))
+                    continue;
+
+                if (createdObjects[groupInformation[kvp.Key]].group == null)
+                {
+                    var group = POGroup.CreateGroupWithRoot(createdObjects[groupInformation[kvp.Key]]);
+                    ProceduralObjectsLogic.instance.groups.Add(group);
+                }
+
+                createdObjects[groupInformation[kvp.Key]].group.AddToGroup(kvp.Value);
+            }
+        }
+
+        public void ExportSelection(string name, ExternalProceduralObjectsManager manager, bool staticImport)
         {
             if (selection_objects == null)
                 return;
@@ -44,7 +89,7 @@ namespace ProceduralObjects.Classes
                 return;
 
             TextWriter tw = new StreamWriter(path);
-            tw.WriteLine("externaltype = selection");
+            tw.WriteLine("externaltype = " + (staticImport ? "static" : "selection"));
             tw.WriteLine("name = " + name);
             foreach (KeyValuePair<CacheProceduralObject, Vector3> kvp in selection_objects)
             {
@@ -52,11 +97,15 @@ namespace ProceduralObjects.Classes
                 tw.WriteLine("{");
                 tw.WriteLine("baseInfoType = " + kvp.Key.baseInfoType);
                 tw.WriteLine("basePrefabName = " + kvp.Key.basePrefabName);
-                tw.WriteLine("relativePosition = " + kvp.Value.ToStringUnrounded());
+                if (staticImport)
+                    tw.WriteLine("absPosition = " + kvp.Key._staticPos.ToStringUnrounded());
+                else
+                    tw.WriteLine("relativePosition = " + kvp.Value.ToStringUnrounded());
                 tw.WriteLine("isPloppableAsphalt = " + kvp.Key.isPloppableAsphalt.ToString());
                 //  tw.WriteLine("scale = " + pobj.scale.ToString());
                 tw.WriteLine("customTexture = " + ((kvp.Key.customTexture == null) ? "null" : kvp.Key.customTexture.name));
                 tw.WriteLine("renderDistance = " + kvp.Key.renderDistance.ToString());
+                tw.WriteLine("renderDistLocked = " + kvp.Key.renderDistLocked.ToString());
                 tw.WriteLine("rotation = " + kvp.Key.m_rotation.ToStringUnrounded());
                 tw.WriteLine("disableRecalculation = " + kvp.Key.disableRecalculation.ToString());
                 if (kvp.Key.tilingFactor != 8)

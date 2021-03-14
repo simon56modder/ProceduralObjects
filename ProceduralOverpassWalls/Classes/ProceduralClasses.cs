@@ -12,6 +12,7 @@ using ColossalFramework.IO;
 
 using ProceduralObjects.ProceduralText;
 using ProceduralObjects.Tools;
+using ProceduralObjects.UI;
 
 namespace ProceduralObjects.Classes
 {
@@ -28,7 +29,6 @@ namespace ProceduralObjects.Classes
                 this.basePrefabName = container.basePrefabName;
                 this.baseInfoType = "PROP";
                 this.isPloppableAsphalt = sourceProp.IsPloppableAsphalt();
-                renderDistance = container.renderDistance;
                 m_position = container.position.ToVector3();
                 m_rotation = container.rotation.ToQuaternion();
                 if (container.meshStatus == 0)
@@ -92,7 +92,6 @@ namespace ProceduralObjects.Classes
                 this.basePrefabName = container.basePrefabName;
                 this.baseInfoType = "BUILDING";
                 this.isPloppableAsphalt = false;
-                renderDistance = container.renderDistance;
                 m_position = container.position.ToVector3();
                 m_rotation = container.rotation.ToQuaternion();
                 meshStatus = 2;
@@ -118,6 +117,8 @@ namespace ProceduralObjects.Classes
                 }
             }
             m_visibility = container.visibility;
+            renderDistance = container.renderDistance;
+            renderDistLocked = container.renderDistLocked;
             if (container.textParam != null)
             {
                 m_textParameters = TextParameters.Clone(container.textParam, true);
@@ -205,7 +206,6 @@ namespace ProceduralObjects.Classes
                 this.basePrefabName = sourceCacheObj.basePrefabName;
                 this.baseInfoType = "PROP";
                 this.isPloppableAsphalt = sourceProp.IsPloppableAsphalt();
-                renderDistance = sourceCacheObj.renderDistance;
                 if (sourceCacheObj.meshStatus == 2)
                 {
                     m_mesh = sourceProp.m_mesh.InstantiateMesh();
@@ -232,7 +232,6 @@ namespace ProceduralObjects.Classes
                 this.basePrefabName = sourceCacheObj.basePrefabName;
                 this.baseInfoType = "BUILDING";
                 this.isPloppableAsphalt = false;
-                renderDistance = sourceCacheObj.renderDistance;
                 m_mesh = sourceBuilding.m_mesh.InstantiateMesh();
                 allVertices = sourceCacheObj.allVertices;
                 meshStatus = 2;
@@ -269,6 +268,8 @@ namespace ProceduralObjects.Classes
             this.flipFaces = sourceCacheObj.flipFaces;
             if (this.flipFaces)
                 VertexUtils.flipFaces(this);
+            renderDistance = sourceCacheObj.renderDistance;
+            renderDistLocked = sourceCacheObj.renderDistLocked;
             m_position = position;
             m_rotation = sourceCacheObj.m_rotation;
             disableRecalculation = sourceCacheObj.disableRecalculation;
@@ -304,7 +305,6 @@ namespace ProceduralObjects.Classes
             this.basePrefabName = sourceProp.name;
             this.isPloppableAsphalt = sourceProp.IsPloppableAsphalt();
             this.baseInfoType = "PROP";
-            this.renderDistance = ProceduralObjectsMod.PropRenderDistance.value;
             // this.flipFaces = false;
             this.tilingFactor = 8;
             m_position = ToolsModifierControl.cameraController.m_currentPosition;
@@ -322,7 +322,10 @@ namespace ProceduralObjects.Classes
             {
                 m_mesh = sourceProp.m_mesh;
                 meshStatus = 1;
+                if (isPloppableAsphalt)
+                    RecalculateBoundsNormalsExtras(1);
             }
+            this.renderDistance = RenderOptions.instance.CalculateRenderDistance(this, true);
             m_material = GameObject.Instantiate(sourceProp.m_material);
             m_visibility = ProceduralObjectVisibility.Always;
             historyEditionBuffer = new HistoryBuffer(this);
@@ -354,7 +357,6 @@ namespace ProceduralObjects.Classes
             this.basePrefabName = sourceBuilding.name;
             this.isPloppableAsphalt = false;
             this.baseInfoType = "BUILDING";
-            this.renderDistance = ProceduralObjectsMod.BuildingRenderDistance.value;
            // this.flipFaces = false;
             // this.recalculateNormals = true;
             // this.tilingFactor = 8;
@@ -367,6 +369,7 @@ namespace ProceduralObjects.Classes
             m_mesh.colors32 = new Color32[] { };
             allVertices = m_mesh.vertices;
             meshStatus = 2;
+            this.renderDistance = RenderOptions.instance.CalculateRenderDistance(this, true);
             m_material = GameObject.Instantiate(sourceBuilding.m_material);
             m_visibility = ProceduralObjectVisibility.Always;
             historyEditionBuffer = new HistoryBuffer(this);
@@ -418,8 +421,32 @@ namespace ProceduralObjects.Classes
                 normalsRecalcMode = NormalsRecalculation.None;
             }
         }
+        public void RecalculateBoundsNormalsExtras(byte meshStatus)
+        {
+            if (!isPloppableAsphalt && meshStatus != 1)
+            {
+                this.RecalculateNormals();
+                this.m_mesh.RecalculateBounds();
+            }
+            else if (isPloppableAsphalt)
+            {
+                Bounds b;
+                m_correctedMeshPloppableAsph = VertexUtils.GetCorrectedMeshPloppableAsph(m_mesh, m_correctedMeshPloppableAsph, out b);
+                m_mesh.bounds = b;
+            }
+            halfOverlayDiam = Mathf.Max(m_mesh.bounds.extents.x, m_mesh.bounds.extents.z);
+        }
+        public Mesh overlayRenderMesh
+        {
+            get
+            {
+                if (isPloppableAsphalt && (m_correctedMeshPloppableAsph != null))
+                    return m_correctedMeshPloppableAsph;
+                return m_mesh;
+            }
+        }
 
-        public Mesh m_mesh;
+        public Mesh m_mesh, m_correctedMeshPloppableAsph;
         public Material m_material;
         public Vector3 m_position;
         public Quaternion m_rotation;
@@ -430,8 +457,8 @@ namespace ProceduralObjects.Classes
         public int id, tilingFactor;
         // mesh status : 0=undefined ; 1=equivalent to source; 2=custom (see m_mesh)
         public byte meshStatus;
-        public float renderDistance, m_scale;
-        public bool isPloppableAsphalt, disableRecalculation, flipFaces, _insideRenderView, _insideUIview;
+        public float renderDistance, m_scale, halfOverlayDiam;
+        public bool isPloppableAsphalt, disableRecalculation, renderDistLocked, flipFaces, _insideRenderView, _insideUIview, _selected;
         public ProceduralObjectVisibility m_visibility;
         public NormalsRecalculation normalsRecalcMode;
         public Color m_color;
@@ -441,6 +468,8 @@ namespace ProceduralObjects.Classes
         public POGroup group;
         public bool isRootOfGroup;
         public int _groupRootIdData;
+
+        public GUIUtils.FloatInputField[] transformInputFields;
 
         public PropInfo _baseProp;
         public BuildingInfo _baseBuilding;
@@ -481,6 +510,7 @@ namespace ProceduralObjects.Classes
         public CacheProceduralObject(ProceduralObject sourceObj)
         {
             renderDistance = sourceObj.renderDistance;
+            renderDistLocked = sourceObj.renderDistLocked;
             if (sourceObj.meshStatus == 2)
             {
                 allVertices = sourceObj.m_mesh.vertices;
@@ -489,6 +519,7 @@ namespace ProceduralObjects.Classes
             else
                 meshStatus = 1;
             customTexture = sourceObj.customTexture;
+            _staticPos = sourceObj.m_position;
             m_rotation = sourceObj.m_rotation;
             basePrefabName = sourceObj.basePrefabName;
             baseInfoType = sourceObj.baseInfoType;
@@ -526,10 +557,11 @@ namespace ProceduralObjects.Classes
         public Color m_color;
         public Layer layer;
         public float renderDistance;
-        public bool isPloppableAsphalt, disableRecalculation, flipFaces;
+        public bool isPloppableAsphalt, disableRecalculation, renderDistLocked, flipFaces;
         public int tilingFactor;
         public byte meshStatus;
         public Quaternion m_rotation;
+        public Vector3 _staticPos;
         public Texture customTexture;
         public string basePrefabName, baseInfoType;
         public Vector3[] allVertices;
