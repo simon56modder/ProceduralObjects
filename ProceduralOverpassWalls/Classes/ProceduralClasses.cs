@@ -19,11 +19,11 @@ namespace ProceduralObjects.Classes
     public class ProceduralObject
     {
         public ProceduralObject() { }
-        public ProceduralObject(ProceduralObjectContainer container, LayerManager layerManager)
+        public ProceduralObject(ProceduralObjectContainer container, LayerManager layerManager, PropInfo[] props, BuildingInfo[] buildings)
         {
             if (container.objectType == "PROP")
             {
-                PropInfo sourceProp = Resources.FindObjectsOfTypeAll<PropInfo>().FirstOrDefault(info => info.name == container.basePrefabName);
+                PropInfo sourceProp = props.FirstOrDefault(info => info.name == container.basePrefabName);
                 this._baseProp = sourceProp;
                 this.id = container.id;
                 this.basePrefabName = container.basePrefabName;
@@ -86,7 +86,7 @@ namespace ProceduralObjects.Classes
             }
             else if (container.objectType == "BUILDING")// building
             {
-                BuildingInfo sourceProp = Resources.FindObjectsOfTypeAll<BuildingInfo>().FirstOrDefault(info => info.name == container.basePrefabName);
+                BuildingInfo sourceProp = buildings.FirstOrDefault(info => info.name == container.basePrefabName);
                 this._baseBuilding = sourceProp;
                 this.id = container.id;
                 this.basePrefabName = container.basePrefabName;
@@ -390,6 +390,31 @@ namespace ProceduralObjects.Classes
             m_modules = new List<POModule>();
         }
 
+        public void SetPosition(Vector3 pos)
+        {
+            if (m_modules == null) goto SetPos;
+            if (m_modules.Count == 0) goto SetPos;
+            foreach (var m in m_modules)
+            {
+                try { m.OnParentPositionSet(ProceduralObjectsLogic.instance, m_position, pos); }
+                catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module OnParentPositionSet() method!\n" + e); }
+            }
+        SetPos:
+            m_position = pos;
+        }
+        public void SetRotation(Quaternion rot)
+        {
+            if (m_modules == null) goto SetRot;
+            if (m_modules.Count == 0) goto SetRot;
+            foreach (var m in m_modules)
+            {
+                try { m.OnParentRotationSet(ProceduralObjectsLogic.instance, m_rotation, rot); }
+                catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module OnParentRotationSet() method!\n" + e); }
+            }
+        SetRot:
+            m_rotation = rot;
+        }
+
         public void ChangeNormalsRecalc()
         {
             if (normalsRecalcMode == NormalsRecalculation.None)
@@ -454,7 +479,7 @@ namespace ProceduralObjects.Classes
         public Vector3[] allVertices;
         public Layer layer;
         public string basePrefabName, baseInfoType;
-        public int id, tilingFactor;
+        public int id, tilingFactor; 
         // mesh status : 0=undefined ; 1=equivalent to source; 2=custom (see m_mesh)
         public byte meshStatus;
         public float renderDistance, m_scale, halfOverlayDiam;
@@ -534,8 +559,8 @@ namespace ProceduralObjects.Classes
                     _baseProp = sourceObj._baseProp;
                     break;
                 case "BUILDING":
-                    _baseBuilding = sourceObj._baseBuilding;
-                    break;
+                        _baseBuilding = sourceObj._baseBuilding;
+                        break;
             }
             visibility = sourceObj.m_visibility;
             textParam = TextParameters.Clone(sourceObj.m_textParameters, false);

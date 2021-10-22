@@ -14,16 +14,14 @@ namespace ProceduralObjects
         {
             if (deletePreviousIfExisting)
                 DestroyGizmo();
-
-
-
+            
             GameObject xAxis = new GameObject("ProceduralAxis_X");
             var xCollid = xAxis.AddComponent<BoxCollider>();
             xCollid.size = new Vector3(2, 2, 2);
             LineRenderer xLineComp = xAxis.AddComponent<LineRenderer>();
             xLineComp.material = spriteMat;
-            xLineComp.startColor = Color.red;
-            xLineComp.endColor = Color.red;
+            xLineComp.startColor = GizmoRed;
+            xLineComp.endColor = GizmoRed;
             xLineComp.widthMultiplier = 1;
             Vector3[] xPos = new Vector3[2];
             xPos[0] = position;
@@ -37,8 +35,8 @@ namespace ProceduralObjects
             yCollid.size = new Vector3(2, 2, 2);
             LineRenderer yLineComp = yAxis.AddComponent<LineRenderer>();
             yLineComp.material = spriteMat;
-            yLineComp.startColor = Color.green;
-            yLineComp.endColor = Color.green;
+            yLineComp.startColor = GizmoGreen;
+            yLineComp.endColor = GizmoGreen;
             yLineComp.widthMultiplier = 1;
             Vector3[] yPos = new Vector3[2];
             yPos[0] = position;
@@ -52,8 +50,8 @@ namespace ProceduralObjects
             zCollid.size = new Vector3(2, 2, 2);
             LineRenderer zLineComp = zAxis.AddComponent<LineRenderer>();
             zLineComp.material = spriteMat;
-            zLineComp.startColor = Color.blue;
-            zLineComp.endColor = Color.blue;
+            zLineComp.startColor = GizmoBlue;
+            zLineComp.endColor = GizmoBlue;
             zLineComp.widthMultiplier = 1;
             Vector3[] zPos = new Vector3[2];
             zPos[0] = position;
@@ -71,15 +69,15 @@ namespace ProceduralObjects
                 DestroyGizmo();
 
             Material yellow = new Material(Shader.Find("GUI/Text Shader"));
-            yellow.color = Color.yellow;
+            yellow.color = GizmoYellow;
 
             GameObject xAxis = new GameObject("ProceduralAxis_X");
             var xCollid = xAxis.AddComponent<BoxCollider>();
             xCollid.size = new Vector3(2, 2, 2);
             LineRenderer xLineComp = xAxis.AddComponent<LineRenderer>();
             xLineComp.material = spriteMat;
-            xLineComp.startColor = Color.red;
-            xLineComp.endColor = Color.red;
+            xLineComp.startColor = GizmoRed;
+            xLineComp.endColor = GizmoRed;
             xLineComp.widthMultiplier = 1;
             Vector3[] xPos = new Vector3[2];
             xPos[0] = position;
@@ -99,8 +97,8 @@ namespace ProceduralObjects
             yCollid.size = new Vector3(2, 2, 2);
             LineRenderer yLineComp = yAxis.AddComponent<LineRenderer>();
             yLineComp.material = spriteMat;
-            yLineComp.startColor = Color.green;
-            yLineComp.endColor = Color.green;
+            yLineComp.startColor = GizmoGreen;
+            yLineComp.endColor = GizmoGreen;
             yLineComp.widthMultiplier = 1;
             Vector3[] yPos = new Vector3[2];
             yPos[0] = position;
@@ -120,8 +118,8 @@ namespace ProceduralObjects
             zCollid.size = new Vector3(2, 2, 2);
             LineRenderer zLineComp = zAxis.AddComponent<LineRenderer>();
             zLineComp.material = spriteMat;
-            zLineComp.startColor = Color.blue;
-            zLineComp.endColor = Color.blue;
+            zLineComp.startColor = GizmoBlue;
+            zLineComp.endColor = GizmoBlue;
             zLineComp.widthMultiplier = 1;
             Vector3[] zPos = new Vector3[2];
             zPos[0] = position;
@@ -152,8 +150,8 @@ namespace ProceduralObjects
             xCollid.radius = 10; */
             LineRenderer xLineComp = xAxis.AddComponent<LineRenderer>();
             xLineComp.material = spriteMat;
-            xLineComp.startColor = Color.red;
-            xLineComp.endColor = Color.red;
+            xLineComp.startColor = GizmoRed;
+            xLineComp.endColor = GizmoRed;
             xLineComp.useWorldSpace = false;
             xLineComp.widthMultiplier = 1;
             // Code for circle creation by Loek van den Ouweland, April 30, 2018
@@ -185,8 +183,8 @@ namespace ProceduralObjects
             yCollid.height = 2; */
             LineRenderer yLineComp = yAxis.AddComponent<LineRenderer>();
             yLineComp.material = spriteMat;
-            yLineComp.startColor = Color.green;
-            yLineComp.endColor = Color.green;
+            yLineComp.startColor = GizmoGreen;
+            yLineComp.endColor = GizmoGreen;
             yLineComp.useWorldSpace = false;
             yLineComp.widthMultiplier = 1;
             // Code for circle creation by Loek van den Ouweland, April 30, 2018
@@ -218,8 +216,8 @@ namespace ProceduralObjects
             zCollid.height = 2; */
             LineRenderer zLineComp = zAxis.AddComponent<LineRenderer>();
             zLineComp.material = spriteMat;
-            zLineComp.startColor = Color.blue;
-            zLineComp.endColor = Color.blue;
+            zLineComp.startColor = GizmoBlue;
+            zLineComp.endColor = GizmoBlue;
             zLineComp.useWorldSpace = false;
             zLineComp.widthMultiplier = 1;
             // Code for circle creation by Loek van den Ouweland, April 30, 2018
@@ -476,6 +474,11 @@ namespace ProceduralObjects
         public static SpaceReferential referential = SpaceReferential.Local;
         public static float recordingStretch;
 
+        public static Color GizmoRed = new Color(1f, 0f, 0f, ProceduralObjectsMod.GizmoOpacity.value);
+        public static Color GizmoBlue = new Color(0f, 0f, 1f, ProceduralObjectsMod.GizmoOpacity.value);
+        public static Color GizmoGreen = new Color(0f, 1f, 0f, ProceduralObjectsMod.GizmoOpacity.value);
+        public static Color GizmoYellow = new Color(1f, 0.92f, 0.016f, ProceduralObjectsMod.GizmoOpacity.value);
+
         public static Vector3 posDiffSaved = Vector3.zero;
         public static bool useLineTool = false;
 
@@ -640,7 +643,7 @@ namespace ProceduralObjects
         }
         private static void ApplyRotationLineTool(Quaternion rot, ProceduralObjectsLogic logic)
         {
-            logic.currentlyEditingObject.m_rotation = rot * logic.currentlyEditingObject.m_rotation;
+            logic.currentlyEditingObject.SetRotation(rot * logic.currentlyEditingObject.m_rotation);
             Gizmos.posDiffSaved = rot * Gizmos.posDiffSaved;
             logic.gizmoOffset = rot * logic.gizmoOffset;
             logic.axisHitPoint = VertexUtils.RotatePointAroundPivot(logic.axisHitPoint, logic.currentlyEditingObject.historyEditionBuffer.prevTempPos, rot);
@@ -751,7 +754,7 @@ namespace ProceduralObjects
         }
         
         public bool enableMovement, storedVertices;
-        public byte toolType;
+        public byte toolType, planeUsed;
         public Dictionary<Vertex, Vector3> relativePositions;
         public Vector3 originHitPoint;
         public Vector2 originMousePosition;
@@ -787,10 +790,37 @@ namespace ProceduralObjects
                 rotVertices[new Vertex(vertex)] = vertex;
                 verticesBounds.Encapsulate(vertex.Position);
             }
+            ProceduralObjectsLogic.PlaySound(3);
+            if (toolType <= 1)
+            {
+                var angToYZPlaneNormal = Vector3.Angle(originClickRay.direction, (obj.m_rotation * Vector3.right).normalized);
+                if (angToYZPlaneNormal > 90f) angToYZPlaneNormal = 180f - angToYZPlaneNormal;
+                var angToXZPlaneNormal = Vector3.Angle(originClickRay.direction, (obj.m_rotation * Vector3.up).normalized);
+                if (angToXZPlaneNormal > 90f) angToXZPlaneNormal = 180f - angToXZPlaneNormal;
+                var angToXYPlaneNormal = Vector3.Angle(originClickRay.direction, (obj.m_rotation * Vector3.forward).normalized);
+                if (angToXYPlaneNormal > 90f) angToXYPlaneNormal = 180f - angToXYPlaneNormal;
+                var min = Mathf.Min(angToXZPlaneNormal, angToXYPlaneNormal, angToYZPlaneNormal);
+                if (min == angToYZPlaneNormal)
+                {
+                    movementPlane = new Plane((obj.m_rotation * Vector3.right).normalized, obj.m_position + obj.m_rotation * verticesBounds.min);
+                    planeUsed = 0;
+                }
+                else if (min == angToXZPlaneNormal)
+                {
+                    movementPlane = new Plane((obj.m_rotation * Vector3.up).normalized, obj.m_position + obj.m_rotation * verticesBounds.min);
+                    planeUsed = 1;
+                }
+                else if (min == angToXYPlaneNormal)
+                {
+                    movementPlane = new Plane((obj.m_rotation * Vector3.forward).normalized, obj.m_position + obj.m_rotation * verticesBounds.min);
+                    planeUsed = 2;
+                }
+                else
+                    movementPlane = new Plane((obj.m_rotation * Vector3.right).normalized, obj.m_position + obj.m_rotation * verticesBounds.min);
+
+            }
             if (toolType == 0)
             {
-                movementPlane = new Plane((obj.m_rotation * Vector3.up).normalized, obj.m_position + obj.m_rotation * verticesBounds.min);
-                
                 float enter;
                 if (movementPlane.Raycast(originClickRay, out enter))
                     originHitPoint = originClickRay.GetPoint(enter);
@@ -798,14 +828,24 @@ namespace ProceduralObjects
                     originHitPoint = obj.m_position;
 
                 relativePositions = new Dictionary<Vertex, Vector3>();
-
                 foreach (var vertex in selectedVertices)
                     relativePositions[vertex] = vertex.Position - originHitPoint;
 
-                SetupLines(obj);
+                SetupLinesPos(obj);
                 if (Input.GetKey(KeyCode.LeftControl))
                     HideLines();
             }
+            else if (toolType == 1)
+            {
+                if (obj.normalsRecalcMode == NormalsRecalculation.None)
+                {
+                    ProceduralObjectsLogic.PlaySound(2);
+                    obj.normalsRecalcMode = NormalsRecalculation.Default;
+                    obj.RecalculateNormals();
+                }
+                SetupLinesRot(obj);
+            }
+
             storedVertices = true;
         }
         // move vertices
@@ -819,22 +859,66 @@ namespace ProceduralObjects
             int line = -1;
             if (snapToAxis)
             {
-                Vector3 zSnappedLocal = Vector3.Project(newHitPoint - originHitPoint, obj.m_rotation * Vector3.forward);
-                Vector3 xSnappedLocal = Vector3.Project(newHitPoint - originHitPoint, obj.m_rotation * Vector3.right);
-                if (xSnappedLocal.magnitude > zSnappedLocal.magnitude)
+                Vector3 xSnappedLocal = Vector3.zero, ySnappedLocal = Vector3.zero, zSnappedLocal = Vector3.zero;
+                if (planeUsed > 0)
+                    xSnappedLocal = Vector3.Project(newHitPoint - originHitPoint, obj.m_rotation * Vector3.right);
+                if (planeUsed == 0 || planeUsed == 2)
+                    ySnappedLocal = Vector3.Project(newHitPoint - originHitPoint, obj.m_rotation * Vector3.up);
+                if (planeUsed == 0 || planeUsed == 1) 
+                    zSnappedLocal = Vector3.Project(newHitPoint - originHitPoint, obj.m_rotation * Vector3.forward);
+
+                if (planeUsed == 0)
                 {
-                    if (zSnappedLocal.magnitude > 3f)
-                        goto finallyNotSnapAxis;
-                    newHitPoint = xSnappedLocal + originHitPoint;
-                    line = 0;
+                    if (ySnappedLocal.sqrMagnitude > zSnappedLocal.sqrMagnitude)
+                    {
+                        if (zSnappedLocal.magnitude > 3f)
+                            goto finallyNotSnapAxis;
+                        newHitPoint = ySnappedLocal + originHitPoint;
+                        line = 1;
+                    }
+                    else
+                    {
+                        if (ySnappedLocal.magnitude > 3f)
+                            goto finallyNotSnapAxis;
+                        newHitPoint = zSnappedLocal + originHitPoint;
+                        line = 2;
+                    }
                 }
-                else
+                else if (planeUsed == 1)
                 {
-                    if (xSnappedLocal.magnitude > 3f)
-                        goto finallyNotSnapAxis;
-                    newHitPoint = zSnappedLocal + originHitPoint;
-                    line = 1;
+                    if (xSnappedLocal.sqrMagnitude > zSnappedLocal.sqrMagnitude)
+                    {
+                        if (zSnappedLocal.magnitude > 3f)
+                            goto finallyNotSnapAxis;
+                        newHitPoint = xSnappedLocal + originHitPoint;
+                        line = 0;
+                    }
+                    else
+                    {
+                        if (xSnappedLocal.magnitude > 3f)
+                            goto finallyNotSnapAxis;
+                        newHitPoint = zSnappedLocal + originHitPoint;
+                        line = 2;
+                    }
                 }
+                else if (planeUsed == 2)
+                {
+                    if (xSnappedLocal.sqrMagnitude > ySnappedLocal.sqrMagnitude)
+                    {
+                        if (ySnappedLocal.magnitude > 3f)
+                            goto finallyNotSnapAxis;
+                        newHitPoint = xSnappedLocal + originHitPoint;
+                        line = 0;
+                    }
+                    else
+                    {
+                        if (xSnappedLocal.magnitude > 3f)
+                            goto finallyNotSnapAxis;
+                        newHitPoint = ySnappedLocal + originHitPoint;
+                        line = 1;
+                    }
+                }
+
             finallyNotSnapAxis:
                 this.HighlightLine(line);
                 if (line == -1)
@@ -853,6 +937,8 @@ namespace ProceduralObjects
                 if (line == 0)
                     newHitPoint = originHitPoint + (obj.m_rotation * (Vector3.right * Gizmos.GetStoredDistanceValue));
                 else if (line == 1)
+                    newHitPoint = originHitPoint + (obj.m_rotation * (Vector3.up * Gizmos.GetStoredDistanceValue));
+                else if (line == 2)
                     newHitPoint = originHitPoint + (obj.m_rotation * (Vector3.forward * Gizmos.GetStoredDistanceValue));
             }
             var referencial = VertexUtils.RotatePointAroundPivot(newHitPoint, originHitPoint, Quaternion.Inverse(obj.m_rotation));
@@ -863,8 +949,7 @@ namespace ProceduralObjects
             }
             foreach (KeyValuePair<Vertex, Vector3> kvp in relativePositions)
             {
-                var newpos = kvp.Value + referencial;
-                kvp.Key.Position = new Vector3(newpos.x, kvp.Key.Position.y, newpos.z);
+                kvp.Key.Position = kvp.Value + referencial;
             }
         }
         // rotate vertices
@@ -874,10 +959,11 @@ namespace ProceduralObjects
                 Gizmos.RegisterKeyTyping();
 
             Quaternion rot;
+            Vector3 axis = planeUsed == 0 ? Vector3.right : (planeUsed == 1 ? Vector3.up : Vector3.forward);
             if (Gizmos.registeredString != "")
-                rot = Quaternion.AngleAxis(Gizmos.GetStoredAngleValue, Vector3.up);
+                rot = Quaternion.AngleAxis(Gizmos.GetStoredAngleValue, axis);
             else
-                rot = Quaternion.AngleAxis(((originMousePosition.x - mousePosX) * 370f) / Screen.width, Vector3.up);
+                rot = Quaternion.AngleAxis(((originMousePosition.x - mousePosX) * 370f) / Screen.width, axis);
 
             foreach (KeyValuePair<Vertex, Vertex> kvp in rotVertices)
             {
@@ -907,22 +993,47 @@ namespace ProceduralObjects
         }
 
         // Snap to Axis methods
-        public void SetupLines(ProceduralObject obj)
+        public void SetupLinesPos(ProceduralObject obj)
         {
-            linesObj = new GameObject[] { new GameObject("PO_verticesLineX"), new GameObject("PO_verticesLineZ") };
-            axis = new LineRenderer[] { linesObj[0].AddComponent<LineRenderer>(), linesObj[1].AddComponent<LineRenderer>() };
+            linesObj = new GameObject[] { new GameObject("PO_verticesLineX"), new GameObject("PO_verticesLineY"), new GameObject("PO_verticesLineZ") };
+            axis = new LineRenderer[] { linesObj[0].AddComponent<LineRenderer>(), linesObj[1].AddComponent<LineRenderer>(), linesObj[2].AddComponent<LineRenderer>() };
 
-            axis[0].startColor = Color.red;
-            axis[0].endColor = Color.red;
-            axis[0].material = Gizmos.spriteMat;
-            axis[0].widthMultiplier = 0.26f * AxisWidthFactor;
-            axis[0].SetPositions(new Vector3[] { originHitPoint + (obj.m_rotation * Vector3.right) * 500f, originHitPoint + (obj.m_rotation * Vector3.left) * 500f });
+            setupAxis(0, Color.red);
+            if (planeUsed > 0)
+                axis[0].SetPositions(new Vector3[] { originHitPoint + (obj.m_rotation * Vector3.right) * 500f, originHitPoint + (obj.m_rotation * Vector3.left) * 500f });
 
-            axis[1].startColor = Color.blue;
-            axis[1].endColor = Color.blue;
-            axis[1].material = Gizmos.spriteMat;
-            axis[1].widthMultiplier = 0.26f * AxisWidthFactor;
-            axis[1].SetPositions(new Vector3[] { originHitPoint + (obj.m_rotation * Vector3.forward) * 500f, originHitPoint + (obj.m_rotation * Vector3.back) * 500f });
+            setupAxis(1, Color.green);
+            if (planeUsed == 0 || planeUsed == 2)
+                axis[1].SetPositions(new Vector3[] { originHitPoint + (obj.m_rotation * Vector3.up) * 500f, originHitPoint + (obj.m_rotation * Vector3.down) * 500f });
+
+            setupAxis(2, Color.blue);
+            if (planeUsed == 0 || planeUsed == 1)
+                axis[2].SetPositions(new Vector3[] { originHitPoint + (obj.m_rotation * Vector3.forward) * 500f, originHitPoint + (obj.m_rotation * Vector3.back) * 500f });
+        }
+        public void SetupLinesRot(ProceduralObject obj)
+        {
+            linesObj = new GameObject[] { new GameObject("PO_verticesLineX"), new GameObject("PO_verticesLineY"), new GameObject("PO_verticesLineZ") };
+            axis = new LineRenderer[] { linesObj[0].AddComponent<LineRenderer>(), linesObj[1].AddComponent<LineRenderer>(), linesObj[2].AddComponent<LineRenderer>() };
+            var worldBoundsCenter = (obj.m_rotation * verticesBounds.center) + obj.m_position;
+
+            setupAxis(0, Color.red);
+            if (planeUsed == 0)
+                axis[0].SetPositions(new Vector3[] { worldBoundsCenter + (obj.m_rotation * Vector3.right) * 500f, worldBoundsCenter + (obj.m_rotation * Vector3.left) * 500f });
+
+            setupAxis(1, Color.green);
+            if (planeUsed == 1)
+                axis[1].SetPositions(new Vector3[] { worldBoundsCenter + (obj.m_rotation * Vector3.up) * 500f, worldBoundsCenter + (obj.m_rotation * Vector3.down) * 500f });
+
+            setupAxis(2, Color.blue);
+            if (planeUsed == 2)
+                axis[2].SetPositions(new Vector3[] { worldBoundsCenter + (obj.m_rotation * Vector3.forward) * 500f, worldBoundsCenter + (obj.m_rotation * Vector3.back) * 500f });
+        }
+        private void setupAxis(int i, Color c)
+        {
+            axis[i].startColor = c;
+            axis[i].endColor = c;
+            axis[i].material = Gizmos.spriteMat;
+            axis[i].widthMultiplier = 0.26f * AxisWidthFactor;
         }
         public void ShowLines()
         {
@@ -930,6 +1041,7 @@ namespace ProceduralObjects
                 return;
             axis[0].enabled = true;
             axis[1].enabled = true;
+            axis[2].enabled = true;
             Gizmos.EnableKeyTyping();
         }
         public void HideLines()
@@ -938,6 +1050,7 @@ namespace ProceduralObjects
                 return;
             axis[0].enabled = false;
             axis[1].enabled = false;
+            axis[2].enabled = false;
             Gizmos.DisableKeyTyping();
         }
         public void DestroyLines()
@@ -946,28 +1059,27 @@ namespace ProceduralObjects
                 return;
             UnityEngine.Object.Destroy(linesObj[0]);
             UnityEngine.Object.Destroy(linesObj[1]);
+            UnityEngine.Object.Destroy(linesObj[2]);
         }
         private void HighlightLine(int i)
         {
             if (axis == null)
                 return;
-            var toHighlight = i == -1 ? null : axis[i];
-            var toDampen = axis[i == 1 ? 0 : 1];
 
-            if (i != -1)
+            for (int j = 0; j < 3; j++)
             {
-                toHighlight.widthMultiplier = 0.26f * AxisWidthFactor;
-                toHighlight.startColor = new Color(toHighlight.startColor.r, toHighlight.startColor.g, toHighlight.startColor.b, 0.65f);
-            }
-           dampen:
-            toDampen.widthMultiplier = 0.12f * AxisWidthFactor;
-            toDampen.startColor = new Color(toDampen.startColor.r, toDampen.startColor.g, toDampen.startColor.b, 0.2f);
-
-            if (i == -1)
-            {
-                toDampen = axis[0];
-                i = 2;
-                goto dampen;
+                if (i == j)
+                {
+                    var toHighlight = axis[j];
+                    toHighlight.widthMultiplier = 0.26f * AxisWidthFactor;
+                    toHighlight.startColor = new Color(toHighlight.startColor.r, toHighlight.startColor.g, toHighlight.startColor.b, 0.65f);
+                }
+                else
+                {
+                    var toDampen = axis[j];
+                    toDampen.widthMultiplier = 0.12f * AxisWidthFactor;
+                    toDampen.startColor = new Color(toDampen.startColor.r, toDampen.startColor.g, toDampen.startColor.b, 0.2f);
+                }
             }
         }
         private float AxisWidthFactor
@@ -976,8 +1088,7 @@ namespace ProceduralObjects
             {
                 return ((ProceduralObjectsMod.GizmoSize.value - 1f) / 2f) + 1f;
             }
-        }
-
+        } 
     }
 }
  

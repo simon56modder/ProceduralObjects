@@ -64,11 +64,11 @@ namespace ProceduralObjects.Classes
         #endregion
 
         // new MI integration
-        /*
         public static Assembly MIAssembly;
-        static Type t_MIPOLogic, t_MIPOobj;
+        static Type t_MIPOLogic, t_MIPOobj, t_MIPOManager;
         static bool isSetup = false;
         static object MIPOLogic;
+        static object MIPOManager;
         static BindingFlags flags;
 
         public static void SetupMoveIt()
@@ -95,7 +95,9 @@ namespace ProceduralObjects.Classes
 
             t_MIPOLogic = MIAssembly.GetType("MoveIt.PO_Logic");
             t_MIPOobj = MIAssembly.GetType("MoveIt.PO_Object");
+            t_MIPOManager = MIAssembly.GetType("MoveIt.PO_Manager");
             MIPOLogic = GameObject.Find("MIT_POLogic").GetComponent(t_MIPOLogic);
+            MIPOManager = MIAssembly.GetType("MoveIt.MoveItTool").GetField("PO", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Instance).GetValue(null);
 
             flags = BindingFlags.Instance | BindingFlags.NonPublic;
             isSetup = true;
@@ -106,13 +108,32 @@ namespace ProceduralObjects.Classes
             var obj = t_MIPOobj.GetField("procObj", flags).GetValue(MIPO_obj);
             return (ProceduralObject)obj;
         }
-        public static void ClonePO(object record, InstanceID target)
+        public static void ClonePO(InstanceID original, InstanceID target)
         {
-            var clone = ProceduralObjectsLogic.instance.CloneObject((ProceduralObject)record);
-            var MIPOclone = t_MIPOobj.GetConstructor(new Type[] { typeof(ProceduralObject) }).Invoke(null, new object[] { clone });
-            target.NetLane = (uint)clone.id + 1;
+            var clone = ProceduralObjectsLogic.instance.CloneObject(GetPO(original));
+            AddPOToMIVisibleObj(clone);
+            t_MIPOLogic.GetMethod("Paste").Invoke(MIPOLogic, new object[] { original, target, clone.id });
         }
-         * */
+        public static void InitializeAsPO(InstanceID target, ProceduralObject po)
+        {
+            if (po.meshStatus != 1)
+            {
+                if (po.RequiresUVRecalculation && !po.disableRecalculation)
+                    po.m_mesh.uv = Vertex.RecalculateUVMap(po, Vertex.CreateVertexList(po));
+            }
+            po.RecalculateBoundsNormalsExtras(po.meshStatus);
+            AddPOToMIVisibleObj(po);
+            t_MIPOLogic.GetMethod("Paste").Invoke(MIPOLogic, new object[] { null, target, po.id });
+        }
+        public static void AddPOToMIVisibleObj(ProceduralObject obj)
+        {
+            var mi_obj = t_MIPOobj.GetConstructor(new Type[] { typeof(object) }).Invoke(new object[] { obj });
+            uint mi_id = (uint)(obj.id + 1);
+            var visibleObjects = t_MIPOManager.GetField("visibleObjects", flags).GetValue(MIPOManager);
+            visibleObjects.GetType().GetMethod("Add").Invoke(visibleObjects, new object[] { mi_id, mi_obj });
+            var visibleIds = t_MIPOManager.GetField("visibleIds", flags).GetValue(MIPOManager);
+            visibleIds.GetType().GetMethod("Add").Invoke(visibleIds, new object[] { mi_id });
+        }
     }
     public class POConversionRequest
     {
@@ -131,7 +152,7 @@ namespace ProceduralObjects.Classes
         public ProceduralObject converted;
     }
 
-    /*
+    /* 
     public class MoveItIntegrationFactory : IMoveItIntegrationFactory
     {
         public MoveItIntegrationBase GetInstance()
@@ -162,34 +183,59 @@ namespace ProceduralObjects.Classes
             if (sourceInstanceID.Type == InstanceType.NetLane)
             {
                 PO_MoveIt.SetupMoveIt();
-                return PO_MoveIt.GetPO(sourceInstanceID);
+                return sourceInstanceID;
             }
             return null;
         }
         public override void Paste(InstanceID targetInstanceID, object record, Dictionary<InstanceID, InstanceID> map)
         {
-            if (record is ProceduralObject)
+            if (record == null)
+                return;
+
+            if (record is InstanceID)
+            {
+                if (((InstanceID)record).Type != InstanceType.NetLane)
+                    return;
+                PO_MoveIt.SetupMoveIt();
+                PO_MoveIt.ClonePO((InstanceID)record, targetInstanceID);
+            }
+            else if (record is ProceduralObject)
             {
                 PO_MoveIt.SetupMoveIt();
-                PO_MoveIt.ClonePO(record, targetInstanceID);
+                var obj = (ProceduralObject)record;
+                obj.id = ProceduralObjectsLogic.instance.proceduralObjects.GetNextUnusedId();
+                ProceduralObjectsLogic.instance.proceduralObjects.Add(obj);
+                PO_MoveIt.InitializeAsPO(targetInstanceID, obj);
             }
         }
         public override string Encode64(object record)
         {
-            if (record is ProceduralObject)
-            {
-                PO_MoveIt.SetupMoveIt();
-                var container = new ProceduralObjectContainer((ProceduralObject)record);
-                return EncodeUtil.BinaryEncode64(container);
-            }
-            return null;
+            if (!(record is InstanceID))
+                return null;
+            if (((InstanceID)record).Type != InstanceType.NetLane)
+                return null;
+            PO_MoveIt.SetupMoveIt();
+            var container = new ProceduralObjectContainer(PO_MoveIt.GetPO((InstanceID)record));
+            return EncodeUtil.BinaryEncode64(container);
         }
         public override object Decode64(string base64Data, Version dataVersion)
         {
             if (base64Data == null || base64Data.Length == 0) return null;
 
             PO_MoveIt.SetupMoveIt();
-            return new ProceduralObject((ProceduralObjectContainer)EncodeUtil.BinaryDecode64(base64Data), ProceduralObjectsLogic.instance.layerManager);
+            object decoded = EncodeUtil.BinaryDecode64(base64Data);
+            if (!(decoded is ProceduralObjectContainer))
+                return null;
+            try
+            {
+                var obj = new ProceduralObject((ProceduralObjectContainer)decoded, ProceduralObjectsLogic.instance.layerManager);
+                return obj;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[ProceduralObjects] [MoveItIntegration] Unable to decode a Procedural Object from a stored Move It import !\n" + e);
+                return null;
+            }
         }
     }
      * */

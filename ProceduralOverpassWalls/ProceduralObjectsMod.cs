@@ -33,7 +33,7 @@ namespace ProceduralObjects
         }
 
 
-        public static readonly string VERSION = "1.7.2";
+        public static readonly string VERSION = "1.7.4";
         public static readonly string DOCUMENTATION_URL = "http://proceduralobjects.shoutwiki.com/wiki/";
         public static readonly string OTHER_SETTINGS_FILENAME = "ProceduralObjectsSettings";
 
@@ -92,7 +92,38 @@ namespace ProceduralObjects
                 return DataLocation.localApplicationData + @"\ModConfig\SavedProceduralObjects\";
             }
         }
-
+        public static string[] WorkshopOrLocalFolders
+        {
+            get
+            {
+                var subItems = PlatformService.workshop.GetSubscribedItems();
+                if (subItems.Length > 0)
+                {
+                    List<string> paths = new List<string>();
+                    foreach (PublishedFileId fileId in subItems)
+                    {
+                        string path = PlatformService.workshop.GetSubscribedItemPath(fileId);
+                        if (!Directory.Exists(path))
+                            continue;
+                        paths.Add(path);
+                    }
+                    return paths.ToArray();
+                }
+                else
+                {
+                    return (Directory.GetDirectories(DataLocation.addonsPath)
+                        .Concat(Directory.GetDirectories(DataLocation.gameContentPath  + (ProceduralObjectsMod.IsLinux ? "/" : @"\") + "Mods")))
+                        .ToArray();
+                }
+            }
+        }
+        public static void OpenURL(string url)
+        {
+            if (PlatformService.workshop.GetSubscribedItems().Length > 0)
+                PlatformService.ActivateGameOverlayToWebPage(url);
+            else
+                Application.OpenURL(url);
+        }
         public static bool IsLinux
         {
             get
@@ -195,14 +226,16 @@ namespace ProceduralObjects
         public static SavedFloat PropRenderDistance = new SavedFloat("propRenderDist", OTHER_SETTINGS_FILENAME, 1400f, true);
         public static SavedFloat BuildingRenderDistance = new SavedFloat("buildingRenderDist", OTHER_SETTINGS_FILENAME, 2000f, true);
         public static SavedFloat GizmoSize = new SavedFloat("gizmoSize", OTHER_SETTINGS_FILENAME, 1.2f, true);
+        public static SavedFloat GizmoOpacity = new SavedFloat("gizmoOpacity", OTHER_SETTINGS_FILENAME, 1f, true);
 
         public static SavedInt DistanceUnits = new SavedInt("distanceUnits", OTHER_SETTINGS_FILENAME, 0, true);
         public static SavedInt AngleUnits = new SavedInt("angleUnits", OTHER_SETTINGS_FILENAME, 0, true);
 
-        public static SavedBool HideDisabledLayersIcon = new SavedBool("hideIconLayerHidden", OTHER_SETTINGS_FILENAME, true, true);
         public static SavedBool UseUINightMode = new SavedBool("useNightMode", OTHER_SETTINGS_FILENAME, false, true);
+        public static SavedBool HideDisabledLayersIcon = new SavedBool("hideIconLayerHidden", OTHER_SETTINGS_FILENAME, true, true);
         public static SavedBool UsePasteInto = new SavedBool("usePasteInto", OTHER_SETTINGS_FILENAME, false, true);
         public static SavedBool AutoResizeDecals = new SavedBool("autoResizeDecals", OTHER_SETTINGS_FILENAME, true, true);
+        public static SavedBool IncludeSubBuildings = new SavedBool("includeSubBuildings", OTHER_SETTINGS_FILENAME, true, true);
         public static SavedBool UseColorVariation = new SavedBool("useColorVar", OTHER_SETTINGS_FILENAME, true, true);
 
         public static SavedInt ConfirmDeletionThreshold = new SavedInt("confirmDeletionPanelThreshold", OTHER_SETTINGS_FILENAME, 2, true);
@@ -212,9 +245,9 @@ namespace ProceduralObjects
 
         public static SavedBool ShowToolsControls = new SavedBool("showToolsControls", OTHER_SETTINGS_FILENAME, true, true);
 
-        private UISlider confirmDelThresholdSlider, gizmoSizeSlider;  // propRenderSlider, buildingRenderSlider 
-        private UILabel confirmDelThresholdLabel, gizmoSizeLabel; // propRenderLabel, buildingRenderLabel
-        private UICheckBox confirmDelCheckbox, showDevCheckbox, hideDisLayerIconCheckbox, useUINightModeCheckbox, autoResizeDecalsCheckbox, useColorVariationCheckbox;
+        private UISlider confirmDelThresholdSlider, gizmoSizeSlider, gizmoOpacitySlider;  // propRenderSlider, buildingRenderSlider 
+        private UILabel confirmDelThresholdLabel, gizmoSizeLabel, gizmoOpacityLabel; // propRenderLabel, buildingRenderLabel
+        private UICheckBox confirmDelCheckbox, showDevCheckbox, hideDisLayerIconCheckbox, useUINightModeCheckbox, autoResizeDecalsCheckbox, includeSubBuildingsCheckbox, useColorVariationCheckbox;
         private UIButton openKeybindingsButton;
 
         public void OnSettingsUI(UIHelperBase helper)
@@ -229,14 +262,24 @@ namespace ProceduralObjects
             openKeybindingsButton = (UIButton)group.AddButton(LocalizationManager.instance.current["open_kbd_cfg"], openKeybindings);
 
             gizmoSizeSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], (GizmoSize.value * 100).ToString()), 0.2f, 3f, 0.1f, GizmoSize.value, gizmoSizeChanged);
-            gizmoSizeSlider.width = 715;
+            gizmoSizeSlider.width = 600;
             gizmoSizeSlider.height = 16;
             gizmoSizeSlider.tooltip = LocalizationManager.instance.current["settings_GIZMO_tooltip"];
 
-            var gizmoPanel = globalPanel.Find<UIPanel>("OptionsSliderTemplate(Clone)");
-            gizmoPanel.name = "GizmoSizePanel";
-            gizmoSizeLabel = gizmoPanel.Find<UILabel>("Label");
+            var gizmoSizePanel = globalPanel.Find<UIPanel>("OptionsSliderTemplate(Clone)");
+            gizmoSizePanel.name = "GizmoSizePanel";
+            gizmoSizeLabel = gizmoSizePanel.Find<UILabel>("Label");
             gizmoSizeLabel.width *= 3.5f;
+
+            gizmoOpacitySlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_GIZMO_OPACITY_label"], (GizmoOpacity.value * 100).ToString()), .1f, 1f, 0.05f, GizmoOpacity.value, gizmoOpacityChanged);
+            gizmoOpacitySlider.width = 600;
+            gizmoOpacitySlider.height = 16;
+
+            var gizmoOpacityPanel = globalPanel.components.First(c => c.GetType() == typeof(UIPanel) && c != gizmoSizePanel);
+            gizmoOpacityPanel.name = "GizmoOpacityPanel";
+            gizmoOpacityLabel = gizmoOpacityPanel.Find<UILabel>("Label");
+            gizmoOpacityLabel.width *= 3.5f;
+
 
             group.AddDropdown(LocalizationManager.instance.current["settings_DISTUNITS_label"],
                 new string[] { LocalizationManager.instance.current["settings_DISTUNITS_m"] + " (m)", 
@@ -260,6 +303,8 @@ namespace ProceduralObjects
           // usePasteIntoCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_USEPASTEINTO_toggle"], UsePasteInto.value, usePasteIntoChanged);
 
             autoResizeDecalsCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_AUTORESIZEDECALS_toggle"], AutoResizeDecals.value, autoResizeDecalsChanged);
+
+            includeSubBuildingsCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_CONVERTSUBBUILDINGS_toggle"], IncludeSubBuildings.value, includeSubBuildingsChanged);
 
             useColorVariationCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_USECOLORVAR_toggle"], UseColorVariation.value, useColorVariationChanged);
 
@@ -314,6 +359,15 @@ namespace ProceduralObjects
             GizmoSize.value = value;
             gizmoSizeLabel.text = string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], (value * 100).ToString());
         }
+        private void gizmoOpacityChanged(float value)
+        {
+            GizmoOpacity.value = value;
+            gizmoOpacityLabel.text = string.Format(LocalizationManager.instance.current["settings_GIZMO_OPACITY_label"], (value * 100).ToString());
+            Gizmos.GizmoRed = new Color(1f, 0f, 0f, value);
+            Gizmos.GizmoBlue = new Color(0f, 0f, 1f, value);
+            Gizmos.GizmoGreen = new Color(0f, 1f, 0f, value);
+            Gizmos.GizmoYellow = new Color(1f, 0.92f, 0.016f, value);
+        }
         private void confirmDeletionThresholdChanged(float value)
         {
             ConfirmDeletionThreshold.value = (int)value;
@@ -334,6 +388,10 @@ namespace ProceduralObjects
         private void autoResizeDecalsChanged(bool value)
         {
             AutoResizeDecals.value = value;
+        }
+        private void includeSubBuildingsChanged(bool value)
+        {
+            IncludeSubBuildings.value = value;
         }
         private void useColorVariationChanged(bool value)
         {
@@ -356,12 +414,14 @@ namespace ProceduralObjects
          // propRenderSlider.tooltip = LocalizationManager.instance.current["settings_RD_PROP_tooltip"];
             gizmoSizeLabel.text = string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], (GizmoSize.value * 100).ToString());
             gizmoSizeSlider.tooltip = LocalizationManager.instance.current["settings_GIZMO_tooltip"];
+            gizmoOpacityLabel.text = string.Format(LocalizationManager.instance.current["settings_GIZMO_OPACITY_label"], (GizmoOpacity.value * 100).ToString());
             confirmDelCheckbox.text = LocalizationManager.instance.current["settings_CONFDEL_toggle"];
             showDevCheckbox.text = LocalizationManager.instance.current["settings_DEVTOOLS_toggle"];
             showDevCheckbox.tooltip = LocalizationManager.instance.current["settings_DEVTOOLS_tooltip"];
             hideDisLayerIconCheckbox.text = LocalizationManager.instance.current["settings_HIDEDISABLEDLAYERSICON_toggle"];
             useUINightModeCheckbox.text = LocalizationManager.instance.current["settings_USEUINIGHTMODE_toggle"];
             autoResizeDecalsCheckbox.text = LocalizationManager.instance.current["settings_AUTORESIZEDECALS_toggle"];
+            includeSubBuildingsCheckbox.text = LocalizationManager.instance.current["settings_CONVERTSUBBUILDINGS_toggle"];
             useColorVariationCheckbox.text = LocalizationManager.instance.current["settings_USECOLORVAR_toggle"];
          // usePasteIntoCheckbox.text = LocalizationManager.instance.current["settings_USEPASTEINTO_toggle"];
             if (ProceduralObjectsLogic.instance != null)

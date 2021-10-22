@@ -96,7 +96,7 @@ namespace ProceduralObjects
             if (openedUIModules == null)
                 openedUIModules = new List<POModule>();
             else
-                openedUIModules.Clear();
+                closeModulesThatAreRequired();
             if (obj.m_modules == null)
                 obj.m_modules = new List<POModule>();
             searchTextfield = "";
@@ -104,20 +104,44 @@ namespace ProceduralObjects
             selectedObject = obj;
             showWindow = true;
         }
-        public void CloseWindow()
+        public void CloseWindow(bool closeEverything)
         {
             showWindow = false;
-            openedUIModules.Clear();
+            if (closeEverything)
+            {
+                foreach (var m in new List<POModule>(openedUIModules))
+                    CloseWindow(m);
+            }
+            else
+                closeModulesThatAreRequired();
             searchTextfield = "";
+        }
+        private void closeModulesThatAreRequired()
+        {
+            if (openedUIModules == null) return;
+            if (openedUIModules.Count == 0) return;
+            var opened = new List<POModule>(openedUIModules);
+            for (int i = 0; i < opened.Count; i++)
+            {
+                if (!opened[i].ModuleType.keepOpenWhenLeaveObj)
+                    CloseWindow(opened[i]);
+            }
+        }
+        public void CloseWindow(POModule m)
+        {
+            if (!openedUIModules.Contains(m)) return;
+            try { m.OnModuleWindowClose(logic); }
+            catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module OnModuleWindowClose() method!\n" + e); }
+            openedUIModules.Remove(m);
         }
         public void DrawWCustomizationindows()
         {
-            if (selectedObject == null)
-                return;
-
-            windowRect.height = 241 + selectedObject.m_modules.Count * 26;
-            if (showWindow)
-                windowRect = GUIUtils.ClampRectToScreen(GUIUtils.Window(581644831, windowRect, drawCtWindow, LocalizationManager.instance.current["modules"]));
+            if (selectedObject != null)
+            {
+                windowRect.height = 241 + selectedObject.m_modules.Count * 26;
+                if (showWindow)
+                    windowRect = GUIUtils.ClampRectToScreen(GUIUtils.Window(581644831, windowRect, drawCtWindow, LocalizationManager.instance.current["modules"]));
+            }
 
             if (openedUIModules.Count == 0)
                 return;
@@ -134,7 +158,7 @@ namespace ProceduralObjects
             if (GUIUtils.CloseHelpButtons(windowRect, "Modules"))
             {
                 ProceduralObjectsLogic.PlaySound();
-                CloseWindow();
+                CloseWindow(false);
             }
             GUI.DragWindow(new Rect(0, 0, 189, 22));
             GUI.Label(new Rect(5, 22, 240, 18), "<size=12>" + LocalizationManager.instance.current["modules_current"] + "</size>");
@@ -146,7 +170,11 @@ namespace ProceduralObjects
                     ProceduralObjectsLogic.PlaySound();
                     m.window.position = new Vector2(windowRect.xMax, windowRect.y);
                     if (!openedUIModules.Contains(m))
+                    {
                         openedUIModules.Add(m);
+                        try { m.OnModuleWindowOpen(logic); }
+                        catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module OnModuleWindowOpen() method!\n" + e); }
+                    }
                 }
                 if (m.ModuleType.Icon != null)
                 {
@@ -181,7 +209,11 @@ namespace ProceduralObjects
                         var m = this.AddModule(mType, selectedObject);
                         m.window.position = new Vector2(windowRect.xMax, windowRect.y);
                         if (!openedUIModules.Contains(m))
+                        {
                             openedUIModules.Add(m);
+                            try { m.OnModuleWindowOpen(logic); }
+                            catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module OnModuleWindowOpen() method!\n" + e); }
+                        }
                     }
                 }
                 if (mType.Icon != null)
@@ -241,7 +273,7 @@ namespace ProceduralObjects
             try { m.OnModuleRemoved(logic); }
             catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module OnModuleRemoved() method!\n" + e); }
             if (openedUIModules.Contains(m))
-                openedUIModules.Remove(m);
+                CloseWindow(m);
             if (m.parentObject.m_modules.Contains(m))
                 m.parentObject.m_modules.Remove(m);
             modules.Remove(m);
@@ -255,7 +287,7 @@ namespace ProceduralObjects
             if (obj.m_modules.Count == 0)
                 return;
             if (obj == selectedObject && showWindow)
-                CloseWindow();
+                CloseWindow(true);
             foreach (var m in obj.m_modules)
             {
                 if (!modules.Contains(m))

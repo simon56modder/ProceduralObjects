@@ -218,7 +218,7 @@ namespace ProceduralObjects.UI
             if (GUI.Button(new Rect(window.width - 51, 2, 24, 24), buttons[1], GUI.skin.label))
             {
                 ProceduralObjectsLogic.PlaySound();
-                PlatformService.ActivateGameOverlayToWebPage(url);
+                ProceduralObjectsMod.OpenURL(url);
             }
             return CloseButton(window);
         }
@@ -236,7 +236,7 @@ namespace ProceduralObjects.UI
             if (GUI.Button(new Rect(windowWidth - 25, 2, 24, 24), buttons[1], GUI.skin.label))
             {
                 ProceduralObjectsLogic.PlaySound();
-                PlatformService.ActivateGameOverlayToWebPage(LocalizationManager.instance.current.LocalizedWikiLink(ProceduralObjectsMod.DOCUMENTATION_URL + wikiHelpPage));
+                ProceduralObjectsMod.OpenURL(LocalizationManager.instance.current.LocalizedWikiLink(ProceduralObjectsMod.DOCUMENTATION_URL + wikiHelpPage));
             }
         }
         public static void HelpButton(Rect position, string wikiHelpPage)
@@ -244,7 +244,7 @@ namespace ProceduralObjects.UI
             if (GUI.Button(new Rect(position.x, position.y, 24, 24), buttons[1], GUI.skin.label))
             {
                 ProceduralObjectsLogic.PlaySound();
-                PlatformService.ActivateGameOverlayToWebPage(LocalizationManager.instance.current.LocalizedWikiLink(ProceduralObjectsMod.DOCUMENTATION_URL + wikiHelpPage));
+                ProceduralObjectsMod.OpenURL(LocalizationManager.instance.current.LocalizedWikiLink(ProceduralObjectsMod.DOCUMENTATION_URL + wikiHelpPage));
             }
         }
         public static float HorizontalSliderIncrements(Rect rect, float value, params float[] values)

@@ -59,22 +59,22 @@ namespace ProceduralObjects.Classes
         {
             if (type == StepType.position || type == StepType.moveTo)
             {
-                obj.m_position = positions.Key;
+                obj.SetPosition(positions.Key);
             }
             if (type == StepType.rotation || type == StepType.moveTo)
             {
-                obj.m_rotation = rotations.Key;
+                obj.SetRotation(rotations.Key);
             }
         }
         public void RedoPosRotMoveTo(ProceduralObject obj)
         {
             if (type == StepType.position || type == StepType.moveTo)
             {
-                obj.m_position = positions.Value;
+                obj.SetPosition(positions.Value);
             }
             if (type == StepType.rotation || type == StepType.moveTo)
             {
-                obj.m_rotation = rotations.Value;
+                obj.SetRotation(rotations.Value);
             }
         }
 

@@ -22,22 +22,20 @@ namespace ProceduralObjects.SelectionMode
         }
         public override void OnActionGUI(Vector2 uiPos)
         {
-            GUI.BeginGroup(new Rect(uiPos, new Vector2(195, 48)));
-            value = renderDistInput.DrawField(new Rect(0, 0, 60, 22), value, false).returnValue;
+            value = renderDistInput.DrawField(new Rect(uiPos.x, uiPos.y, 60, 22), value, false).returnValue;
 
-            GUI.Label(new Rect(62, 0, 20, 22), ProceduralObjectsMod.distanceUnit.Trim());
-            if (GUI.Button(new Rect(0, 24, 40, 22), LocalizationManager.instance.current["ok"]))
+            GUI.Label(new Rect(uiPos.x + 62, uiPos.y, 20, 22), ProceduralObjectsMod.distanceUnit.Trim());
+            if (GUI.Button(new Rect(uiPos.x, uiPos.y + 24, 40, 22), LocalizationManager.instance.current["ok"]))
             {
                 ProceduralObjectsLogic.PlaySound();
                 SetRenderDistancesAll(value);
                 ExitAction();
             }
-            if (GUI.Button(new Rect(42, 24, 90, 22), LocalizationManager.instance.current["cancel"]))
+            if (GUI.Button(new Rect(uiPos.x + 42, uiPos.y + 24, 90, 22), LocalizationManager.instance.current["cancel"]))
             {
                 ProceduralObjectsLogic.PlaySound();
                 ExitAction();
             }
-            GUI.EndGroup();
         }
         public override Rect CollisionUI(Vector2 uiPos)
         {

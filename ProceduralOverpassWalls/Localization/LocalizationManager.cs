@@ -33,12 +33,8 @@ namespace ProceduralObjects.Localization
             List<string> extensionFiles = new List<string>(), 
                 baseFiles = new List<string>();
 
-            foreach (PublishedFileId fileId in PlatformService.workshop.GetSubscribedItems())
+            foreach (string path in ProceduralObjectsMod.WorkshopOrLocalFolders)
             {
-                string path = PlatformService.workshop.GetSubscribedItemPath(fileId);
-                if (!Directory.Exists(path))
-                    continue;
-
                 var localeFiles = Directory.GetFiles(path, "*.polocale", SearchOption.AllDirectories);
                 if (!localeFiles.Any())
                     continue;

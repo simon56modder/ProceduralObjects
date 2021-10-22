@@ -70,6 +70,7 @@
     <Compile Include="SelectionMode\AlignHeights.cs" />
     <Compile Include="SelectionMode\AlignRotations.cs" />
     <Compile Include="SelectionMode\ColorGradient.cs" />
+    <Compile Include="SelectionMode\RandomizeRotation.cs" />
     <Compile Include="SelectionMode\SnapToGround.cs" />
     <Compile Include="SelectionMode\EqualSlope.cs" />
     <Compile Include="SelectionMode\ExportSelection.cs" />

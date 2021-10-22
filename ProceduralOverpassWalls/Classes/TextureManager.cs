@@ -135,12 +135,13 @@ namespace ProceduralObjects.Classes
 
             // workshop textures loading
             Debug.Log("[ProceduralObjects] Texture Loading : Starting Workshop textures loading.");
-            foreach (PublishedFileId fileId in PlatformService.workshop.GetSubscribedItems())
+            foreach (string path in ProceduralObjectsMod.WorkshopOrLocalFolders)
             {
-                string path = PlatformService.workshop.GetSubscribedItemPath(fileId);
-                string infoPath = ProceduralObjectsMod.IsLinux ? path + @"/ProceduralObjectsTextures.cfg" : path + @"\ProceduralObjectsTextures.cfg";
-                if (File.Exists(infoPath))
+                var infoFiles = Directory.GetFiles(path, "*ProceduralObjectsTextures.cfg", SearchOption.AllDirectories);
+                foreach (string infoPath in infoFiles)
                 {
+                    if (!File.Exists(infoPath))
+                        continue;
                     var texResource = new TextureResourceInfo();
                     texResource.m_fullPath = path;
                     string[] files = File.ReadAllLines(infoPath);
@@ -152,17 +153,18 @@ namespace ProceduralObjects.Classes
                         }
                         else
                         {
-                            if (File.Exists(path + (ProceduralObjectsMod.IsLinux ? "/" : @"\") + files[i] + ".png"))
+                            string pngPath = Path.GetDirectoryName(infoPath) + (ProceduralObjectsMod.IsLinux ? "/" : @"\") + files[i] + ".png";
+                            if (File.Exists(pngPath))
                             {
-                                var tex = TextureUtils.LoadPNG(path + (ProceduralObjectsMod.IsLinux ? "/" : @"\") + files[i] + ".png");
-                           //   textures.Add(tex);
+                                var tex = TextureUtils.LoadPNG(pngPath);
+                                //   textures.Add(tex);
                                 tex.name = texResource.m_name + "/" + files[i];
                                 texResource.m_textures.Add(TextureUtils.CreateSelectorThumbnail(tex), tex);
                                 TotalTexturesCount += 1;
                             }
                             else
                             {
-                                Debug.LogError("[ProceduralObjects] Workshop texture : a file marked as a PO texture was not found at " + path + (ProceduralObjectsMod.IsLinux ? "/" : @"\") + files[i] + ".png");
+                                Debug.LogError("[ProceduralObjects] Workshop texture : a file marked as a PO texture was not found at " + pngPath);
                                 texResource.m_failedToLoadTextures += 1;
                             }
                         }

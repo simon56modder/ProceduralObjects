@@ -56,7 +56,7 @@ namespace ProceduralObjects
                 if (GUIUtils.CloseButton(window))
                 {
                     if (ModuleManager.instance.openedUIModules.Contains(this))
-                        ModuleManager.instance.openedUIModules.Remove(this);
+                        ModuleManager.instance.CloseWindow(this);
                     showWindow = false;
                 }
                 GUI.DragWindow(new Rect(0, 0, window.width - 26, 22));
@@ -66,7 +66,7 @@ namespace ProceduralObjects
                 if (GUIUtils.CloseHelpButtonsURL(window, ModuleType.help_URL))
                 {
                     if (ModuleManager.instance.openedUIModules.Contains(this))
-                        ModuleManager.instance.openedUIModules.Remove(this);
+                        ModuleManager.instance.CloseWindow(this);
                     showWindow = false;
                 }
                 GUI.DragWindow(new Rect(0, 0, window.width - 50, 22));
@@ -96,6 +96,24 @@ namespace ProceduralObjects
         public virtual void OnModuleDisabled(ProceduralObjectsLogic logic) { }
 
         /// <summary>
+        /// Invoked when the parent object position is changed.
+        /// </summary>
+        public virtual void OnParentPositionSet(ProceduralObjectsLogic logic, Vector3 oldPosition, Vector3 newPosition) { }
+        /// <summary>
+        /// Invoked when the parent object rotation is changed.
+        /// </summary>
+        public virtual void OnParentRotationSet(ProceduralObjectsLogic logic, Quaternion oldRotation, Quaternion newRotation) { }
+
+        /// <summary>
+        /// Invoked when the module window is opened.
+        /// </summary>
+        public virtual void OnModuleWindowOpen(ProceduralObjectsLogic logic) { }
+        /// <summary>
+        /// Invoked when the module window is closed.
+        /// </summary>
+        public virtual void OnModuleWindowClose(ProceduralObjectsLogic logic) { }
+
+        /// <summary>
         /// Update method, runs in Update() if the module is enabled regardless of object visibility.
         /// </summary>
         public virtual void UpdateModule(ProceduralObjectsLogic logic, bool simulationPaused, bool layerVisible) { }
@@ -119,7 +137,7 @@ namespace ProceduralObjects
         public Texture2D Icon;
         public int maxModulesOnMap;
         public string help_URL;
-        public bool hide_all;
+        public bool hide_all, keepOpenWhenLeaveObj;
 
         public Type ModuleType;
     }

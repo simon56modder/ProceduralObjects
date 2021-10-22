@@ -50,7 +50,7 @@ namespace ProceduralObjects.SelectionMode
                         if (o == po) continue;
 
                         o.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, null);
-                        o.m_position.y += diffheight;
+                        o.SetPosition(new Vector3(o.m_position.x, o.m_position.y + diffheight, o.m_position.z));
                         o.historyEditionBuffer.ConfirmNewStep(null);
                     }
                 }

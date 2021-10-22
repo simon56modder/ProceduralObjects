@@ -17,7 +17,7 @@ namespace ProceduralObjects.Classes
             instance = this;
             this.logic = logic;
             RefreshCounters();
-            window = new Rect(555, 200, 300, 225);
+            window = new Rect(555, 200, 300, 235);
         }
 
         public static POStatisticsManager instance;
@@ -43,13 +43,13 @@ namespace ProceduralObjects.Classes
             }
             GUI.DragWindow(new Rect(0, 0, 223, 22));
 
-            GUI.Label(new Rect(5, 27, 290, 190), LocalizationManager.instance.current["stats_total"] + "\n" + LocalizationManager.instance.current["stats_groups"] + "\n" + LocalizationManager.instance.current["stats_customModel"] + "\n" + LocalizationManager.instance.current["stats_failed"] + "\n\n" + LocalizationManager.instance.current["stats_convProps"] + "\n    " + LocalizationManager.instance.current["stats_convProps_decals"] 
+            GUI.Label(new Rect(5, 27, 290, 200), LocalizationManager.instance.current["stats_total"] + "\n" + LocalizationManager.instance.current["stats_groups"] + "\n" + LocalizationManager.instance.current["stats_customModel"] + "\n" + LocalizationManager.instance.current["stats_failed"] + "\n" + LocalizationManager.instance.current["stats_loadingTime"] + "\n\n" + LocalizationManager.instance.current["stats_convProps"] + "\n    " + LocalizationManager.instance.current["stats_convProps_decals"] 
                 + "\n    " + LocalizationManager.instance.current["stats_convProps_pSrf"]
                 + "\n    " + LocalizationManager.instance.current["stats_convProps_pAsph"]
                 + "\n" + LocalizationManager.instance.current["stats_convBuildings"]
                 + "\n\n" + LocalizationManager.instance.current["stats_layers"]);
             GUI.skin.label.alignment = TextAnchor.UpperRight;
-            try { GUI.Label(new Rect(5, 27, 290, 190), counter_POs + "\n" + logic.groups.Count + "\n" + counter_customModels + "\n" + logic.failedToLoadObjects + "\n\n" + counter_ConvProps + "\n" + counter_Decals + "\n" + counter_PSrfs + "\n" + counter_PA + "\n" + counter_ConvBuildings + "\n\n" + counter_layers); }
+            try { GUI.Label(new Rect(5, 27, 290, 200), counter_POs + "\n" + logic.groups.Count + "\n" + counter_customModels + "\n" + logic.failedToLoadObjects + "\n"  + logic.loadingTime + " s\n\n" + counter_ConvProps + "\n" + counter_Decals + "\n" + counter_PSrfs + "\n" + counter_PA + "\n" + counter_ConvBuildings + "\n\n" + counter_layers); }
             catch { }
             GUI.skin.label.alignment = TextAnchor.UpperLeft;
         }

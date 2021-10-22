@@ -62,7 +62,7 @@ namespace ProceduralObjects.Classes
         public static void SnapToGround(this ProceduralObject obj)
         {
             obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, null);
-            obj.m_position = NearestGroundPointVertical(obj.m_position);
+            obj.SetPosition(NearestGroundPointVertical(obj.m_position));
             obj.historyEditionBuffer.ConfirmNewStep(null);
         }
         public static Vector3 NearestGroundPointVertical(Vector3 pos, bool andNetBuildings = false)
@@ -108,7 +108,7 @@ namespace ProceduralObjects.Classes
             }
             obj.historyEditionBuffer.ConfirmNewStep(buffer);
             obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, buffer);
-            obj.m_position = centerWorldSpace;
+            obj.SetPosition(centerWorldSpace);
             obj.historyEditionBuffer.ConfirmNewStep(buffer);
         }
 
@@ -153,11 +153,14 @@ namespace ProceduralObjects.Classes
                 logic.availableProceduralInfos = CreateProceduralInfosList();
             logic.failedToLoadObjects = 0;
 
+            PropInfo[] props = Resources.FindObjectsOfTypeAll<PropInfo>();
+            BuildingInfo[] buildings = Resources.FindObjectsOfTypeAll<BuildingInfo>();
+
             foreach (var c in containerArray)
             {
                 try
                 {
-                    var obj = new ProceduralObject(c, logic.layerManager);
+                    var obj = new ProceduralObject(c, logic.layerManager, props, buildings);
                     if (obj.meshStatus != 1)
                     {
                         if (obj.RequiresUVRecalculation && !obj.disableRecalculation)
@@ -288,32 +291,56 @@ namespace ProceduralObjects.Classes
             return true;
         } 
 
-        public static Dictionary<ProceduralObject, Vector3> ConstructSubBuildings(ProceduralObject obj, List<ProceduralObject> allObjects)
+        public static POGroup ConstructSubBuildings(ProceduralObject obj)
         {
+            var logic = ProceduralObjectsLogic.instance;
             if (obj.baseInfoType != "BUILDING")
             {
-                var d = new Dictionary<ProceduralObject, Vector3>();
-                d.Add(obj, Vector3.zero);
-                return d;
+                return null;
             }
-            var dict = new Dictionary<ProceduralObject, Vector3>();
-            dict.Add(obj, Vector3.zero);
-            var subs = obj._baseBuilding.m_subBuildings;
-            for (int i = 0; i < subs.Length; i++)
+            var pos = new List<ProceduralObject>();
+            pos.Add(obj);
+            // Sub buildings
+            var subBuildings = obj._baseBuilding.m_subBuildings;
+            if (subBuildings.Length >= 1)
             {
-                if (subs[i] == null)
-                    continue;
-                if (subs[i].m_buildingInfo == null)
-                    continue;
-                ProceduralObject sub = new ProceduralObject();
-                sub.ConstructObject(subs[i].m_buildingInfo, allObjects.GetNextUnusedId());
-                float a = -(subs[i].m_angle * Mathf.Rad2Deg) % 360f;
-                if (a < 0) a += 360f;
-                sub.m_rotation = Quaternion.Euler(sub.m_rotation.eulerAngles.x, a, sub.m_rotation.eulerAngles.z);
-                sub.m_position = obj.m_position + subs[i].m_position;
-                dict.Add(sub, subs[i].m_position);
+                for (int i = 0; i < subBuildings.Length; i++)
+                {
+                    var subB = subBuildings[i];
+                    if (subB == null)
+                        continue;
+                    if (subB.m_buildingInfo == null)
+                        continue;
+                    if (subB.m_buildingInfo.m_mesh == null)
+                        continue;
+                    if (!subB.m_buildingInfo.m_mesh.isReadable)
+                        continue;
+                    int id = 0;
+                    try
+                    {
+                        ProceduralObject sub = new ProceduralObject();
+                        id = logic.proceduralObjects.GetNextUnusedId();
+                        sub.ConstructObject(subB.m_buildingInfo, id);
+                        float a = -(subB.m_angle * Mathf.Rad2Deg) % 360f;
+                        if (a < 0) a += 360f;
+                        sub.m_rotation = Quaternion.Euler(sub.m_rotation.eulerAngles.x, a, sub.m_rotation.eulerAngles.z) * obj.m_rotation;
+                        sub.m_position = VertexUtils.RotatePointAroundPivot(subB.m_position + obj.m_position, obj.m_position, obj.m_rotation);
+                        pos.Add(sub);
+                        logic.proceduralObjects.Add(sub);
+                    }
+                    catch
+                    {
+                        if (id != 0)
+                        {
+                            if (logic.activeIds.Contains(id))
+                                logic.activeIds.Remove(id);
+                        }
+                    }
+                }
             }
-            return dict;
+            if (pos.Count < 2) return null;
+            var group = POGroup.MakeGroup(logic, pos, pos[0]);
+            return group;
         }
         public static ProceduralInfo[] ToProceduralInfoArray(this IEnumerable<PropInfo> source)
         {
@@ -339,6 +366,11 @@ namespace ProceduralObjects.Classes
         {
             if (obj.customTexture)
                 return obj.customTexture as Texture;
+            else
+                return GetBasePrefabMainTex(obj);
+        }
+        public static Texture GetBasePrefabMainTex(ProceduralObject obj)
+        {
             if (obj.baseInfoType == "PROP")
                 return obj._baseProp.m_material.mainTexture;
             else

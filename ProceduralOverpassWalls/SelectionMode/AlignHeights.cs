@@ -20,14 +20,14 @@ namespace ProceduralObjects.SelectionMode
                     foreach (var o in po.group.objects)
                     {
                         o.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, null);
-                        o.m_position = new Vector3(o.m_position.x, o.m_position.y - diffToApply, o.m_position.z);
+                        o.SetPosition(new Vector3(o.m_position.x, o.m_position.y - diffToApply, o.m_position.z));
                         o.historyEditionBuffer.ConfirmNewStep(null);
                     }
                 }
                 else
                 {
                     po.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, null);
-                    po.m_position = new Vector3(po.m_position.x, height, po.m_position.z);
+                    po.SetPosition(new Vector3(po.m_position.x, height, po.m_position.z));
                     po.historyEditionBuffer.ConfirmNewStep(null);
                 }
             }

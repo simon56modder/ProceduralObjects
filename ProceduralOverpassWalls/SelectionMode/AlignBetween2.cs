@@ -45,21 +45,21 @@ namespace ProceduralObjects.SelectionMode
                     var newPos = firstPoint + Vector3.Project(po.m_position - firstPoint, diffVector);
                     var diffPos = newPos - po.m_position;
                     po.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, null);
-                    po.m_position = newPos;
+                    po.SetPosition(newPos);
                     po.historyEditionBuffer.ConfirmNewStep(null);
                     foreach (var o in po.group.objects)
                     {
                         if (o == po)
                             continue;
                         o.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, null);
-                        o.m_position += diffPos;
+                        o.SetPosition(o.m_position + diffPos);
                         o.historyEditionBuffer.ConfirmNewStep(null);
                     }
                 }
                 else
                 {
                     po.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, null);
-                    po.m_position = firstPoint + Vector3.Project(po.m_position - firstPoint, diffVector);
+                    po.SetPosition(firstPoint + Vector3.Project(po.m_position - firstPoint, diffVector));
                     po.historyEditionBuffer.ConfirmNewStep(null);
                 }
             }

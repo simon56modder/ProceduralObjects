@@ -71,15 +71,15 @@ namespace ProceduralObjects.SelectionMode
                         if (oriented)
                         {
                             o.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.moveTo, null);
-                            o.m_position = new Vector3(o.m_position.x, localheightdiff + maxObjects.Key.m_position.y, o.m_position.z);
-                            o.m_rotation = rotDiff * o.m_rotation;
+                            o.SetPosition( new Vector3(o.m_position.x, localheightdiff + maxObjects.Key.m_position.y, o.m_position.z));
+                            o.SetRotation( rotDiff * o.m_rotation);
                             if (o != po)
                                 o.m_position = VertexUtils.RotatePointAroundPivot(o.m_position, po.m_position, rotDiff);
                         }
                         else
                         {
                             o.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, null);
-                            o.m_position = new Vector3(o.m_position.x, localheightdiff + maxObjects.Key.m_position.y, o.m_position.z);
+                            o.SetPosition( new Vector3(o.m_position.x, localheightdiff + maxObjects.Key.m_position.y, o.m_position.z));
                         }
                         o.historyEditionBuffer.ConfirmNewStep(null);
                     }
@@ -89,13 +89,13 @@ namespace ProceduralObjects.SelectionMode
                     if (oriented)
                     {
                         po.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.moveTo, null);
-                        po.m_rotation = rotDiff * po.m_rotation;
+                        po.SetRotation( rotDiff * po.m_rotation);
                     }
                     else
                     {
                         po.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, null);
                     }
-                    po.m_position = new Vector3(po.m_position.x, localheightdiff + maxObjects.Key.m_position.y, po.m_position.z);
+                    po.SetPosition( new Vector3(po.m_position.x, localheightdiff + maxObjects.Key.m_position.y, po.m_position.z));
                     po.historyEditionBuffer.ConfirmNewStep(null);
                 }
             }

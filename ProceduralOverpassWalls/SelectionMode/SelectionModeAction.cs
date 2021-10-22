@@ -44,6 +44,7 @@ namespace ProceduralObjects.SelectionMode
             SelectionModeActions = new Dictionary<string, Type>();
             SelectionModeActions.Add("align_heights", typeof(AlignHeights));
             SelectionModeActions.Add("align_rotations", typeof(AlignRotations));
+            SelectionModeActions.Add("randomize_rot", typeof(RandomizeRotation));
             SelectionModeActions.Add("align_between2", typeof(AlignBetween2));
             SelectionModeActions.Add("equal_slope", typeof(EqualSlope));
             SelectionModeActions.Add("snapToGround", typeof(SnapToGround));

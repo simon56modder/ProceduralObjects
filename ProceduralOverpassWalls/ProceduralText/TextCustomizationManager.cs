@@ -82,11 +82,12 @@ namespace ProceduralObjects.ProceduralText
                 {
                     if (movingField > -1)
                     {
-                        parameters[movingField].x = (mousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor;
-                        parameters[movingField].y = (mousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor;
+                        parameters[movingField].x = ((mousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor) - dragTexPos.x;
+                        parameters[movingField].y = ((mousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor) - dragTexPos.y;
                         if (Input.GetMouseButtonDown(0))
                         {
                             ProceduralObjectsLogic.PlaySound();
+                            dragTexPos = Vector2.zero;
                             movingField = -1;
                         }
                     }
@@ -119,8 +120,9 @@ namespace ProceduralObjects.ProceduralText
                 {
                     if (movingField == -2)
                         movingField = -1;
-
-                    dragTexPos = Vector2.zero;
+                    
+                    if (movingField <= -1)
+                        dragTexPos = Vector2.zero;
                     dragTimer = 0f;
                 }
                 else
@@ -169,6 +171,8 @@ namespace ProceduralObjects.ProceduralText
                         if (GUI.Button(new Rect(parameters[i].x * zoomFactor, parameters[i].y * zoomFactor, parameters[i].texWidth * zoomFactor, parameters[i].texHeight * zoomFactor), string.Empty, GUI.skin.label))
                         {
                             ProceduralObjectsLogic.PlaySound();
+                            dragTexPos = new Vector2(((GUIUtils.MousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor) - parameters[i].x,
+                                ((GUIUtils.MousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor) - parameters[i].y);
                             movingField = i;
                         }
                     }
@@ -232,13 +236,29 @@ namespace ProceduralObjects.ProceduralText
             GUI.DragWindow(new Rect(0, 0, 395, 28));
             GUI.Label(new Rect(7, 30, 385, 26), string.Format(LocalizationManager.instance.current["font_chars_available"], selectedCharTable.m_fontName));
             var height = (Mathf.FloorToInt(selectedCharTable.m_orderedChars.Length / 10) + 1) * 67 + (ProceduralObjectsMod.ShowDeveloperTools.value ? 52 : 6);
-            scrollCharTable = GUI.BeginScrollView(new Rect(3, 57, 415, 338), scrollCharTable, new Rect(0, 0, 400, height));
+            scrollCharTable = GUI.BeginScrollView(new Rect(3, 57, 415, 338), scrollCharTable, new Rect(0, 0, 395, height));
             GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+            bool useButton = selectedField != null;
+            if (useButton)
+            {
+                if (selectedField.m_type != 0 || selectedCharTable != selectedField.m_font)
+                    useButton = false;
+            }
             for (int i = 0; i < selectedCharTable.m_orderedChars.Length; i++)
             {
                 int line = Mathf.FloorToInt(i / 10);
                 int leftOffset = i % 10;
-                GUI.Box(new Rect(7 + leftOffset * 39, 3 + 67 * line, 35, 62), string.Empty);
+                var charRect = new Rect(7 + leftOffset * 39, 3 + 67 * line, 35, 62);
+                if (useButton)
+                {
+                    if (GUI.Button(charRect, string.Empty))
+                    {
+                        ProceduralObjectsLogic.PlaySound();
+                        selectedField.m_text += selectedCharTable.m_orderedChars[i];
+                    }
+                }
+                else
+                    GUI.Box(charRect, string.Empty);
                 GUI.Label(new Rect(7 + leftOffset * 39, 2 + 67 * line, 35, 28), "<size=20>" + selectedCharTable.m_orderedChars[i] + "</size>");
                 GUI.Label(new Rect(7 + leftOffset * 39, 30 + 67 * line, 35, 35), selectedCharTable.m_charTexturesNormal[selectedCharTable.m_orderedChars[i]]);
             }

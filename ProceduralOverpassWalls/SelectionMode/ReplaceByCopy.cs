@@ -38,10 +38,30 @@ namespace ProceduralObjects.SelectionMode
                     {
                         for (int i = 0; i < selection.Count; i++)
                         {
-                            if (selection[i].isRootOfGroup && logic.selectedGroup == null)
-                                POGroup.DeleteGroup(logic, selection[i].group);
+                            bool mustAddToGroup = false, mustSetAsRoot = false;
+                            if (logic.selectedGroup == null)
+                            {
+                                if (selection[i].isRootOfGroup)
+                                {
+                                    POGroup.DeleteGroup(logic, selection[i].group);
+                                    logic.activeIds.Add(selection[i].id);
+                                }
+                            }
+                            else
+                            {
+                                mustAddToGroup = true;
+                                if (selection[i] == logic.selectedGroup.root)
+                                    mustSetAsRoot = true;
+                                logic.selectedGroup.Remove(logic, selection[i]);
+                            }
                             logic.proceduralObjects.Remove(selection[i]);
                             var obj = new ProceduralObject(source, selection[i].id, selection[i].m_position, logic.layerManager);
+                            if (mustAddToGroup)
+                            {
+                                logic.selectedGroup.AddToGroup(obj);
+                                if (mustSetAsRoot)
+                                    logic.selectedGroup.ChooseAsRoot(obj);
+                            }
                             obj.RecalculateBoundsNormalsExtras(obj.meshStatus);
                             if (obj.meshStatus != 1)
                             {

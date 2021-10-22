@@ -90,10 +90,13 @@ namespace ProceduralObjects.ProceduralText
                 }
                 if (selectedFont.file_id != PublishedFileId.invalid)
                 {
-                    if (GUI.Button(new Rect(254, 30, 124, 25), LocalizationManager.instance.current["show_font_wk"]))
+                    if (PlatformService.workshop.GetSubscribedItems().Length >= 0)
                     {
-                        ProceduralObjectsLogic.PlaySound();
-                        PlatformService.ActivateGameOverlayToWorkshopItem(selectedFont.file_id);
+                        if (GUI.Button(new Rect(254, 30, 124, 25), LocalizationManager.instance.current["show_font_wk"]))
+                        {
+                            ProceduralObjectsLogic.PlaySound();
+                            PlatformService.ActivateGameOverlayToWorkshopItem(selectedFont.file_id);
+                        }
                     }
                 }
 
@@ -200,11 +203,8 @@ namespace ProceduralObjects.ProceduralText
             }
             try
             {
-                foreach (PublishedFileId fileId in PlatformService.workshop.GetSubscribedItems())
+                foreach (string path in ProceduralObjectsMod.WorkshopOrLocalFolders)
                 {
-                    string path = PlatformService.workshop.GetSubscribedItemPath(fileId);
-                    if (!Directory.Exists(path))
-                        continue;
                     var wkFiles = Directory.GetFiles(path, "*.pofont", SearchOption.AllDirectories);
                     if (wkFiles.Any())
                     {
@@ -215,7 +215,7 @@ namespace ProceduralObjects.ProceduralText
                             TextureFont _font = new TextureFont(wkFiles[i]);
                             if (LoadSingleFont(wkFiles[i], _font))
                             {
-                                _font.file_id = fileId;
+                             // _font.file_id = fileId;
                                 m_fonts.Add(_font);
                             }
                         }
@@ -339,6 +339,12 @@ namespace ProceduralObjects.ProceduralText
                 font.m_disableColorOverwriting = disableOverwriting;
                 font.m_charSize = charSize;
                 font.BuildFont();
+                if (font.m_textureNormal != null)
+                    font.m_textureNormal.DisposeTexFromMemory();
+                if (font.m_textureItalic != null)
+                    font.m_textureItalic.DisposeTexFromMemory();
+                if (font.m_textureBold != null)
+                    font.m_textureBold.DisposeTexFromMemory();
                 font.m_defaultSpacing = defaultSpacing;
                 font.m_kerningNormal = kerningNormal;
                 font.m_kerningItalic = kerningItalic;

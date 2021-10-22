@@ -145,12 +145,9 @@ namespace ProceduralObjects.Classes
             }
 
             // workshop externals
-            foreach (PublishedFileId fileId in PlatformService.workshop.GetSubscribedItems())
+            foreach (string path in ProceduralObjectsMod.WorkshopOrLocalFolders)
             {
-                var dirPath = PlatformService.workshop.GetSubscribedItemPath(fileId);
-                if (!Directory.Exists(dirPath))
-                    continue;
-                var pobjFiles = Directory.GetFiles(dirPath, "*.pobj", SearchOption.AllDirectories);
+                var pobjFiles = Directory.GetFiles(path, "*.pobj", SearchOption.AllDirectories);
                 if (pobjFiles.Any())
                 {
                     foreach (string file in pobjFiles)
