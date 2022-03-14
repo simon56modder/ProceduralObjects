@@ -15,6 +15,7 @@ using ColossalFramework.Globalization;
 using ProceduralObjects.Tools;
 using ProceduralObjects.Classes;
 using ProceduralObjects.Localization;
+using ProceduralObjects.UI;
 
 namespace ProceduralObjects
 {
@@ -33,9 +34,10 @@ namespace ProceduralObjects
         }
 
 
-        public static readonly string VERSION = "1.7.4";
+        public static readonly string VERSION = "1.7.6";
         public static readonly string DOCUMENTATION_URL = "http://proceduralobjects.shoutwiki.com/wiki/";
-        public static readonly string OTHER_SETTINGS_FILENAME = "ProceduralObjectsSettings";
+        public static readonly string SETTINGS_FILENAME = "ProceduralObjectsSettings";
+        public static SettingsFile SettingsFile;
 
 
         public static string PODirectoryPath
@@ -72,6 +74,15 @@ namespace ProceduralObjects
                 if (IsLinux)
                     return DataLocation.localApplicationData + @"/ProceduralObjects/Fonts/";
                 return DataLocation.localApplicationData + @"\ProceduralObjects\Fonts\";
+            }
+        }
+        public static string RequirementsListsPath
+        {
+            get
+            {
+                if (IsLinux)
+                    return DataLocation.localApplicationData + @"/ProceduralObjects/RequirementsLists/";
+                return DataLocation.localApplicationData + @"\ProceduralObjects\RequirementsLists\";
             }
         }
         public static string ExternalsConfigPath
@@ -170,14 +181,18 @@ namespace ProceduralObjects
                             TextureUtils.LoadTextureFromAssembly("unlocked"),
                             TextureUtils.LoadTextureFromAssembly("painterPicker"),
                             TextureUtils.LoadTextureFromAssembly("painterSlider"),
-                            TextureUtils.LoadTextureFromAssembly("picker") };
+                            TextureUtils.LoadTextureFromAssembly("picker"),
+                            TextureUtils.LoadTextureFromAssembly("distance"),
+                            TextureUtils.LoadTextureFromAssembly("angle"),
+                            TextureUtils.LoadTextureFromAssembly("copy") };
                         SelectionModeIcons = new Texture2D[] { TextureUtils.LoadTextureFromAssembly("main_layers"),
                             TextureUtils.LoadTextureFromAssembly("main_exported"),
                             TextureUtils.LoadTextureFromAssembly("main_textures"),
                             TextureUtils.LoadTextureFromAssembly("main_fonts"),
                             TextureUtils.LoadTextureFromAssembly("main_modules"),
                             TextureUtils.LoadTextureFromAssembly("main_render"),
-                            TextureUtils.LoadTextureFromAssembly("main_stats") };
+                            TextureUtils.LoadTextureFromAssembly("main_stats"),
+                            TextureUtils.LoadTextureFromAssembly("main_measures") };
                     }
                     gameLogicObject = new GameObject("Logic_ProceduralObjects");
                     ProceduralObjectsLogic.instance = gameLogicObject.AddComponent<ProceduralObjectsLogic>();
@@ -213,37 +228,40 @@ namespace ProceduralObjects
 
         public ProceduralObjectsMod()
         {
-            try { GameSettings.AddSettingsFile(new SettingsFile() { fileName = OTHER_SETTINGS_FILENAME } ); }
+            try {
+                SettingsFile = new SettingsFile() { fileName = SETTINGS_FILENAME };
+                GameSettings.AddSettingsFile(SettingsFile);
+            }
             catch (Exception e) { Debug.LogError("[Procedural Objects] Failed to add the settings file :" + e); }
         }
 
         // Settings panel
 
-        public static SavedFloat GlobalRDMultiplier = new SavedFloat("RDGlobalMult", OTHER_SETTINGS_FILENAME, 1f, true);
-        public static SavedBool UseDynamicRenderDist = new SavedBool("dynamicRenderDist", OTHER_SETTINGS_FILENAME, true, true);
-        public static SavedFloat DynamicRDMultiplier = new SavedFloat("dynRDmultiplier", OTHER_SETTINGS_FILENAME, 70f, true);
-        public static SavedFloat DynamicRDMinThreshold = new SavedFloat("dynRDminThreshold", OTHER_SETTINGS_FILENAME, 250f, true);
-        public static SavedFloat PropRenderDistance = new SavedFloat("propRenderDist", OTHER_SETTINGS_FILENAME, 1400f, true);
-        public static SavedFloat BuildingRenderDistance = new SavedFloat("buildingRenderDist", OTHER_SETTINGS_FILENAME, 2000f, true);
-        public static SavedFloat GizmoSize = new SavedFloat("gizmoSize", OTHER_SETTINGS_FILENAME, 1.2f, true);
-        public static SavedFloat GizmoOpacity = new SavedFloat("gizmoOpacity", OTHER_SETTINGS_FILENAME, 1f, true);
+        public static SavedFloat GlobalRDMultiplier = new SavedFloat("RDGlobalMult", SETTINGS_FILENAME, 1f, true);
+        public static SavedBool UseDynamicRenderDist = new SavedBool("dynamicRenderDist", SETTINGS_FILENAME, true, true);
+        public static SavedFloat DynamicRDMultiplier = new SavedFloat("dynRDmultiplier", SETTINGS_FILENAME, 70f, true);
+        public static SavedFloat DynamicRDMinThreshold = new SavedFloat("dynRDminThreshold", SETTINGS_FILENAME, 250f, true);
+        public static SavedFloat PropRenderDistance = new SavedFloat("propRenderDist", SETTINGS_FILENAME, 1400f, true);
+        public static SavedFloat BuildingRenderDistance = new SavedFloat("buildingRenderDist", SETTINGS_FILENAME, 2000f, true);
+        public static SavedFloat GizmoSize = new SavedFloat("gizmoSize", SETTINGS_FILENAME, 1.2f, true);
+        public static SavedFloat GizmoOpacity = new SavedFloat("gizmoOpacity", SETTINGS_FILENAME, 1f, true);
 
-        public static SavedInt DistanceUnits = new SavedInt("distanceUnits", OTHER_SETTINGS_FILENAME, 0, true);
-        public static SavedInt AngleUnits = new SavedInt("angleUnits", OTHER_SETTINGS_FILENAME, 0, true);
+        public static SavedInt DistanceUnits = new SavedInt("distanceUnits", SETTINGS_FILENAME, 0, true);
+        public static SavedInt AngleUnits = new SavedInt("angleUnits", SETTINGS_FILENAME, 0, true);
 
-        public static SavedBool UseUINightMode = new SavedBool("useNightMode", OTHER_SETTINGS_FILENAME, false, true);
-        public static SavedBool HideDisabledLayersIcon = new SavedBool("hideIconLayerHidden", OTHER_SETTINGS_FILENAME, true, true);
-        public static SavedBool UsePasteInto = new SavedBool("usePasteInto", OTHER_SETTINGS_FILENAME, false, true);
-        public static SavedBool AutoResizeDecals = new SavedBool("autoResizeDecals", OTHER_SETTINGS_FILENAME, true, true);
-        public static SavedBool IncludeSubBuildings = new SavedBool("includeSubBuildings", OTHER_SETTINGS_FILENAME, true, true);
-        public static SavedBool UseColorVariation = new SavedBool("useColorVar", OTHER_SETTINGS_FILENAME, true, true);
+        public static SavedBool UseUINightMode = new SavedBool("useNightMode", SETTINGS_FILENAME, false, true);
+        public static SavedBool HideDisabledLayersIcon = new SavedBool("hideIconLayerHidden", SETTINGS_FILENAME, true, true);
+        public static SavedBool UsePasteInto = new SavedBool("usePasteInto", SETTINGS_FILENAME, false, true);
+        public static SavedBool AutoResizeDecals = new SavedBool("autoResizeDecals", SETTINGS_FILENAME, true, true);
+        public static SavedBool IncludeSubBuildings = new SavedBool("includeSubBuildings", SETTINGS_FILENAME, true, true);
+        public static SavedBool UseColorVariation = new SavedBool("useColorVar", SETTINGS_FILENAME, true, true);
 
-        public static SavedInt ConfirmDeletionThreshold = new SavedInt("confirmDeletionPanelThreshold", OTHER_SETTINGS_FILENAME, 2, true);
-        public static SavedBool ShowConfirmDeletion = new SavedBool("showConfirmDeletion", OTHER_SETTINGS_FILENAME, true, true);
-        public static SavedString LanguageUsed = new SavedString("languageUsed", OTHER_SETTINGS_FILENAME, "default", true);
-        public static SavedBool ShowDeveloperTools = new SavedBool("showDevTools", OTHER_SETTINGS_FILENAME, false, true);
+        public static SavedInt ConfirmDeletionThreshold = new SavedInt("confirmDeletionPanelThreshold", SETTINGS_FILENAME, 2, true);
+        public static SavedBool ShowConfirmDeletion = new SavedBool("showConfirmDeletion", SETTINGS_FILENAME, true, true);
+        public static SavedString LanguageUsed = new SavedString("languageUsed", SETTINGS_FILENAME, "default", true);
+        public static SavedBool ShowDeveloperTools = new SavedBool("showDevTools", SETTINGS_FILENAME, false, true);
 
-        public static SavedBool ShowToolsControls = new SavedBool("showToolsControls", OTHER_SETTINGS_FILENAME, true, true);
+        public static SavedBool ShowToolsControls = new SavedBool("showToolsControls", SETTINGS_FILENAME, true, true);
 
         private UISlider confirmDelThresholdSlider, gizmoSizeSlider, gizmoOpacitySlider;  // propRenderSlider, buildingRenderSlider 
         private UILabel confirmDelThresholdLabel, gizmoSizeLabel, gizmoOpacityLabel; // propRenderLabel, buildingRenderLabel
@@ -256,10 +274,36 @@ namespace ProceduralObjects
                 LocalizationManager.CreateManager();
             SetUnits();
 
-            UIHelperBase group = helper.AddGroup("    Procedural Objects");
-            UIPanel globalPanel = ((UIPanel)((UIHelper)group).self);
+            ExtUITabstrip tabStrip = ExtUITabstrip.Create((UIHelper)helper);
 
-            openKeybindingsButton = (UIButton)group.AddButton(LocalizationManager.instance.current["open_kbd_cfg"], openKeybindings);
+            UIHelper gentab = tabStrip.AddTabPage("  " + LocalizationManager.instance.current["settings_GENERAL"] + "  ");
+            UIHelperBase group = gentab.AddGroup("");
+            UIHelper keybindingsTab = tabStrip.AddTabPage(" " + LocalizationManager.instance.current["settings_KB"] + " ");
+            UIHelperBase kbGroup = keybindingsTab.AddGroup("");
+           // UIHelperBase group = helper.AddGroup("    Procedural Objects");
+
+            // KEY BINDINGS TAB
+
+            ((UIPanel)((UIHelper)kbGroup).self).gameObject.AddComponent<OptionsKeymappingGeneral>();
+            kbGroup.AddSpace(8);
+            var KBPosGroup = kbGroup.AddGroup(LocalizationManager.instance.current["position"]);
+            ((UIPanel)((UIHelper)KBPosGroup).self).gameObject.AddComponent<OptionsKeymappingPosition>();
+            KBPosGroup.AddSpace(8);
+            var KBRotGroup = kbGroup.AddGroup(LocalizationManager.instance.current["rotation"]);
+            ((UIPanel)((UIHelper)KBRotGroup).self).gameObject.AddComponent<OptionsKeymappingRotation>();
+            KBRotGroup.AddSpace(8);
+            var KBScaleGroup = kbGroup.AddGroup(LocalizationManager.instance.current["scale_obj"]);
+            ((UIPanel)((UIHelper)KBScaleGroup).self).gameObject.AddComponent<OptionsKeymappingScale>();
+            KBScaleGroup.AddSpace(8);
+            var KBSMActionsGroup = kbGroup.AddGroup(LocalizationManager.instance.current["CTActions"] + " (" + LocalizationManager.instance.current["selection_mode"] + ")");
+            ((UIPanel)((UIHelper)KBSMActionsGroup).self).gameObject.AddComponent<OptionsKeymappingSelectionModeActions>();
+            KBSMActionsGroup.AddSpace(8);
+            openKeybindingsButton = (UIButton)kbGroup.AddButton(LocalizationManager.instance.current["open_kbd_cfg"], openKeybindings);
+
+            KeyBindingsManager.Initialize();
+
+            // GENERAL TAB
+            UIPanel globalPanel = ((UIPanel)((UIHelper)group).self);
 
             gizmoSizeSlider = (UISlider)group.AddSlider(string.Format(LocalizationManager.instance.current["settings_GIZMO_label"], (GizmoSize.value * 100).ToString()), 0.2f, 3f, 0.1f, GizmoSize.value, gizmoSizeChanged);
             gizmoSizeSlider.width = 600;
@@ -297,7 +341,7 @@ namespace ProceduralObjects
                     LocalizationManager.instance.current["settings_ANGUNITS_rad"] + " (rad)" }, AngleUnits.value, (int value) => { AngleUnits.value = value; SetUnits(); });
 
             useUINightModeCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_USEUINIGHTMODE_toggle"], UseUINightMode.value, (bool value) => { UseUINightMode.value = value; });
-
+            
             hideDisLayerIconCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_HIDEDISABLEDLAYERSICON_toggle"], HideDisabledLayersIcon.value, hideDisabledLayersIconChanged);
 
           // usePasteIntoCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_USEPASTEINTO_toggle"], UsePasteInto.value, usePasteIntoChanged);
@@ -308,9 +352,8 @@ namespace ProceduralObjects
 
             useColorVariationCheckbox = (UICheckBox)group.AddCheckbox(LocalizationManager.instance.current["settings_USECOLORVAR_toggle"], UseColorVariation.value, useColorVariationChanged);
 
-            group.AddSpace(16);
-
-            var sliderGroup = helper.AddGroup("  " + LocalizationManager.instance.current["settings_CONFDEL_title"]);
+            group.AddSpace(10);
+            var sliderGroup = gentab.AddGroup("  " + LocalizationManager.instance.current["settings_CONFDEL_title"]);
 
             confirmDelCheckbox = (UICheckBox)sliderGroup.AddCheckbox(LocalizationManager.instance.current["settings_CONFDEL_toggle"], ShowConfirmDeletion.value, confirmDeletionCheckboxChanged);
 
@@ -326,11 +369,11 @@ namespace ProceduralObjects
                 confirmDelThresholdSlider.isEnabled = false;
 
 
-            sliderGroup.AddSpace(16);
-            var languageGroup = helper.AddGroup("  " + LocalizationManager.instance.current["settings_LANG_title"]);
+            sliderGroup.AddSpace(10);
+            var languageGroup = gentab.AddGroup("  " + LocalizationManager.instance.current["settings_LANG_title"]);
             languageGroup.AddDropdown(LocalizationManager.instance.current["settings_LANG_title"], LocalizationManager.instance.identifiers, LocalizationManager.instance.available.IndexOf(LocalizationManager.instance.current), languageChanged);
 
-            languageGroup.AddSpace(16);
+            languageGroup.AddSpace(10);
 
             showDevCheckbox = (UICheckBox)languageGroup.AddCheckbox(LocalizationManager.instance.current["settings_DEVTOOLS_toggle"], ShowDeveloperTools.value, (value) =>
             {

@@ -11,8 +11,8 @@ namespace ProceduralObjects.UI
 {
     public class ProceduralObjectsButton : UIButton
     {
-        public static readonly SavedInt savedX = new SavedInt("savedX", ProceduralObjectsMod.OTHER_SETTINGS_FILENAME, -1000, true);
-        public static readonly SavedInt savedY = new SavedInt("savedY", ProceduralObjectsMod.OTHER_SETTINGS_FILENAME, -1000, true);
+        public static readonly SavedInt savedX = new SavedInt("savedX", ProceduralObjectsMod.SETTINGS_FILENAME, -1000, true);
+        public static readonly SavedInt savedY = new SavedInt("savedY", ProceduralObjectsMod.SETTINGS_FILENAME, -1000, true);
 
         public ProceduralObjectsLogic logic;
 

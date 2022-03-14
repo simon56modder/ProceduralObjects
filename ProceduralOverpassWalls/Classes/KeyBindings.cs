@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using ColossalFramework;
 using ColossalFramework.IO;
 using System.IO;
 
@@ -59,22 +60,74 @@ namespace ProceduralObjects.Classes
             else
                 Debug.LogError("[ProceduralObjects] KeyBindingInfo constructor failure : Syntax error - no 'Equals' character found for a key binding line");
         }
+        public KeyBindingInfo(string name, SavedInputKey key)
+        {
+            this.m_name = name;
+            ApplySavedInput(key);
+        }
 
         public string m_name, m_fullKeys;
         public KeyCode[] m_orderedKeys;
 
+        public void ApplySavedInput(SavedInputKey key)
+        {
+            if (key == null)
+            {
+                return;
+            }
+            if (key.Key == KeyCode.None || key.value == SavedInputKey.Empty)
+            {
+                SetEmpty();
+            }
+            else
+            {
+                List<KeyCode> keys = new List<KeyCode>();
+                if (key.Control) keys.Add(KeyCode.LeftControl);
+                if (key.Shift) keys.Add(KeyCode.LeftShift);
+                if (key.Alt) keys.Add(KeyCode.LeftAlt);
+                keys.Add(key.Key);
+                m_orderedKeys = keys.ToArray();
+                m_fullKeys = (key.Control ? "LeftControl+" : "") + (key.Shift ? "LeftShift+" : "") + (key.Alt ? "LeftAlt+" : "") + key.Key.ToString();
+                AdjustFullKeys();
+            }
+        }
+        public void ApplySavedInput(KeyCode keycode, bool ctrl, bool shift, bool alt)
+        {
+            if (keycode == KeyCode.None)
+            {
+                m_orderedKeys = new KeyCode[] { };
+                m_fullKeys = "(none)";
+            }
+            else
+            {
+                List<KeyCode> keys = new List<KeyCode>();
+                if (ctrl) keys.Add(KeyCode.LeftControl);
+                if (shift) keys.Add(KeyCode.LeftShift);
+                if (alt) keys.Add(KeyCode.LeftAlt);
+                keys.Add(keycode);
+                m_orderedKeys = keys.ToArray();
+                m_fullKeys = (ctrl ? "LeftControl" : "") + (shift ? "LeftShift" : "") + (alt ? "LeftAlt" : "") + keycode.ToString();
+                AdjustFullKeys();
+            }
+        }
+        public void SetEmpty()
+        {
+            m_orderedKeys = new KeyCode[] { };
+            m_fullKeys = "(none)";
+        }
+
         public bool GetBindingDown()
         {
             int count = m_orderedKeys.Count();
-            if (count == 1)
-            {
+            if (count == 0)
+                return false;
+            else if (count == 1)
                 return Input.GetKeyDown(m_orderedKeys[0]);
-            }
             else
             {
                 if (!Input.GetKeyDown(m_orderedKeys[count - 1]))
                     return false;
-                
+
                 for (int i = 0; i < count; i++)
                 {
                     if (i != count - 1)
@@ -83,9 +136,7 @@ namespace ProceduralObjects.Classes
                             return false;
                     }
                     else
-                    {
                         return Input.GetKeyDown(m_orderedKeys[i]);
-                    }
                 }
             }
             return false;
@@ -94,10 +145,10 @@ namespace ProceduralObjects.Classes
         public bool GetBinding()
         {
             int count = m_orderedKeys.Count();
-            if (count == 1)
-            {
+            if (count == 0)
+                return false;
+            else if (count == 1)
                 return Input.GetKey(m_orderedKeys[0]);
-            }
             else
             {
                 if (!Input.GetKey(m_orderedKeys[count - 1]))
@@ -111,9 +162,7 @@ namespace ProceduralObjects.Classes
                             return false;
                     }
                     else
-                    {
                         return Input.GetKey(m_orderedKeys[i]);
-                    }
                 }
             }
             return false;
@@ -122,10 +171,10 @@ namespace ProceduralObjects.Classes
         public bool GetBindingUp()
         {
             int count = m_orderedKeys.Count();
-            if (count == 1)
-            {
+            if (count == 0)
+                return false;
+            else if (count == 1)
                 return Input.GetKeyUp(m_orderedKeys[0]);
-            }
             else
             {
                 for (int i = 0; i < count; i++)
@@ -136,9 +185,7 @@ namespace ProceduralObjects.Classes
                             return false;
                     }
                     else
-                    {
                         return Input.GetKeyUp(m_orderedKeys[i]);
-                    }
                 }
             }
             return false;
@@ -172,15 +219,11 @@ namespace ProceduralObjects.Classes
 
         public static void Initialize()
         {
+            if (instance != null) return;
+
             instance = new KeyBindingsManager();
-            try
-            {
-                instance.LoadData();
-            }
-            catch
-            {
-                Debug.LogError("[ProceduralObjects] Fatal Loading exception : couldn't load key bindings !");
-            }
+            try { instance.LoadData(); }
+            catch { Debug.LogError("[ProceduralObjects] Fatal Loading exception : couldn't load key bindings !"); }
         }
 
         public KeyBindingsManager()
@@ -217,55 +260,45 @@ namespace ProceduralObjects.Classes
                 tw.WriteLine("https://docs.unity3d.com/ScriptReference/KeyCode.html");
                 tw.WriteLine("");
                 tw.WriteLine("generalShowHideUI = LeftControl+P+O");
-                tw.WriteLine("convertToProcedural = LeftShift+P");
-                tw.WriteLine("copy = LeftControl+C");
-                tw.WriteLine("paste = LeftControl+V");
                 tw.WriteLine("switchActionMode = LeftControl");
-                tw.WriteLine("switchGeneralToVertexTools = Tab");
-                tw.WriteLine("deleteObject = Delete");
                 tw.WriteLine("");
                 tw.WriteLine("edition_smoothMovements = LeftShift");
                 tw.WriteLine("edition_smallMovements = LeftAlt");
-                tw.WriteLine("");
-                tw.WriteLine("position_moveUp = PageUp");
-                tw.WriteLine("position_moveDown = PageDown");
-                tw.WriteLine("position_moveRight = RightArrow");
-                tw.WriteLine("position_moveLeft = LeftArrow");
-                tw.WriteLine("position_moveForward = UpArrow");
-                tw.WriteLine("position_moveBackward = DownArrow");
-                tw.WriteLine("");
-                tw.WriteLine("rotation_moveUp = PageUp");
-                tw.WriteLine("rotation_moveDown = PageDown");
-                tw.WriteLine("rotation_moveRight = RightArrow");
-                tw.WriteLine("rotation_moveLeft = LeftArrow");
-                tw.WriteLine("rotation_moveForward = UpArrow");
-                tw.WriteLine("rotation_moveBackward = DownArrow");
-                tw.WriteLine("");
-                tw.WriteLine("scale_scaleUp = PageUp");
-                tw.WriteLine("scale_scaleDown = PageDown");
-                tw.WriteLine("");
-                tw.WriteLine("snapStoredHeight = H");
-                tw.WriteLine("undo = LeftControl+Z");
-                tw.WriteLine("redo = LeftControl+Y");
-                tw.WriteLine("enableSnapping = S");
                 tw.Close();
             }
             m_keyBindings = new List<KeyBindingInfo>();
             var lines = File.ReadAllLines(BindingsConfigPath).ToList();
-            // settings added after v1.2.2
-            CheckAddMissingSetting(lines, "snapStoredHeight", "H");
-            CheckAddMissingSetting(lines, "undo", "LeftControl+Z");
-            CheckAddMissingSetting(lines, "redo", "LeftControl+Y");
-            CheckAddMissingSetting(lines, "enableSnapping", "S");
-            foreach (string line in lines)
+            var keys = ProceduralObjectsMod.SettingsFile.ListKeys().Where(s => s.StartsWith("KB_"));
+            foreach (string line in new List<string>(lines))
             {
                 if (line != string.Empty && line.Contains("="))
                 {
-                    KeyBindingInfo kbInfo = new KeyBindingInfo(line);
-                    m_keyBindings.Add(kbInfo);
+                    var key = line.Split(new string[] { "=" }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+                    if (keys.Any(k => k.Contains("KB_" + key)))
+                    {
+                        lines.Remove(line);
+                    }
+                    else
+                    {
+                        KeyBindingInfo kbInfo = new KeyBindingInfo(line);
+                        m_keyBindings.Add(kbInfo);
+                    }
                 }
             }
 
+            RewriteCfgLines(lines);
+            
+            if (ProceduralObjectsMod.SettingsFile != null)
+            {
+                foreach (var key in keys)
+                {
+                    var k = key.Replace("KB_", "");
+                    if (m_keyBindings.Any(kb => kb.m_name == k))
+                        continue;
+                    KeyBindingInfo kbInfo = new KeyBindingInfo(k, new SavedInputKey(key, ProceduralObjectsMod.SETTINGS_FILENAME));
+                    m_keyBindings.Add(kbInfo);
+                }
+            }
             keyBindingsDictionary = new Dictionary<string, KeyBindingInfo>();
             foreach (var kbInfo in m_keyBindings)
             {
@@ -273,19 +306,16 @@ namespace ProceduralObjects.Classes
             }
             Debug.Log("[ProceduralObjects] Key Bindings loading ended from " + BindingsConfigPath);
         }
-        private void CheckAddMissingSetting(List<string> lines, string id, string defaultValue)
+        public static void RewriteCfgLines(List<string> lines)
         {
-            if (!lines.Any(line => line.Contains(id + " = ")))
+            if (File.Exists(BindingsConfigPath))
+                File.Delete(BindingsConfigPath);
+            TextWriter tw = new StreamWriter(BindingsConfigPath);
+            for (int i = 0; i < lines.Count; i++)
             {
-                if (File.Exists(BindingsConfigPath))
-                    File.Delete(BindingsConfigPath);
-                TextWriter tw = new StreamWriter(BindingsConfigPath);
-                foreach (string line in lines)
-                    tw.WriteLine(line);
-                tw.WriteLine(id + " = " + defaultValue);
-                lines.Add(id + " = " + defaultValue);
-                tw.Close();
+                tw.WriteLine(lines[i]);
             }
+            tw.Close();
         }
     }
 }

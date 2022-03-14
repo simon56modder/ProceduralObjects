@@ -378,7 +378,6 @@ namespace ProceduralObjects.Classes
             }
             return tex;
         }
-
         public static Texture2D LoadTextureFromAssembly(string filename)
         {
             Stream manifestResourceStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("ProceduralObjects.Icons." + filename + ".png");
@@ -391,7 +390,6 @@ namespace ProceduralObjects.Classes
 
             return texture2D;
         }
-
         public static Texture2D RotateRight(Texture2D originalTexture)
         {
             Color32[] original = originalTexture.GetPixels32();
@@ -418,7 +416,6 @@ namespace ProceduralObjects.Classes
             if (tex != null)
                 UnityEngine.Object.Destroy(tex);
         }
-
         public static Texture2D PlainTexture(int width, int height, Color color)
         {
             var texture = new Texture2D(width, height);
@@ -456,36 +453,29 @@ namespace ProceduralObjects.Classes
             return thumb as Texture;
         }
 
-        public static void PrintRectangle(Texture2D originalTex, int x, int y, int width, int height, Color color)
+        public static void PrintRectangle(Texture2D originalTex, int x, int y, int width, int height, Color color, int border, Color borderColor)
         {
             var oldY = y;
             y = originalTex.height - y - height;
-            for (int i = 1; i <= width; i++)
+            Color bcolor = borderColor.KeepAlphaFrom(color);
+            for (int i = 0; i < width; i++)
             {
                 if (i + x < originalTex.width)
                 {
-                    for (int j = 1; j <= height; j++)
+                    for (int j = 0; j < height; j++)
                     {
                         if (y + j >= 0)
                         {
-                            /*
-                            if (haveBorder)
+                            var c = color;
+                            if (border > 0)
                             {
-                                bool isLeftBorder = (i >= bDistance && i < bDistance + bWidth) && (j <= originalTex.height - bDistance && j >= bDistance);
-                                bool isRightBorder = (i > originalTex.width - bDistance - bWidth && i <= originalTex.width - bDistance) && (j <= originalTex.height - bDistance && j >= bDistance);
-                                bool isTopBorder = (j >= bDistance && j < bDistance + bWidth) && (i <= originalTex.width - bDistance && i >= bDistance);
-                                bool isBottomBorder = (j > originalTex.height - bDistance - bWidth && j <= originalTex.height - bDistance) && (i <= originalTex.width - bDistance && i >= bDistance);
-                                if (isLeftBorder || isRightBorder || isTopBorder || isBottomBorder)
-                                {
-                                    float alpha = color.a;
-                                    color = bColor;
-                                    color.a = alpha;
-                                }
-                            } */
+                                if (j < border || j >= height - border) c = bcolor;
+                                else if (i < border || i >= width - border) c = bcolor;
+                            }
                             if (color.a < 1)
-                                originalTex.SetPixel(i + x, j + y, AverageColor(originalTex.GetPixel(i + x, j + y), color));
+                                originalTex.SetPixel(i + x, j + y, AverageColor(originalTex.GetPixel(i + x, j + y), c));
                             else
-                                originalTex.SetPixel(i + x, j + y, color);
+                                originalTex.SetPixel(i + x, j + y, c);
                         }
                     }
                 }
@@ -506,6 +496,7 @@ namespace ProceduralObjects.Classes
         {
             return new Color(src.r, src.g, src.b, alphaSrc.a);
         }
+
     }
     public class TextureResourceInfo
     {

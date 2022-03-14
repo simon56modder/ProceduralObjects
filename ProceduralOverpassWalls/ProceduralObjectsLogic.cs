@@ -24,6 +24,8 @@ namespace ProceduralObjects
     {
         public static ProceduralObjectsLogic instance;
 
+        public Vertex[] tempVerticesBuffer; // TO BE REMOVED - it is assume this will fix Move It compatibility
+
         public List<ProceduralObject> proceduralObjects, pObjSelection;
         public HashSet<int> activeIds;
         public ProceduralObject currentlyEditingObject;
@@ -44,12 +46,12 @@ namespace ProceduralObjects
         public Rect externalsWindow = new Rect(555, 100, 400, 400);
         public string externalsSaveTextfield = "Enter object name here";
         public Vector2 scrollVertices = Vector2.zero, scrollObjects = Vector2.zero, scrollTextures = Vector2.zero, scrollExternals = Vector2.zero;
-        public Vertex[] tempVerticesBuffer;
         public Type previousToolType;
         public static AxisEditionState axisState = AxisEditionState.none;
         public Vector3 axisHitPoint = Vector3.zero, gizmoOffset = Vector3.zero;
         private RotationWizardData rotWizardData = null;
         private VerticesWizardData vertWizardData = null;
+        public DrawWizardData drawWizardData = null;
         private ProceduralObject SingleHoveredObj = null;
         public SelectionModeAction selectionModeAction = null;
 
@@ -84,6 +86,7 @@ namespace ProceduralObjects
         public LayerManager layerManager;
         public AdvancedEditionManager advEdManager;
         public ModuleManager moduleManager;
+        public MeasurementsManager measurementsManager;
         public SelectionFilters filters;
 
         public bool showLayerSetScroll = false, showMoreTools = false;
@@ -93,7 +96,7 @@ namespace ProceduralObjects
 
         void Start()
         {
-            Debug.Log("[ProceduralObjects] Game start procedure started.");
+            Debug.Log("[ProceduralObjects] v" + ProceduralObjectsMod.VERSION + " - Game start procedure started.");
             var startTime = DateTime.Now;
             pObjSelection = new List<ProceduralObject>();
             SelectionMode.SelectionModeAction.InitializeSMActions();
@@ -106,7 +109,7 @@ namespace ProceduralObjects
             {
                 pausePanel.eventVisibilityChanged += (uiComponent, value) =>
                 {
-                    ClosePO();
+                    ClosePO(true);
                     layerManager.showWindow = false;
                 };
             }
@@ -146,6 +149,7 @@ namespace ProceduralObjects
             RenderOptions.Initialize();
             layerManager = new LayerManager(this);
             moduleManager = new ModuleManager(this);
+            measurementsManager = new MeasurementsManager(this);
             filters = new SelectionFilters();
             if (ProceduralObjectsMod.tempLayerData != null)
             {
@@ -214,7 +218,17 @@ namespace ProceduralObjects
                         var po = new ProceduralObject();
                         Color c = req.color;
                         if (req.buildingInfo != null)
+                        {
                             po.ConstructObject(req.buildingInfo, proceduralObjects.GetNextUnusedId(), null);
+                            if (ProceduralObjectsMod.IncludeSubBuildings.value)
+                            {
+                                if (po._baseBuilding != null)
+                                {
+                                    if (po._baseBuilding.m_subBuildings.Length >= 1)
+                                        ProceduralUtils.ConstructSubBuildings(po);
+                                }
+                            }
+                        }
                         else if (req.propInfo != null)
                         {
                             po.ConstructObject(req.propInfo, proceduralObjects.GetNextUnusedId(), null, true);
@@ -237,6 +251,8 @@ namespace ProceduralObjects
 
             GUIPainter.UpdatePainter(painter);
 
+            layerManager.Update();
+
             var currentToolType = ToolsModifierControl.toolController.CurrentTool.GetType();
 
             if ((currentToolType == typeof(PropTool)) || (currentToolType == typeof(BuildingTool)))
@@ -252,6 +268,7 @@ namespace ProceduralObjects
 
             if (KeyBindingsManager.instance.GetBindingFromName("convertToProcedural").GetBindingDown())
             {
+                ColossalFramework.UI.UIView.SetFocus(mainButton);
                 CallConvertToPO(ToolsModifierControl.toolController.CurrentTool);
             }
 
@@ -263,13 +280,13 @@ namespace ProceduralObjects
                     var obj = proceduralObjects[i];
                     var sqrRd = (obj.renderDistance * RenderOptions.instance.globalMultiplier);
                     sqrRd *= sqrRd;
-                    var sqrDist = (renderCamera.transform.position - obj.m_position).sqrMagnitude;
-                    obj._insideRenderView = sqrDist <= sqrRd;
+                    obj._squareDistToCam = (renderCamera.transform.position - obj.m_position).sqrMagnitude;
+                    obj._insideRenderView = obj._squareDistToCam <= sqrRd;
 
                     if (obj._insideRenderView)
                     {
                         if (renderCamera.WorldToScreenPoint(obj.m_position).z >= 0)
-                            obj._insideUIview = sqrDist <= Mathf.Max(sqrRd * 0.7f, sqrDynMinThreshold);
+                            obj._insideUIview = obj._squareDistToCam <= Mathf.Max(sqrRd * 0.7f, sqrDynMinThreshold);
                         else
                             obj._insideUIview = false;
                     }
@@ -353,6 +370,18 @@ namespace ProceduralObjects
                     {
                         if (selectionModeAction == null && !movingWholeModel)
                         {
+                            foreach (SMActionPrefab actionprefab in SelectionModeAction.SelectionModeActions)
+                            {
+                                if (actionprefab.keyBinding == null) continue;
+                                if (actionprefab.keyBinding.GetBindingDown())
+                                {
+                                    var action = (SelectionModeAction)Activator.CreateInstance(actionprefab.type);
+                                    action.logic = ProceduralObjectsLogic.instance;
+                                    selectionModeAction = action;
+                                    action.OnOpen(new List<ProceduralObject>(pObjSelection));
+                                }
+                            }
+
                             if (KeyBindingsManager.instance.GetBindingFromName("deleteObject").GetBindingDown())
                             {
                                 var inclusiveList = (selectedGroup == null) ? POGroup.AllObjectsInSelection(pObjSelection, selectedGroup) : pObjSelection;
@@ -636,7 +665,7 @@ namespace ProceduralObjects
                                 }
                             }
                             Gizmos.ReleaseAxis();
-                            currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                            currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                             Gizmos.recordingStretch = 0f;
                             axisState = AxisEditionState.none;
                         }
@@ -661,7 +690,7 @@ namespace ProceduralObjects
                                             type = EditingStep.StepType.position;
                                         else if (actionMode == 2)
                                             type = EditingStep.StepType.rotation;
-                                        currentlyEditingObject.historyEditionBuffer.InitializeNewStep(type, tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.InitializeNewStep(type, currentlyEditingObject.vertices);
                                         if (hit.transform.gameObject.name.Contains("ProceduralAxis_X"))
                                         {
                                             axisState = AxisEditionState.X;
@@ -694,7 +723,7 @@ namespace ProceduralObjects
                                         }
 
                                         if (actionMode == 1)
-                                            Gizmos.tempBuffer = tempVerticesBuffer.GetPositionsArray();
+                                            Gizmos.tempBuffer = currentlyEditingObject.vertices.GetPositionsArray();
                                         else if (actionMode == 2)
                                             Gizmos.initialRotationTemp = currentlyEditingObject.m_rotation;
 
@@ -885,7 +914,7 @@ namespace ProceduralObjects
                                                         stretch = Vector3.Project(hit - currentlyEditingObject.m_position, currentlyEditingObject.m_rotation * Vector3.right).magnitude / gizmoOffset.magnitude;
                                                     }
                                                     Gizmos.recordingStretch = stretch;
-                                                    VertexUtils.StretchX(Gizmos.tempBuffer, tempVerticesBuffer, stretch);
+                                                    VertexUtils.StretchX(Gizmos.tempBuffer, currentlyEditingObject.vertices, stretch);
                                                     Apply();
                                                 }
                                                 break;
@@ -901,7 +930,7 @@ namespace ProceduralObjects
                                                         stretch = Vector3.Project(hit - currentlyEditingObject.m_position, currentlyEditingObject.m_rotation * Vector3.up).magnitude / gizmoOffset.magnitude;
                                                     }
                                                     Gizmos.recordingStretch = stretch;
-                                                    VertexUtils.StretchY(Gizmos.tempBuffer, tempVerticesBuffer, stretch);
+                                                    VertexUtils.StretchY(Gizmos.tempBuffer, currentlyEditingObject.vertices, stretch);
                                                     Apply();
                                                 }
                                                 break;
@@ -917,7 +946,7 @@ namespace ProceduralObjects
                                                         stretch = Vector3.Project(hit - currentlyEditingObject.m_position, currentlyEditingObject.m_rotation * Vector3.forward).magnitude / gizmoOffset.magnitude;
                                                     }
                                                     Gizmos.recordingStretch = stretch;
-                                                    VertexUtils.StretchZ(Gizmos.tempBuffer, tempVerticesBuffer, stretch);
+                                                    VertexUtils.StretchZ(Gizmos.tempBuffer, currentlyEditingObject.vertices, stretch);
                                                     Apply();
                                                 }
                                                 break;
@@ -1016,11 +1045,12 @@ namespace ProceduralObjects
                         }
                         #endregion
                     }
-                    else
+                    else // vertex customization
                     {
                         if (KeyBindingsManager.instance.GetBindingFromName("switchGeneralToVertexTools").GetBindingDown())
                         {
                             PlaySound(2);
+                            drawWizardData = null;
                             if (verticesToolType < 2)
                             {
                                 tabSwitchTimer = TimeUtils.deltaTime;
@@ -1034,109 +1064,117 @@ namespace ProceduralObjects
                                 SwitchToMainTool();
                             }
                         }
-                        if (Input.GetMouseButtonDown(0))
+                        if (verticesToolType == 3)
                         {
-                            if (editingVertexIndex.Count > 0 && vertWizardData == null)
+                            if (drawWizardData != null)
+                                drawWizardData.Update();
+                        }
+                        else
+                        {
+                            if (Input.GetMouseButtonDown(0))
                             {
-                                if (!IsInWindowElement(GUIUtils.MousePos))
+                                if (editingVertexIndex.Count > 0 && vertWizardData == null)
                                 {
-                                    vertWizardData = new VerticesWizardData(verticesToolType);
-                                    vertWizardData.Store(GUIUtils.MousePos);
+                                    if (!IsInWindowElement(GUIUtils.MousePos))
+                                    {
+                                        vertWizardData = new VerticesWizardData(verticesToolType);
+                                        vertWizardData.Store(GUIUtils.MousePos);
+                                    }
                                 }
                             }
-                        }
-                        else if (Input.GetMouseButtonUp(0) || (Gizmos.registeredString != "" && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))))
-                        {
-                            if (vertWizardData != null)
-                            {
-                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
-                                Gizmos.DisableKeyTyping();
-                                vertWizardData.DestroyLines();
-                                vertWizardData = null;
-                            }
-                        }
-                        else if (Input.GetMouseButton(0))
-                        {
-                            if (editingVertexIndex.Count > 0)
+                            else if (Input.GetMouseButtonUp(0) || (Gizmos.registeredString != "" && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))))
                             {
                                 if (vertWizardData != null)
                                 {
-                                    vertWizardData.IncrementStep();
-                                    if (vertWizardData.enableMovement)
+                                    currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
+                                    Gizmos.DisableKeyTyping();
+                                    vertWizardData.DestroyLines();
+                                    vertWizardData = null;
+                                }
+                            }
+                            else if (Input.GetMouseButton(0))
+                            {
+                                if (editingVertexIndex.Count > 0)
+                                {
+                                    if (vertWizardData != null)
                                     {
-                                        if (!vertWizardData.storedVertices)
+                                        vertWizardData.IncrementStep();
+                                        if (vertWizardData.enableMovement)
                                         {
-                                            currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                            if (verticesToolType != 0)
-                                                Gizmos.EnableKeyTyping();
-                                            vertWizardData.Store(tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))).ToArray(), currentlyEditingObject);
-                                        }
-                                        if (vertWizardData.toolType == 0)
-                                        {
-                                            if (Input.GetKeyDown(KeyCode.LeftControl))
-                                                vertWizardData.HideLines();
-                                            else if (Input.GetKeyUp(KeyCode.LeftControl))
-                                                vertWizardData.ShowLines();
-
-                                            Ray ray = renderCamera.ScreenPointToRay(Input.mousePosition);
-                                            float enter;
-                                            if (vertWizardData.movementPlane.Raycast(ray, out enter))
+                                            if (!vertWizardData.storedVertices)
                                             {
-                                                var point = ray.GetPoint(enter);
-                                                vertWizardData.ApplyToNewPosition(point, currentlyEditingObject, !Input.GetKey(KeyCode.LeftControl));
+                                                currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                                if (verticesToolType != 0)
+                                                    Gizmos.EnableKeyTyping();
+                                                vertWizardData.Store(currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))).ToArray(), currentlyEditingObject);
+                                            }
+                                            if (vertWizardData.toolType == 0)
+                                            {
+                                                if (Input.GetKeyDown(KeyCode.LeftControl))
+                                                    vertWizardData.HideLines();
+                                                else if (Input.GetKeyUp(KeyCode.LeftControl))
+                                                    vertWizardData.ShowLines();
+
+                                                Ray ray = renderCamera.ScreenPointToRay(Input.mousePosition);
+                                                float enter;
+                                                if (vertWizardData.movementPlane.Raycast(ray, out enter))
+                                                {
+                                                    var point = ray.GetPoint(enter);
+                                                    vertWizardData.ApplyToNewPosition(point, currentlyEditingObject, !Input.GetKey(KeyCode.LeftControl));
+                                                    Apply();
+                                                }
+                                            }
+                                            else if (vertWizardData.toolType == 1)
+                                            {
+                                                vertWizardData.ApplyToNewPosition(Input.mousePosition.x);
+                                                Apply();
+                                            }
+                                            else if (vertWizardData.toolType == 2)
+                                            {
+                                                vertWizardData.ApplyToNewPosition(GUIUtils.MousePos);
                                                 Apply();
                                             }
                                         }
-                                        else if (vertWizardData.toolType == 1)
-                                        {
-                                            vertWizardData.ApplyToNewPosition(Input.mousePosition.x);
-                                            Apply();
-                                        }
-                                        else if (vertWizardData.toolType == 2)
-                                        {
-                                            vertWizardData.ApplyToNewPosition(GUIUtils.MousePos);
-                                            Apply();
-                                        }
                                     }
                                 }
                             }
-                        }
-                        else if (Input.GetMouseButton(1))
-                        {
-                            if (selectionModeAction == null)
+                            else if (Input.GetMouseButton(1))
                             {
-                                if (!clickingRegion)
+                                if (selectionModeAction == null)
                                 {
-                                    topLeftRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
-                                    bottomRightRegion = topLeftRegion;
-                                    clickingRegion = true;
-                                }
-                                else
-                                    bottomRightRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
-                            }
-                        }
-                        else if (Input.GetMouseButtonUp(1))
-                        {
-                            if (clickingRegion)
-                            {
-                                bottomRightRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
-                                Rect region = GUIUtils.RectFromCorners(topLeftRegion, bottomRightRegion, false);
-                                clickingRegion = false;
-                                if (!Input.GetKey(KeyCode.LeftControl))
-                                    editingVertexIndex.Clear();
-                                editingVertex = true;
-                                editingWholeModel = false;
-                                foreach (Vertex vertex in tempVerticesBuffer.Where(v => !v.IsDependent))
-                                {
-                                    if (region.Contains(ProceduralUtils.VertexWorldPosition(vertex, currentlyEditingObject).WorldToGuiPoint(), true))
+                                    if (!clickingRegion)
                                     {
-                                        editingVertexIndex.Add(vertex.Index);
+                                        topLeftRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
+                                        bottomRightRegion = topLeftRegion;
+                                        clickingRegion = true;
+                                    }
+                                    else
+                                        bottomRightRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
+                                }
+                            }
+                            else if (Input.GetMouseButtonUp(1))
+                            {
+                                if (clickingRegion)
+                                {
+                                    bottomRightRegion = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
+                                    Rect region = GUIUtils.RectFromCorners(topLeftRegion, bottomRightRegion, false);
+                                    clickingRegion = false;
+                                    if (!Input.GetKey(KeyCode.LeftControl))
+                                        editingVertexIndex.Clear();
+                                    editingVertex = true;
+                                    editingWholeModel = false;
+                                    foreach (Vertex vertex in currentlyEditingObject.vertices)
+                                    {
+                                        if (vertex.IsDependent) continue;
+                                        if (region.Contains(ProceduralUtils.VertexWorldPosition(vertex, currentlyEditingObject).WorldToGuiPoint(), true))
+                                        {
+                                            editingVertexIndex.Add(vertex.Index);
+                                        }
                                     }
                                 }
                             }
-                        }
-                        #region vertex gizmos
-                        /* if (vertexShifting != null)
+                            #region vertex gizmos
+                            /* if (vertexShifting != null)
                            {
                                if (vertexShifting.Count > 0)
                                {
@@ -1197,8 +1235,9 @@ namespace ProceduralObjects
                                }
                            } */
 
-                        // |---------------------------|
-                        #endregion
+                            // |---------------------------|
+                            #endregion
+                        }
                     }
                     if (KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").GetBinding())
                     {
@@ -1211,44 +1250,44 @@ namespace ProceduralObjects
                                 #region déplacement des vertex
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.y += 5f * TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.y += 5f * TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.y -= 5f * TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.y -= 5f * TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.z += 5f * TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.z += 5f * TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveRight").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.z -= 5f * TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.z -= 5f * TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveForward").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.x += 5f * TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.x += 5f * TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.x -= 5f * TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.x -= 5f * TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 #endregion
@@ -1309,12 +1348,12 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").GetBinding())
                                         {
-                                            currentlyEditingObject.Scale(tempVerticesBuffer, 1 + (.3f * TimeUtils.deltaTime));
+                                            currentlyEditingObject.Scale(currentlyEditingObject.vertices, 1 + (.3f * TimeUtils.deltaTime));
                                             Apply();
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").GetBinding())
                                         {
-                                            currentlyEditingObject.Scale(tempVerticesBuffer, 1 - (.3f * TimeUtils.deltaTime));
+                                            currentlyEditingObject.Scale(currentlyEditingObject.vertices, 1 - (.3f * TimeUtils.deltaTime));
                                             Apply();
                                         }
                                         break;
@@ -1377,44 +1416,44 @@ namespace ProceduralObjects
                                 #region déplacement des vertex
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.y += TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.y += TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.y -= TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.y -= TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.z += TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.z += TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveRight").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.z -= TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.z -= TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveForward").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.x += TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.x += TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").GetBinding())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.x -= TimeUtils.deltaTime;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.x -= TimeUtils.deltaTime;
                                     Apply();
                                 }
                                 #endregion
@@ -1475,12 +1514,12 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").GetBinding())
                                         {
-                                            currentlyEditingObject.Scale(tempVerticesBuffer, 1 + (.12f * TimeUtils.deltaTime));
+                                            currentlyEditingObject.Scale(currentlyEditingObject.vertices, 1 + (.12f * TimeUtils.deltaTime));
                                             Apply();
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").GetBinding())
                                         {
-                                            currentlyEditingObject.Scale(tempVerticesBuffer, 1 - (.12f * TimeUtils.deltaTime));
+                                            currentlyEditingObject.Scale(currentlyEditingObject.vertices, 1 - (.12f * TimeUtils.deltaTime));
                                             Apply();
                                         }
                                         break;
@@ -1540,27 +1579,27 @@ namespace ProceduralObjects
                             #region confirm edition steps
                             if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBindingUp())
                             {
-                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                             }
                             if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBindingUp())
                             {
-                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                             }
                             if (KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").GetBindingUp())
                             {
-                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                             }
                             if (KeyBindingsManager.instance.GetBindingFromName("position_moveRight").GetBindingUp())
                             {
-                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                             }
                             if (KeyBindingsManager.instance.GetBindingFromName("position_moveForward").GetBindingUp())
                             {
-                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                             }
                             if (KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").GetBindingUp())
                             {
-                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                             }
                             #endregion
                         }
@@ -1576,56 +1615,56 @@ namespace ProceduralObjects
                                 #region déplacement des vertex
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.y += 1f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.y += 1f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.y -= 1f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.y -= 1f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.z += 1f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.z += 1f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveRight").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.z -= 1f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.z -= 1f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveForward").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.x += 1f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.x += 1f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.x -= 1f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.x -= 1f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 #endregion
@@ -1685,12 +1724,12 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").GetBindingDown())
                                         {
-                                            currentlyEditingObject.Scale(tempVerticesBuffer, 1.12f);
+                                            currentlyEditingObject.Scale(currentlyEditingObject.vertices, 1.12f);
                                             Apply();
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").GetBindingDown())
                                         {
-                                            currentlyEditingObject.Scale(tempVerticesBuffer, .88f);
+                                            currentlyEditingObject.Scale(currentlyEditingObject.vertices, .88f);
                                             Apply();
                                         }
                                         break;
@@ -1753,56 +1792,56 @@ namespace ProceduralObjects
                                 #region déplacement des vertex
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.y += 0.15f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.y += 0.15f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.y -= 0.15f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.y -= 0.15f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.z += 0.15f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.z += 0.15f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveRight").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.z -= 0.15f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.z -= 0.15f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveForward").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.x += 0.15f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.x += 0.15f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 if (KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").GetBindingDown())
                                 {
-                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, tempVerticesBuffer);
-                                    foreach (Vertex v in tempVerticesBuffer.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
-                                        tempVerticesBuffer[v.Index].Position.x -= 0.15f;
+                                    currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, currentlyEditingObject.vertices);
+                                    foreach (Vertex v in currentlyEditingObject.vertices.Where(v => (editingVertexIndex.Contains(v.Index) || (v.IsDependent && editingVertexIndex.Contains(v.DependencyIndex)))))
+                                        currentlyEditingObject.vertices[v.Index].Position.x -= 0.15f;
                                     if (vertWizardData == null)
-                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                                        currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                                     Apply();
                                 }
                                 #endregion
@@ -1863,12 +1902,12 @@ namespace ProceduralObjects
 
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp").GetBindingDown())
                                         {
-                                            currentlyEditingObject.Scale(tempVerticesBuffer, 1.06f);
+                                            currentlyEditingObject.Scale(currentlyEditingObject.vertices, 1.06f);
                                             Apply();
                                         }
                                         if (KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown").GetBindingDown())
                                         {
-                                            currentlyEditingObject.Scale(tempVerticesBuffer, .94f);
+                                            currentlyEditingObject.Scale(currentlyEditingObject.vertices, .94f);
                                             Apply();
                                         }
                                         break;
@@ -1942,6 +1981,8 @@ namespace ProceduralObjects
             FontManager.instance.DrawWindow();
 
             ModuleManager.instance.DrawWindow();
+
+            MeasurementsManager.instance.DrawWindow();
 
             RenderOptions.instance.DrawWindow();
 
@@ -2030,7 +2071,7 @@ namespace ProceduralObjects
                                                     {
                                                         pObjSelection.Clear();
                                                         SetCurrentlyEditingObj(obj);
-                                                        obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.moveTo, tempVerticesBuffer);
+                                                        obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.moveTo, currentlyEditingObject.vertices);
                                                         placingSelection = false;
                                                     }
                                                     CloseAllSMWindows();
@@ -2411,7 +2452,7 @@ namespace ProceduralObjects
 
                     if (advEdManager != null)
                     {
-                        advEdManager.m_vertices = tempVerticesBuffer;
+                        advEdManager.m_vertices = currentlyEditingObject.vertices;
                         advEdManager.DrawWindow();
                     }
 
@@ -2432,20 +2473,46 @@ namespace ProceduralObjects
 
                             if (vertWizardAllows && !KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements").GetBinding())
                             {
-                                foreach (Vertex vertex in tempVerticesBuffer)
+                                var vertices = new List<Vertex>(currentlyEditingObject.vertices);
+
+                                foreach (var index in editingVertexIndex)
+                                {
+                                    var vertex = currentlyEditingObject.vertices[index];
+                                    if (vertex == null)
+                                        continue;
+                                    if (vertex.IsDependent)
+                                        continue;
+                            //        if (currentlyEditingObject.m_mesh.name == "ploppablecliffgrass" && vertex.Index >= currentlyEditingObject.m_mesh.vertices.Length - 2)
+                           //           continue;
+                                    var vertexWorldPos = ProceduralUtils.VertexWorldPosition(vertex, currentlyEditingObject);
+                                    if (renderCamera.WorldToScreenPoint(vertexWorldPos).z < 0)
+                                        continue;
+                                    if (GUI.Button(new Rect(vertexWorldPos.WorldToGuiPoint() + new Vector2(-10, -10), new Vector2(20, 20)), VertexUtils.vertexIcons[1], GUI.skin.label))
+                                    {
+                                        if (verticesToolType != 3 && drawWizardData == null)
+                                        {
+                                            PlaySound();
+                                            editingVertexIndex.Remove(vertex.Index);
+                                            if (editingVertexIndex.Count == 0)
+                                                editingVertex = false;
+                                        }
+                                    }
+                                    vertices.Remove(vertex);
+                                }
+                                foreach (Vertex vertex in vertices)
                                 {
                                     if (vertex == null)
                                         continue;
                                     if (vertex.IsDependent)
                                         continue;
-                                    if (currentlyEditingObject.m_mesh.name == "ploppablecliffgrass" && vertex.Index >= currentlyEditingObject.allVertices.Length - 2)
+                                    if (currentlyEditingObject.m_mesh.name == "ploppablecliffgrass" && vertex.Index >= currentlyEditingObject.m_mesh.vertices.Length - 2)
                                         continue;
                                     var vertexWorldPos = ProceduralUtils.VertexWorldPosition(vertex, currentlyEditingObject);
                                     if (renderCamera.WorldToScreenPoint(vertexWorldPos).z < 0)
                                         continue;
-                                    if ((editingVertex && !editingVertexIndex.Contains(vertex.Index)) || !editingVertex)
+                                    if (GUI.Button(new Rect(vertexWorldPos.WorldToGuiPoint() + new Vector2(-10, -10), new Vector2(20, 20)), VertexUtils.vertexIcons[0], GUI.skin.label))
                                     {
-                                        if (GUI.Button(new Rect(vertexWorldPos.WorldToGuiPoint() + new Vector2(-10, -10), new Vector2(20, 20)), VertexUtils.vertexIcons[0], GUI.skin.label))
+                                        if (verticesToolType != 3 && drawWizardData == null)
                                         {
                                             PlaySound();
                                             editingVertex = true;
@@ -2459,16 +2526,6 @@ namespace ProceduralObjects
                                             }
                                         }
                                     }
-                                    else
-                                    {
-                                        if (GUI.Button(new Rect(vertexWorldPos.WorldToGuiPoint() + new Vector2(-10, -10), new Vector2(20, 20)), VertexUtils.vertexIcons[1], GUI.skin.label))
-                                        {
-                                            PlaySound();
-                                            editingVertexIndex.Remove(vertex.Index);
-                                            if (editingVertexIndex.Count == 0)
-                                                editingVertex = false;
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -2479,7 +2536,7 @@ namespace ProceduralObjects
                             {
                                 PlaySound();
                                 getBackToGeneralTool = true;
-                                currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.moveTo, tempVerticesBuffer);
+                                currentlyEditingObject.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.moveTo, currentlyEditingObject.vertices);
                                 movingWholeModel = true;
                                 toolAction = ToolAction.build;
                                 placingSelection = false;
@@ -2700,7 +2757,7 @@ namespace ProceduralObjects
                             + Gizmos.ConvertRoundToDistanceUnit(currentlyEditingObject.renderDistance).ToString("N").Replace(".00", "") + ProceduralObjectsMod.distanceUnit
                             + ((RenderOptions.instance.globalMultiplier != 1f) ? ("  (x " + RenderOptions.instance.globalMultiplier + ")") : ""));
 
-                        var renderDistSlider = GUI.HorizontalSlider(new Rect(0, 240, 350, 20), Mathf.Floor(currentlyEditingObject.renderDistance), 50f, 16000f);
+                        var renderDistSlider = GUI.HorizontalSlider(new Rect(0, 240, 350, 20), Mathf.Floor(currentlyEditingObject.renderDistance), 50f, 24000f);
                         if (renderDistSlider != currentlyEditingObject.renderDistance)
                         {
                             currentlyEditingObject.renderDistance = renderDistSlider;
@@ -2825,6 +2882,19 @@ namespace ProceduralObjects
                         }
                         GUI.Label(new Rect(129, 24, 52, 40), ProceduralTool.scaleVertices.m_texture);
                         GUI.Label(new Rect(127, 56, 56, 22), (verticesToolType == 2 ? "<color=red><b>" : "") + LocalizationManager.instance.current["scale_obj"] + (verticesToolType == 2 ? "</b></color>" : ""));
+
+                        // draw
+                        if (currentlyEditingObject.IsPloppableSrfCircle())
+                        {
+                            if (GUI.Button(new Rect(189, 25, 58, 52), string.Empty))
+                            {
+                                PlaySound();
+                                verticesToolType = 3;
+                                drawWizardData = new DrawWizardData(currentlyEditingObject);
+                            }
+                            GUI.Label(new Rect(192, 24, 52, 40), ProceduralTool.draw.m_texture);
+                            GUI.Label(new Rect(190, 56, 56, 22), (verticesToolType == 3 ? "<color=red><b>" : "") + LocalizationManager.instance.current["draw"] + (verticesToolType == 3 ? "</b></color>" : ""));
+                        }
                         GUI.skin.label.alignment = prevAlign;
 
                         GUIUtils.DrawSeparator(new Vector2(0, 80), 380);
@@ -2838,7 +2908,7 @@ namespace ProceduralObjects
                         // PO actions
                         for (int i = 0; i < POToolAction.actions.Count; i++)
                         {
-                            POToolAction.actions[i].ActionButton(new Rect(0, 29 + i * 26, 375, 24), currentlyEditingObject, editingVertexIndex, tempVerticesBuffer, Apply);
+                            POToolAction.actions[i].ActionButton(new Rect(0, 29 + i * 26, 375, 24), currentlyEditingObject, editingVertexIndex, currentlyEditingObject.vertices, Apply);
                         }
 
                         GUIUtils.DrawSeparator(new Vector2(0, heightDueToCTA - 5), 380);
@@ -2904,6 +2974,10 @@ namespace ProceduralObjects
                             new SelectionModeTab("layers", 0, () => {
                                     layerManager.winRect.position = new Vector2(window.x + 400, window.y);
                                     layerManager.showWindow = !layerManager.showWindow; } ),
+                            new SelectionModeTab("measurmt", 7, () => {
+                                    measurementsManager.window.position = new Vector2(window.x + 400, window.y);
+                                    if (measurementsManager.showWindow) measurementsManager.CloseWindow();
+                                    else measurementsManager.showWindow = true; } ),
                             new SelectionModeTab("saved_pobjs", 1, () => {
                                 if (showExternals)
                                     CloseExternalsWindow();
@@ -2981,6 +3055,39 @@ namespace ProceduralObjects
                 }
                 else
                 {
+                    /*
+                    if (reselectingTex)
+                    {
+                        string label = "";
+                        if (currentlyEditingObject.baseInfoType == "PROP")
+                            label = LocalizationManager.instance.current["choose_tex_to_apply"] + " \"" + currentlyEditingObject._baseProp.GetLocalizedTitle() + "\"";
+                        else if (currentlyEditingObject.baseInfoType == "BUILDING")
+                            label = LocalizationManager.instance.current["choose_tex_to_apply"] + " \"" + currentlyEditingObject._baseBuilding.GetLocalizedTitle() + "\"";
+                        GUI.Label(new Rect(10, 30, 350, 39), label);
+                        // Texture selection
+                        Texture tex = null;
+                        if (GUIUtils.TextureSelector(new Rect(10, 70, 380, 320), ref scrollTextures, out tex))
+                        {
+                            editingVertex = false;
+                            editingVertexIndex.Clear();
+                            editingWholeModel = false;
+                            proceduralTool = false;
+                            ToolHelper.FullySetTool<DefaultTool>();
+                            Gizmos.DestroyGizmo();
+                            SpawnObject(chosenProceduralInfo, tex);
+                            currentlyEditingObject.vertices = Vertex.CreateVertexList(currentlyEditingObject);
+                            ToolHelper.FullySetTool<ProceduralTool>();
+                            proceduralTool = true;
+                            movingWholeModel = true;
+                            toolAction = ToolAction.build;
+                            placingSelection = false;
+                            editingVertex = false;
+                            chosenProceduralInfo = null;
+                            TextureManager.instance.MinimizeAll();
+                            reselectingTex = false;
+                        }
+                    } */
+
                     string label = "";
                     if (reselectingTex)
                     {
@@ -3020,7 +3127,7 @@ namespace ProceduralObjects
                             ToolHelper.FullySetTool<DefaultTool>();
                             Gizmos.DestroyGizmo();
                             SpawnObject(chosenProceduralInfo, tex);
-                            tempVerticesBuffer = Vertex.CreateVertexList(currentlyEditingObject);
+                            currentlyEditingObject.vertices = Vertex.CreateVertexList(currentlyEditingObject);
                             ToolHelper.FullySetTool<ProceduralTool>();
                             proceduralTool = true;
                             movingWholeModel = true;
@@ -3077,13 +3184,26 @@ namespace ProceduralObjects
                                     if (ok)
                                     {
                                         pObjSelection.Clear();
+                                        selectedGroup = null;
                                         external.CreateClipboard();
-                                        foreach (var cache in ((external.m_externalType == ClipboardProceduralObjects.ClipboardType.Single) ? new List<CacheProceduralObject>() { external.m_object } : external.m_selection.selection_objects.Keys.ToList()))
+                                        if (external.m_externalType == ClipboardProceduralObjects.ClipboardType.Single)
                                         {
-                                            var obj = PlaceCacheObject(cache, false);
-                                            obj.m_position = cache._staticPos;
+                                            var obj = PlaceCacheObject(external.m_object, false);
+                                            obj.m_position = external.m_object._staticPos;
                                             pObjSelection.Add(obj);
                                         }
+                                        else if (external.m_externalType == ClipboardProceduralObjects.ClipboardType.Selection)
+                                        {
+                                            var created = new Dictionary<CacheProceduralObject, ProceduralObject>();
+                                            foreach (var cache in external.m_selection.selection_objects.Keys.ToList())
+                                            {
+                                                var obj = PlaceCacheObject(cache, false);
+                                                obj.m_position = cache._staticPos;
+                                                pObjSelection.Add(obj);
+                                                created.Add(cache, obj);
+                                            }
+                                            external.m_selection.RecreateGroups(created);
+                                        }                                        
                                         movingWholeModel = false;
                                         toolAction = ToolAction.none;
                                         placingSelection = false;
@@ -3093,11 +3213,7 @@ namespace ProceduralObjects
                             }
                             else
                             {
-                                external.CreateClipboard();
-                                if (external.m_externalType == ClipboardProceduralObjects.ClipboardType.Single)
-                                    PlaceCacheObject(external.m_object, true);
-                                else
-                                    Paste(external.m_selection);
+                                PlaceExternal(external);
                             }
                         }
                     }
@@ -3138,33 +3254,7 @@ namespace ProceduralObjects
 
         public void Apply()
         {
-            List<Vector3> posArray = new List<Vector3>(tempVerticesBuffer.GetPositionsArray());
-            // sets mesh renderer vertices
-            currentlyEditingObject.m_mesh.SetVertices(posArray);
-            currentlyEditingObject.RecalculateBoundsNormalsExtras(currentlyEditingObject.meshStatus);
-
-            // call Modules' OnApplyModelChange()
-            if (currentlyEditingObject.m_modules != null)
-            {
-                if (currentlyEditingObject.m_modules.Count > 0)
-                {
-                    foreach (var m in currentlyEditingObject.m_modules)
-                    {
-                        try { m.OnApplyModelChange(tempVerticesBuffer); }
-                        catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module OnApplyModelChange() method!\n" + e); }
-                    }
-                }
-            }
-
-            // UV map recalculation
-            if (currentlyEditingObject.RequiresUVRecalculation && !currentlyEditingObject.disableRecalculation)
-            {
-                try { currentlyEditingObject.m_mesh.uv = Vertex.RecalculateUVMap(currentlyEditingObject, tempVerticesBuffer); }
-                catch { Debug.LogError("[ProceduralObjects] Error : Couldn't recalculate UV map on a procedural object of type " + currentlyEditingObject.basePrefabName + " (" + currentlyEditingObject.baseInfoType + ")"); }
-            }
-
-            // render distance calculation
-            currentlyEditingObject.renderDistance = RenderOptions.instance.CalculateRenderDistance(currentlyEditingObject, false);
+            currentlyEditingObject.ApplyModelChange();
         }
         public ProceduralObject SpawnObject(ProceduralInfo infoBase, Texture customTex = null)
         {
@@ -3186,7 +3276,6 @@ namespace ProceduralObjects
             if (setCurrentlyEditing)
             {
                 SetCurrentlyEditingObj(obj);
-                tempVerticesBuffer = Vertex.CreateVertexList(obj);
             }
             movingWholeModel = true;
             toolAction = ToolAction.build;
@@ -3198,58 +3287,75 @@ namespace ProceduralObjects
                 if (obj.RequiresUVRecalculation && !obj.disableRecalculation)
                 {
                     if (obj == currentlyEditingObject)
-                        obj.m_mesh.uv = Vertex.RecalculateUVMap(obj, tempVerticesBuffer);
+                        obj.m_mesh.uv = Vertex.RecalculateUVMap(obj, currentlyEditingObject.vertices);
                     else
                         obj.m_mesh.uv = Vertex.RecalculateUVMap(obj, Vertex.CreateVertexList(obj));
                 }
             }
             return obj;
         }
+        public void PlaceExternal(ExternalInfo external)
+        {
+            external.CreateClipboard();
+            if (external.m_externalType == ClipboardProceduralObjects.ClipboardType.Single)
+                PlaceCacheObject(external.m_object, true);
+            else
+            {
+                selectedGroup = null;
+                ToolHelper.FullySetTool<ProceduralTool>();
+                ToolsModifierControl.mainToolbar.CloseEverything();
+                Paste(external.m_selection);
+            }
+        }
         public ProceduralObject CloneObject(ProceduralObject source)
         {
-            var obj = new ProceduralObject()
-            {
-                id = proceduralObjects.GetNextUnusedId(),
-                m_material = GameObject.Instantiate(source.m_material),
-                m_position = source.m_position,
-                m_rotation = source.m_rotation,
-                customTexture = source.customTexture,
-                layer = source.layer,
-                tilingFactor = source.tilingFactor,
-                renderDistance = source.renderDistance,
-                m_scale = source.m_scale,
-                isPloppableAsphalt = source.isPloppableAsphalt,
-                disableRecalculation = source.disableRecalculation,
-                m_textParameters = (source.m_textParameters == null) ? null : TextParameters.Clone(source.m_textParameters, false),
-                basePrefabName = source.basePrefabName,
-                baseInfoType = source.baseInfoType,
-                _baseProp = source._baseProp,
-                _baseBuilding = source._baseBuilding,
-                m_visibility = source.m_visibility,
-                flipFaces = source.flipFaces,
-                normalsRecalcMode = source.normalsRecalcMode,
-                halfOverlayDiam = source.halfOverlayDiam,
-                m_color = source.m_color
-            };
+            var obj = new ProceduralObject();
+            obj.id = proceduralObjects.GetNextUnusedId();
+            CloneIntoObject(source, obj);
+            proceduralObjects.Add(obj);
+            return obj;
+        }
+        public void CloneIntoObject(ProceduralObject source, ProceduralObject destination)
+        {
+            // destination.id = proceduralObjects.GetNextUnusedId();
+            destination.m_material = GameObject.Instantiate(source.m_material);
+            destination.m_position = source.m_position;
+            destination.m_rotation = source.m_rotation;
+            destination.customTexture = source.customTexture;
+            destination.layer = source.layer;
+            destination.tilingFactor = source.tilingFactor;
+            destination.renderDistance = source.renderDistance;
+            destination.m_scale = source.m_scale;
+            destination.isPloppableAsphalt = source.isPloppableAsphalt;
+            destination.disableRecalculation = source.disableRecalculation;
+            destination.m_textParameters = (source.m_textParameters == null) ? null : TextParameters.Clone(source.m_textParameters, false);
+            destination.basePrefabName = source.basePrefabName;
+            destination.baseInfoType = source.baseInfoType;
+            destination._baseProp = source._baseProp;
+            destination._baseBuilding = source._baseBuilding;
+            destination.m_visibility = source.m_visibility;
+            destination.flipFaces = source.flipFaces;
+            destination.normalsRecalcMode = source.normalsRecalcMode;
+            destination.halfOverlayDiam = source.halfOverlayDiam;
+            destination.m_color = source.m_color;
+
             if (source.meshStatus == 1 && source.baseInfoType == "PROP")
             {
-                obj.m_mesh = source._baseProp.m_mesh;
-                obj.meshStatus = 1;
+                destination.m_mesh = source._baseProp.m_mesh;
+                destination.meshStatus = 1;
             }
             else
             {
-                obj.m_mesh = source.m_mesh.InstantiateMesh();
-                obj.meshStatus = 2;
+                destination.m_mesh = source.m_mesh.InstantiateMesh();
+                destination.meshStatus = 2;
             }
-            if (obj.isPloppableAsphalt)
-                obj.m_correctedMeshPloppableAsph = source.m_correctedMeshPloppableAsph.InstantiateMesh();
-
-            obj.m_material.color = obj.m_color;
-            obj.allVertices = obj.m_mesh.vertices;
-            obj.historyEditionBuffer = new HistoryBuffer(obj);
-            obj.m_modules = (source.m_modules == null) ? new List<POModule>() : ModuleManager.instance.CloneModuleList(source.m_modules, obj);
-            proceduralObjects.Add(obj);
-            return obj;
+            if (destination.isPloppableAsphalt)
+                destination.m_correctedMeshPloppableAsph = source.m_correctedMeshPloppableAsph.InstantiateMesh();
+            destination.vertices = Vertex.CreateVertexList(destination);
+            destination.m_material.color = destination.m_color;
+            destination.historyEditionBuffer = new HistoryBuffer(destination);
+            destination.m_modules = (source.m_modules == null) ? new List<POModule>() : ModuleManager.instance.CloneModuleList(source.m_modules, destination);
+            // proceduralObjects.Add(obj);
         }
         public void SwitchToMainTool(byte mode = 0)
         {
@@ -3271,6 +3377,7 @@ namespace ProceduralObjects
             }
             editingVertex = false;
             editingWholeModel = true;
+            drawWizardData = null;
         }
         public void SwitchActionMode()
         {
@@ -3295,6 +3402,9 @@ namespace ProceduralObjects
             textManager.CloseWindow();
             advEdManager = null;
             moduleManager.CloseWindow(false);
+            if (drawWizardData != null)
+                drawWizardData.Confirm();
+            drawWizardData = null;
             CloseExternalsWindow();
             toolAction = ToolAction.none;
             ToolHelper.FullySetTool<ProceduralTool>();
@@ -3317,11 +3427,15 @@ namespace ProceduralObjects
             advEdManager = null;
             CloseExternalsWindow();
             SelectionModeAction.CloseAction();
+            ProceduralUtils.UpdatePloppableAsphaltCfg();
             editingVertex = false;
             editingVertexIndex.Clear();
             editingWholeModel = false;
             proceduralTool = false;
             reselectingTex = false;
+            if (drawWizardData != null)
+                drawWizardData.Confirm();
+            drawWizardData = null;
             SetCurrentlyEditingObj(null);
             chosenProceduralInfo = null;
             rotWizardData = null;
@@ -3350,7 +3464,6 @@ namespace ProceduralObjects
             obj.MakeUniqueMesh();
             SetCurrentlyEditingObj(obj);
             pObjSelection.Clear();
-            tempVerticesBuffer = Vertex.CreateVertexList(currentlyEditingObject);
             CloseAllSMWindows();
             proceduralTool = true;
             SingleHoveredObj = null;
@@ -3363,6 +3476,14 @@ namespace ProceduralObjects
         {
             if (proceduralTool && !movingWholeModel && currentlyEditingObject != null) // leave edit mode
             { 
+                if (textManager != null)
+                {
+                    if (textManager.showWindow)
+                    {
+                        textManager.CloseWindow();
+                        return;
+                    }
+                }
                 EditModeBack();
                 return;
             }
@@ -3450,22 +3571,28 @@ namespace ProceduralObjects
         }
         public void CallConvertToPO(ToolBase tool)
         {
-            /*
-            var isBuilding = tool.GetType() == typeof(BuildingTool);
-            BuildingInfo.SubInfo[] subbuildings = new BuildingInfo.SubInfo[] {};
-            if (isBuilding)
-                subbuildings = ((BuildingTool)ToolsModifierControl.toolController.CurrentTool).m_prefab.m_subBuildings; */
             var type = tool.GetType();
             bool convertible = true;
+
+            string assetname = "";
             if (type == typeof(PropTool))
             {
-                if (!((PropTool)tool).m_prefab.m_mesh.isReadable)
+                var prop = ((PropTool)tool).m_prefab;
+                assetname = prop.name;
+                if (!prop.m_mesh.isReadable)
                     convertible = false;
             }
             else if (type == typeof(BuildingTool))
             {
-                if (!((BuildingTool)tool).m_prefab.m_mesh.isReadable)
+                var building = ((BuildingTool)tool);
+                assetname = building.name;
+                if (!building.m_prefab.m_mesh.isReadable)
                     convertible = false;
+            }
+            if (ExPObjManager.m_defaultPOsUponConversion.ContainsKey(assetname))
+            {
+                PlaceExternal(ExPObjManager.m_defaultPOsUponConversion[assetname]);
+                return;
             }
 
             if (convertible)
@@ -3658,7 +3785,7 @@ namespace ProceduralObjects
             {
                 ProceduralObject obj = objects[i];
                 if (registerHistory)
-                    obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.moveTo, tempVerticesBuffer);
+                    obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.moveTo, obj.vertices);
                 if (i == 0)
                 {
                     SetCurrentlyEditingObj(obj);
@@ -3689,7 +3816,7 @@ namespace ProceduralObjects
                     new EffectInfo.SpawnArea(currentlyEditingObject.m_position, Vector3.up, 10f), Vector3.zero, 0f, 1f, Singleton<AudioManager>.instance.DefaultGroup, 0u, true);
                 for (int i = 0; i < proceduralObjects.Count; i++)
                 {
-                    proceduralObjects[i].historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                    proceduralObjects[i].historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                     if (proceduralObjects[i] == currentlyEditingObject)
                         continue;
                     if (proceduralObjects[i].tempObj == null)
@@ -3709,7 +3836,7 @@ namespace ProceduralObjects
             }
             else
             {
-                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(tempVerticesBuffer);
+                currentlyEditingObject.historyEditionBuffer.ConfirmNewStep(currentlyEditingObject.vertices);
                 pObjSelection.Clear();
                 Singleton<EffectManager>.instance.DispatchEffect(Singleton<BuildingManager>.instance.m_properties.m_placementEffect,
                     new EffectInfo.SpawnArea(currentlyEditingObject.m_position, Vector3.up, 10f), Vector3.zero, 0f, 1f, Singleton<AudioManager>.instance.DefaultGroup, 0u, true);
@@ -3743,24 +3870,24 @@ namespace ProceduralObjects
         private void Undo()
         {
             Vertex[] buffer;
-            var type = currentlyEditingObject.historyEditionBuffer.UndoLastStep(tempVerticesBuffer, out buffer);
+            var type = currentlyEditingObject.historyEditionBuffer.UndoLastStep(currentlyEditingObject.vertices, out buffer);
             if (type == EditingStep.StepType.vertices || type == EditingStep.StepType.mirrorX || type == EditingStep.StepType.mirrorY || type == EditingStep.StepType.mirrorZ
                  || type == EditingStep.StepType.stretchX || type == EditingStep.StepType.stretchY || type == EditingStep.StepType.stretchZ)
             {
                 if (type == EditingStep.StepType.vertices)
-                    tempVerticesBuffer = buffer;
+                    currentlyEditingObject.vertices = buffer;
                 Apply();
             }
         }
         private void Redo()
         {
             Vertex[] buffer;
-            var type = currentlyEditingObject.historyEditionBuffer.RedoUndoneStep(tempVerticesBuffer, out buffer);
+            var type = currentlyEditingObject.historyEditionBuffer.RedoUndoneStep(currentlyEditingObject.vertices, out buffer);
             if (type == EditingStep.StepType.vertices || type == EditingStep.StepType.mirrorX || type == EditingStep.StepType.mirrorY || type == EditingStep.StepType.mirrorZ
                  || type == EditingStep.StepType.stretchX || type == EditingStep.StepType.stretchY || type == EditingStep.StepType.stretchZ)
             {
                 if (type == EditingStep.StepType.vertices)
-                    tempVerticesBuffer = buffer;
+                    currentlyEditingObject.vertices = buffer;
                 Apply();
             }
         }
@@ -3816,7 +3943,7 @@ namespace ProceduralObjects
             }
 
         }
-        private void ClosePO()
+        private void ClosePO(bool fromPauseMenu = false)
         {
             ResetLayerScrollmenu();
             CloseExternalsWindow();
@@ -3824,6 +3951,7 @@ namespace ProceduralObjects
             fontManager.showWindow = false;
             moduleManager.CloseWindow(true);
             moduleManager.showManagerWindow = false;
+            measurementsManager.CloseWindow();
             toolAction = ToolAction.none;
             editingVertex = false;
             editingVertexIndex.Clear();
@@ -3837,6 +3965,7 @@ namespace ProceduralObjects
             selectedGroup = null;
             selectingNewGrpRoot = false;
             vertWizardData = null;
+            drawWizardData = null;
             pObjSelection.Clear();
             SelectionModeAction.CloseAction();
             tabSwitchTimer = 0;
@@ -3847,7 +3976,8 @@ namespace ProceduralObjects
             POStatisticsManager.instance.showWindow = false;
             Gizmos.DestroyGizmo();
             GUIUtils.SetMouseScroll(true);
-            ColossalFramework.UI.UIView.SetFocus(null);
+            if (!fromPauseMenu)
+                ColossalFramework.UI.UIView.SetFocus(null);
             if (FindObjectOfType<ToolController>().CurrentTool is ProceduralTool)
             {
                 ToolHelper.FullySetTool<DefaultTool>();
@@ -3873,6 +4003,10 @@ namespace ProceduralObjects
             if (ModuleManager.instance.showWindow)
             {
                 if (ModuleManager.instance.windowRect.Contains(pos)) return true;
+            }
+            if (MeasurementsManager.instance.showWindow)
+            {
+                if (MeasurementsManager.instance.window.Contains(pos)) return true;
             }
             if (FontManager.instance.showWindow)
             {

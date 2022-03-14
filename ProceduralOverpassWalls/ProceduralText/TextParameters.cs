@@ -173,6 +173,7 @@ namespace ProceduralObjects.ProceduralText
             m_spacing = 2;
             m_style = FontStyle.Normal;
             m_fontColor = Color.white;
+            borderColor = Color.white;
             x = 0f;
             y = 0f;
             m_scaleX = 1f;
@@ -181,13 +182,13 @@ namespace ProceduralObjects.ProceduralText
         }
 
         public string m_text, m_fontName;
-        public uint m_spacing, m_fontSize, m_width, m_height;
+        public uint m_spacing, m_fontSize, m_width, m_height, borderSize;
         public byte m_rotation, m_type;
         public FontStyle m_style;
         public float x, y, m_scaleX, m_scaleY;
         // formerly used as a 4 components item (RGBA), only for serialization
         public SerializableQuaternion serializableColor;
-        public SerializableColor m_fontColor;
+        public SerializableColor m_fontColor, borderColor;
         [NonSerialized]
         public TextureFont m_font;
         [NonSerialized]
@@ -197,7 +198,7 @@ namespace ProceduralObjects.ProceduralText
         [NonSerialized]
         public bool locked;
         [NonSerialized]
-        public GUIPainter painter;
+        public GUIPainter painter, borderPainter;
         [NonSerialized]
         public GUIUtils.FloatInputField posXfield, posYfield, sizeField, heightField, widthField;
         [NonSerialized]
@@ -234,7 +235,7 @@ namespace ProceduralObjects.ProceduralText
             }
             if (textManager.parameters.CanFieldMoveUp(this))
             {
-                if (GUI.Button(new Rect(158, 3, 25, 12), ProceduralObjectsMod.Icons[6]))
+                if (GUI.Button(new Rect(158, 15.5f, 25, 12), ProceduralObjectsMod.Icons[7]))
                 {
                     ProceduralObjectsLogic.PlaySound();
                     textManager.parameters.MoveFieldUp(this);
@@ -242,7 +243,7 @@ namespace ProceduralObjects.ProceduralText
             }
             if (textManager.parameters.CanFieldMoveDown(this))
             {
-                if (GUI.Button(new Rect(158, 15.5f, 25, 12), ProceduralObjectsMod.Icons[7]))
+                if (GUI.Button(new Rect(158, 3, 25, 12), ProceduralObjectsMod.Icons[6]))
                 {
                     ProceduralObjectsLogic.PlaySound();
                     textManager.parameters.MoveFieldDown(this);
@@ -279,6 +280,12 @@ namespace ProceduralObjects.ProceduralText
         {
             // GUI.Box(rect, string.Empty);
             GUI.BeginGroup(rect);
+            // copy
+            if (GUI.Button(new Rect(220, 3, 25, 23), ProceduralObjectsMod.Icons[15]))
+            {
+                ProceduralObjectsLogic.PlaySound();
+                textManager.copiedField = TextField.Clone(this, false);
+            }
             if (m_type == 0)
             {
                 if (!m_font.m_disableColorOverwriting)
@@ -293,7 +300,8 @@ namespace ProceduralObjects.ProceduralText
                                 textManager.colorPickerSelected = painter;
                         });
                 }
-                m_text = GUI.TextField(new Rect(m_font.m_disableColorOverwriting ? 3 : 31, 3, m_font.m_disableColorOverwriting ? 240 : 212, 25), m_text);
+                GUI.SetNextControlName("TextFieldPOTextCustom");
+                m_text = GUI.TextField(new Rect(m_font.m_disableColorOverwriting ? 3 : 31, 3, m_font.m_disableColorOverwriting ? 214 : 186, 25), m_text);
             }
             else // if m_type == 1
             {
@@ -310,7 +318,7 @@ namespace ProceduralObjects.ProceduralText
                         else
                             textManager.colorPickerSelected = painter;
                     });
-                GUI.Label(new Rect(30, 5, 210, 23), LocalizationManager.instance.current["colorRect"]);
+                GUI.Label(new Rect(30, 5, 190, 23), LocalizationManager.instance.current["colorRect"]);
             }
 
 
@@ -369,41 +377,6 @@ namespace ProceduralObjects.ProceduralText
                         scrollFontsPos = Vector2.zero;
                     }
                 }
-                /*
-                if (textManager.fontManager.previousFontExists(m_font))
-                {
-                    if (GUI.Button(new Rect(4, 145, 26, 25), "◄"))
-                    {
-                        ProceduralObjectsLogic.PlaySound();
-                        SetFont(textManager.fontManager.GetPreviousFont(m_font));
-                    }
-                }
-                else
-                {
-              //    GUI.skin.box.normal.textColor = TextCustomizationManager.inactiveGrey;
-                    GUI.Label(new Rect(4, 145, 26, 25), "◄", GUI.skin.box);
-                    GUI.skin.box.normal.textColor = Color.white;
-                }
-                if (GUI.Button(new Rect(30, 145, 147, 25), m_fontName))
-                {
-                    ProceduralObjectsLogic.PlaySound();
-                    openCharTable.Invoke(m_font);
-                }
-                if (textManager.fontManager.nextFontExists(m_font))
-                {
-                    if (GUI.Button(new Rect(177, 145, 26, 25), "►"))
-                    {
-                        ProceduralObjectsLogic.PlaySound();
-                        SetFont(textManager.fontManager.GetNextFont(m_font));
-                    }
-                }
-                else
-                {
-              //    GUI.skin.box.normal.textColor = TextCustomizationManager.inactiveGrey;
-                    GUI.Label(new Rect(177, 145, 26, 25), "►", GUI.skin.box);
-                    GUI.skin.box.normal.textColor = Color.white;
-                }
-                 * */
             }
             else if (m_type == 1) // COLOR RECT
             {
@@ -420,6 +393,19 @@ namespace ProceduralObjects.ProceduralText
 
                 GUI.Label(new Rect(4, 154, 100, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_opacity"] + " : " + ((int)(m_fontColor.a * 100)).ToString() + "%</size>");
                 m_fontColor.a = GUI.HorizontalSlider(new Rect(4, 176, 200, 25), m_fontColor.a, 0f, 1f);
+
+                if (borderColor == null) borderColor = Color.white;
+                GUI.Label(new Rect(4, 193, 100, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_border"] + " : " + borderSize.ToString() + " px</size>");
+                borderSize = (uint)Mathf.RoundToInt(GUI.HorizontalSlider(new Rect(4, 215, 200, 25), borderSize, 0f, 20f));
+                borderPainter = GUIPainter.DrawPainterSampleOnly(borderPainter, new Vector2(214, 198), borderColor,
+                    (c) => { borderColor = c; },
+                    () =>
+                    {
+                        if (textManager.colorPickerSelected == borderPainter)
+                            textManager.colorPickerSelected = null;
+                        else
+                            textManager.colorPickerSelected = borderPainter;
+                    });
             }
 
             // POSITION
@@ -499,6 +485,8 @@ namespace ProceduralObjects.ProceduralText
             field.m_scaleY = fieldSource.m_scaleY;
             field.m_width = fieldSource.m_width;
             field.m_height = fieldSource.m_height;
+            field.borderSize = fieldSource.borderSize;
+            field.borderColor = new SerializableColor(fieldSource.borderColor);
             if (field.m_type == 0)
             {
                 if (useFontname)
@@ -519,6 +507,10 @@ namespace ProceduralObjects.ProceduralText
                 return true;
             if (A.m_fontSize != B.m_fontSize)
                 return true;
+            if (A.m_height != B.m_height)
+                return true;
+            if (A.m_width != B.m_width)
+                return true;
             if (SerializableColor.Different(A.m_fontColor, B.m_fontColor))
                 return true;
             if (A.m_spacing != B.m_spacing)
@@ -533,9 +525,9 @@ namespace ProceduralObjects.ProceduralText
                 return true;
             if (A.m_scaleY != B.m_scaleY)
                 return true;
-            if (A.m_height != B.m_height)
+            if (A.borderSize != B.borderSize)
                 return true;
-            if (A.m_width != B.m_width)
+            if (SerializableColor.Different(A.borderColor, B.borderColor))
                 return true;
             return false;
         }
@@ -547,7 +539,7 @@ namespace ProceduralObjects.ProceduralText
                             " m_rotation:" + field.m_rotation.ToString() + " m_fontcolor:" + field.m_fontColor.ToString() + " m_text:" + field.m_text;
             else // if (m_type == 1)
                 return "colorRect: m_x:" + field.x.ToString() + " m_y:" + field.y.ToString() + " m_width:" + field.m_width.ToString() + " m_height:" + field.m_height.ToString() +
-                            " m_color:" + field.m_fontColor.ToString();
+                    (field.borderSize > 0 ? " m_borderSize:" + field.borderSize.ToString() + " m_borderColor:" + field.borderColor.ToString() : "") + " m_color:" + field.m_fontColor.ToString();
         }
         public static TextField ParseText(string s, FontManager fManager)
         {
@@ -588,10 +580,16 @@ namespace ProceduralObjects.ProceduralText
             try
             {
                 TextField f = new TextField(1);
+                bool includesborder = s.Contains(" m_borderSize:");
                 f.x = float.Parse(s.GetStringBetween(" m_x:", " m_y:"));
                 f.y = float.Parse(s.GetStringBetween(" m_y:", " m_width:"));
                 f.m_width = uint.Parse(s.GetStringBetween(" m_width:", " m_height:"));
-                f.m_height = uint.Parse(s.GetStringBetween(" m_height:", " m_color:"));
+                f.m_height = uint.Parse(s.GetStringBetween(" m_height:", includesborder ? " m_borderSize:" : " m_color:"));
+                if (includesborder)
+                {
+                    f.borderSize = byte.Parse(s.GetStringBetween(" m_borderSize:", " m_borderColor:"));
+                    f.borderColor = SerializableColor.Parse(s.GetStringBetween(" m_borderColor:", " m_color:"));
+                }
                 f.m_fontColor = SerializableColor.Parse(s.GetStringAfter(" m_color:"));
                 return f;
             }
@@ -607,10 +605,11 @@ namespace ProceduralObjects.ProceduralText
                 m_font.PrintString(texture, m_text, m_style, new Vector2(x, y), m_spacing, m_fontSize, m_fontColor, m_rotation, out texWidth, out texHeight, m_scaleX, m_scaleY);
             else if (m_type == 1)
             {
-                TextureUtils.PrintRectangle(texture, (int)x, (int)y, (int)m_width, (int)m_height, m_fontColor);
+                TextureUtils.PrintRectangle(texture, (int)x, (int)y, (int)m_width, (int)m_height, m_fontColor, (int)borderSize, borderColor);
                 texWidth = (int)m_width;
                 texHeight = (int)m_height;
             }
         }
     }
+
 }

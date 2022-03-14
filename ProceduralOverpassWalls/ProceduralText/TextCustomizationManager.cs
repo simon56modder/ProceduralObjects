@@ -19,14 +19,21 @@ namespace ProceduralObjects.ProceduralText
             editingObject = null;
             showWindow = false;
             fontManager = fManager;
+            placingRect = false;
+            placingText = false;
             updateTimer = 0f;
             dragTimer = 0f;
             zoomFactor = 1f;
             movingField = -1;
+            separatorListEditionZone = 260f;
             dragTexPos = Vector2.zero;
+            placingRectFirstpoint = Vector2.down;
             colorPickerSelected = null;
             selectedField = null;
+            instance = this;
         }
+
+        public static TextCustomizationManager instance;
 
         public Rect windowRect;
         public bool showWindow;
@@ -34,12 +41,16 @@ namespace ProceduralObjects.ProceduralText
         public FontManager fontManager;
         public TextParameters parameters, parametersOld;
         public TextField selectedField;
+        public TextField copiedField;
 
         private Texture2D originalTex;
         public Texture2D windowTex;
         private Vector2 scrollParams, scrollTex, dragTexPos;
-        private float updateTimer, dragTimer, zoomFactor;
+        private float updateTimer, dragTimer, zoomFactor, separatorListEditionZone;
         private int movingField;
+        private bool _justPlacedTextNowFocusField ;
+        private Vector2 placingRectFirstpoint;
+        public bool cursorIsInsideTextureArea, placingText, placingRect;
         public GUIPainter colorPickerSelected;
 
         public TextureFont selectedCharTable = null;
@@ -76,39 +87,101 @@ namespace ProceduralObjects.ProceduralText
                     GUIPainter.UpdatePainter(colorPickerSelected, () => { colorPickerSelected = null; });
                 }
 
-                if (dragTimer < .14f)
+                if (dragTimer < .14f && dragTimer != 0f)
                     dragTimer += TimeUtils.deltaTime;
                 if (new Rect(windowRect.x + 5, windowRect.y + 30, windowRect.width - 285, windowRect.height - 80).IsMouseInside())
                 {
-                    if (movingField > -1)
+                    cursorIsInsideTextureArea = true;
+                    if (Input.GetKey(KeyCode.LeftControl))
                     {
-                        parameters[movingField].x = ((mousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor) - dragTexPos.x;
-                        parameters[movingField].y = ((mousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor) - dragTexPos.y;
+                        zoomFactor *= 1f + Input.mouseScrollDelta.y * 0.3f;
+                    }
+
+                    if (placingText)
+                    {
                         if (Input.GetMouseButtonDown(0))
                         {
-                            ProceduralObjectsLogic.PlaySound();
-                            dragTexPos = Vector2.zero;
-                            movingField = -1;
+                            var field = parameters.AddField(fontManager.Arial, 0);
+                            field.x = (mousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor;
+                            field.y = (mousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor;
+                            selectedField = field;
+                            placingText = false;
+                            _justPlacedTextNowFocusField = true;
                         }
                     }
-                    else if (movingField == -1)
+                    else if (placingRect)
                     {
-                        if (Input.GetMouseButton(0))
+                        if (placingRectFirstpoint != Vector2.down)
                         {
-                            if (dragTimer >= .14f)
+                            var field = selectedField;
+                            var secondPoint = new Vector2((mousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor,
+                                (mousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor);
+                            field.x = Mathf.Min(placingRectFirstpoint.x, secondPoint.x);
+                            field.y = Mathf.Min(placingRectFirstpoint.y, secondPoint.y);
+                            field.m_width = (uint)Mathf.RoundToInt(Mathf.Abs(secondPoint.x - placingRectFirstpoint.x));
+                            field.m_height = (uint)Mathf.RoundToInt(Mathf.Abs(secondPoint.y - placingRectFirstpoint.y));
+                        }
+                        if (Input.GetMouseButtonDown(0))
+                        {
+                            if (placingRectFirstpoint == Vector2.down)
                             {
-                                if (dragTexPos == Vector2.zero)
-                                    dragTexPos = new Vector2((mousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor, (mousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor);
+                                ProceduralObjectsLogic.PlaySound();
+                                var field = parameters.AddField(fontManager.Arial, 1);
+                                placingRectFirstpoint = new Vector2((mousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor,
+                                    (mousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor);
+                                field.x = placingRectFirstpoint.x;
+                                field.y = placingRectFirstpoint.y;
+                                selectedField = field;
+                            }
+                            else
+                            {
+                                ProceduralObjectsLogic.PlaySound();
+                                placingRectFirstpoint = Vector2.down;
+                                placingRect = false;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (movingField > -1)
+                        {
+                            parameters[movingField].x = ((mousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor) - dragTexPos.x;
+                            parameters[movingField].y = ((mousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor) - dragTexPos.y;
+                            if (Input.GetMouseButtonDown(0))
+                            {
+                                ProceduralObjectsLogic.PlaySound();
+                                dragTexPos = Vector2.zero;
+                                movingField = -1;
+                            }
+                        }
+                        else if (movingField == -1)
+                        {
+                            if (Input.GetMouseButtonDown(0))
+                                dragTimer = 0.0001f;
+                            if (Input.GetMouseButton(0))
+                            {
+                                if (dragTimer >= .14f)
+                                {
+                                    if (dragTexPos == Vector2.zero)
+                                        dragTexPos = new Vector2((mousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor, (mousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor);
+                                }
                             }
                         }
                     }
                 }
+                else
+                    cursorIsInsideTextureArea = false;
+
                 if (Input.GetMouseButton(0))
                 {
                     if (movingField == -2)
                     {
-                        if (mousePos.x > (windowRect.x + 300) && mousePos.y > (windowRect.y + 200))
-                            windowRect.size = mousePos - windowRect.position;
+                        var size = mousePos - windowRect.position;
+                        windowRect.size = new Vector2(Mathf.Max(windowRect.x + 400, size.x), Mathf.Max(windowRect.y + 350, size.y));
+                    }
+                    else if (movingField == -3)
+                    {
+                        separatorListEditionZone = Mathf.Clamp(mousePos.y - windowRect.y, 125, 450);
                     }
                     else if (dragTimer >= .14f)
                     {
@@ -118,7 +191,7 @@ namespace ProceduralObjects.ProceduralText
                 }
                 else if (Input.GetMouseButtonUp(0))
                 {
-                    if (movingField == -2)
+                    if (movingField <= -2)
                         movingField = -1;
                     
                     if (movingField <= -1)
@@ -156,24 +229,28 @@ namespace ProceduralObjects.ProceduralText
                 CloseWindow();
             else
             {
-                // texture display
-                //  GUI.Box(new Rect(5, 30, 390, 300), string.Empty);
-                //  GUI.Label(new Rect(10, 35, 380, 290), windowTex);
-                scrollTex = GUI.BeginScrollView(/*new Rect(5, 30, 390, 300)*/ new Rect(5, 30, windowRect.width - 265, windowRect.height - 60), scrollTex, new Rect(0, 0, windowTex.width * zoomFactor, windowTex.height * zoomFactor));
+                var scrollview = GUI.BeginScrollView(new Rect(5, 30, windowRect.width - 265, windowRect.height - 60), scrollTex, new Rect(0, 0, windowTex.width * zoomFactor, windowTex.height * zoomFactor));
+                if (!Input.GetKey(KeyCode.LeftControl)) 
+                    scrollTex = scrollview;
                 GUI.DrawTexture(new Rect(0, 0, windowTex.width * zoomFactor, windowTex.height * zoomFactor), windowTex as Texture);
 
                 if (movingField == -1)
                 {
-                    for (int i = 0; i < parameters.Count(); i++)
+                    if (!placingRect && !placingText)
                     {
-                        if (parameters[i].locked)
-                            continue;
-                        if (GUI.Button(new Rect(parameters[i].x * zoomFactor, parameters[i].y * zoomFactor, parameters[i].texWidth * zoomFactor, parameters[i].texHeight * zoomFactor), string.Empty, GUI.skin.label))
+                        for (int i = 0; i < parameters.Count(); i++)
                         {
-                            ProceduralObjectsLogic.PlaySound();
-                            dragTexPos = new Vector2(((GUIUtils.MousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor) - parameters[i].x,
-                                ((GUIUtils.MousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor) - parameters[i].y);
-                            movingField = i;
+                            if (parameters[i].locked)
+                                continue;
+                            if (GUI.Button(new Rect(parameters[i].x * zoomFactor, parameters[i].y * zoomFactor, parameters[i].texWidth * zoomFactor, parameters[i].texHeight * zoomFactor), string.Empty, GUI.skin.label))
+                            {
+                                ProceduralObjectsLogic.PlaySound();
+                                dragTexPos = new Vector2(((GUIUtils.MousePos.x - windowRect.x - 5 + scrollTex.x) / zoomFactor) - parameters[i].x,
+                                    ((GUIUtils.MousePos.y - windowRect.y - 30 + scrollTex.y) / zoomFactor) - parameters[i].y);
+                                movingField = i;
+                                placingText = false;
+                                placingRect = false;
+                            }
                         }
                     }
                 }
@@ -188,43 +265,69 @@ namespace ProceduralObjects.ProceduralText
 
                 // parameters box
                 GUI.Label(new Rect(windowRect.width - 255, 32, 260, 27), "<size=17>" + LocalizationManager.instance.current["text_fields"] + "</size>");
+
+                // copy
+                if (copiedField == null)
+                {
+                    GUI.Box(new Rect(windowRect.width - 35, 32, 25, 23), ProceduralObjectsMod.Icons[0]);
+                }
+                else
+                {
+                    if (GUI.Button(new Rect(windowRect.width - 35, 32, 25, 23), ProceduralObjectsMod.Icons[0]))
+                    {
+                        ProceduralObjectsLogic.PlaySound();
+                        selectedField = parameters.AddField(TextField.Clone(copiedField, false));
+                    }
+                }
                 if (parameters.Count() == 0)
-                    GUI.Box(new Rect(windowRect.width - 257, 60, 387, 200), string.Empty);
-                scrollParams = GUI.BeginScrollView(new Rect(windowRect.width - 256, 62, 254, 196), scrollParams, new Rect(0, 0, 235, parameters.Count() * 33 + 69));
+                    GUI.Box(new Rect(windowRect.width - 257, 60, 387, separatorListEditionZone - 60), string.Empty);
+                scrollParams = GUI.BeginScrollView(new Rect(windowRect.width - 256, 62, 254, separatorListEditionZone - 64), scrollParams, new Rect(0, 0, 235, parameters.Count() * 33 + 69));
                 int j = 2;
                 for (int i = 0; i < parameters.Count(); i++)
                 {
-                    if (parameters[i].UIButton(new Vector2(0, j), this, movingField == -1))
+                    var param = parameters[parameters.Count() - i - 1];
+                    if (param.UIButton(new Vector2(0, j), this, movingField == -1))
                     {
-                        if (selectedField == parameters[i])
+                        if (selectedField == param)
                             selectedField = null;
                         else
-                            selectedField = parameters[i];
+                            selectedField = param;
+                        placingRect = false;
+                        placingText = false;
+                        placingRectFirstpoint = Vector2.down;
                     }
                     j += 33;
-                    /* bool minimized = parameters[i].minimized;
-                    parameters[i].DrawUI(new Vector2(3, j), this, ShowCharTable, movingField <= -1);
-                    if (minimized)
-                        j += 33;
-                    else
-                        j += 125; */
                 }
                 if (GUI.Button(new Rect(3, j, 245, 30), "<b>+</b> " + LocalizationManager.instance.current["add_field"]))
                 {
                     ProceduralObjectsLogic.PlaySound();
-                    selectedField = parameters.AddField(fontManager.Arial, 0);
+                    placingText = true;
+                    placingRect = false;
+                    placingRectFirstpoint = Vector2.down;
+                    // selectedField = parameters.AddField(fontManager.Arial, 0);
                 }
                 if (GUI.Button(new Rect(3, j + 33, 245, 30), "<b>+</b> " + LocalizationManager.instance.current["add_color_rect"]))
                 {
                     ProceduralObjectsLogic.PlaySound();
-                    selectedField = parameters.AddField(fontManager.Arial, 1);
+                    placingRect = true;
+                    placingText = false;
+                    placingRectFirstpoint = Vector2.down;
+                    // selectedField = parameters.AddField(fontManager.Arial, 1);
                 }
                 GUI.EndScrollView();
 
-                GUI.Box(new Rect(windowRect.width - 257, 265, 387, windowRect.height - 278), string.Empty);
+                if (GUI.RepeatButton(new Rect(windowRect.width - 257, separatorListEditionZone - 1.5f, 387, 6), string.Empty))
+                    movingField = -3;
+
+                GUI.Box(new Rect(windowRect.width - 257, separatorListEditionZone + 5, 387, windowRect.height - separatorListEditionZone - 18), string.Empty);
                 if (selectedField != null)
                 {
-                    selectedField.DrawUI(new Rect(windowRect.width - 255, 269, 245, windowRect.height - 290), this, ShowCharTable);
+                    selectedField.DrawUI(new Rect(windowRect.width - 255, separatorListEditionZone + 9, 245, windowRect.height - 290), this, ShowCharTable);
+                    if (_justPlacedTextNowFocusField)
+                    {
+                        GUI.FocusControl("TextFieldPOTextCustom");
+                        _justPlacedTextNowFocusField = false;
+                    }
                 }
 
                 if (GUI.RepeatButton(new Rect(windowRect.width - 17, windowRect.height - 12, 16, 11), string.Empty))
@@ -313,6 +416,10 @@ namespace ProceduralObjects.ProceduralText
             scrollTex = Vector2.zero;
             updateTimer = 0f;
             dragTimer = 0f;
+            placingText = false;
+            placingRect = false;
+            _justPlacedTextNowFocusField = false;
+            placingRectFirstpoint = Vector2.down;
             zoomFactor = 1f;
             movingField = -1;
             dragTexPos = Vector2.zero;
@@ -326,7 +433,7 @@ namespace ProceduralObjects.ProceduralText
             scrollTex = Vector2.zero;
             movingField = -1;
             dragTexPos = Vector2.zero;
-            windowRect.position = position;
+         // windowRect.position = position;
             Texture tex = ProceduralUtils.GetOriginalTexture(obj);
             originalTex = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
             originalTex.SetPixels(((Texture2D)tex).GetPixels());

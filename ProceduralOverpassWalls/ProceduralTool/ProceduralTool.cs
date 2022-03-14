@@ -9,13 +9,14 @@ using UnityEngine;
 using ProceduralObjects.Classes;
 using ProceduralObjects.Localization;
 using ProceduralObjects.UI;
+using ProceduralObjects.ProceduralText;
 
 namespace ProceduralObjects.Tools
 {
     public class ProceduralTool : ToolBase
     {
         // basically Empty ATM, all the related code is located in /ProceduralObjectsLogic.cs
-        public static CursorInfo buildCursor = null, terrainLevel = null, terrainShift = null, moveVertices, rotateVertices, scaleVertices;
+        public static CursorInfo buildCursor = null, terrainLevel = null, terrainShift = null, moveVertices, rotateVertices, scaleVertices, draw, textCursor, rectCursor;
         
         public static void CreateCursors()
         {
@@ -36,6 +37,18 @@ namespace ProceduralObjects.Tools
             scaleVertices = ScriptableObject.CreateInstance<CursorInfo>();
             scaleVertices.m_texture = TextureUtils.LoadTextureFromAssembly("CursorScaleVertices");
             scaleVertices.m_hotspot = hotspot;
+
+            textCursor = ScriptableObject.CreateInstance<CursorInfo>();
+            textCursor.m_texture = TextureUtils.LoadTextureFromAssembly("CursorText");
+            textCursor.m_hotspot = hotspot;
+
+            rectCursor = ScriptableObject.CreateInstance<CursorInfo>();
+            rectCursor.m_texture = TextureUtils.LoadTextureFromAssembly("CursorColorRect");
+            rectCursor.m_hotspot = hotspot;
+
+            draw = ScriptableObject.CreateInstance<CursorInfo>();
+            draw.m_texture = TextureUtils.LoadTextureFromAssembly("CursorDraw");
+            draw.m_hotspot = new Vector2(1, 31);
         }
         protected override void OnToolUpdate()
         {
@@ -47,7 +60,17 @@ namespace ProceduralObjects.Tools
                     switch (ProceduralObjectsLogic.axisState)
                     {
                         case AxisEditionState.none:
-                            ToolCursor = (CursorInfo)null;
+                            if (TextCustomizationManager.instance.showWindow && TextCustomizationManager.instance.cursorIsInsideTextureArea)
+                            {
+                                if (TextCustomizationManager.instance.placingText)
+                                    ToolCursor = textCursor;
+                                else if (TextCustomizationManager.instance.placingRect)
+                                    ToolCursor = rectCursor;
+                                else
+                                    ToolCursor = (CursorInfo)null;
+                            }
+                            else
+                                ToolCursor = (CursorInfo)null;
                             break;
                         case AxisEditionState.X:
                         case AxisEditionState.Z:
@@ -85,6 +108,19 @@ namespace ProceduralObjects.Tools
                         base.ShowToolInfo(false, "", Vector3.zero);
                     break;
                 case ToolAction.vertices:
+                    if (TextCustomizationManager.instance.showWindow && TextCustomizationManager.instance.cursorIsInsideTextureArea)
+                    {
+                        if (TextCustomizationManager.instance.placingText)
+                            ToolCursor = textCursor;
+                        else if (TextCustomizationManager.instance.placingRect)
+                            ToolCursor = rectCursor;
+                        else
+                            goto verticesCursorSetup;
+                    }
+                    else
+                        goto verticesCursorSetup;
+                    goto skipVerticesCursorSetup;
+               verticesCursorSetup:
                     switch (ProceduralObjectsLogic.verticesToolType)
                     {
                         case 0:
@@ -96,8 +132,20 @@ namespace ProceduralObjects.Tools
                         case 2:
                             ToolCursor = scaleVertices;
                             break;
+                        case 3:
+                            ToolCursor = draw;
+                            break;
                     }
-                    if (ProceduralObjectsLogic.tabSwitchTimer != 0f)
+               skipVerticesCursorSetup:
+                    if (ProceduralObjectsLogic.instance.drawWizardData != null && ProceduralObjectsLogic.verticesToolType == 3)
+                    {
+                        if (ProceduralObjectsLogic.instance.drawWizardData.points == null)
+                            toolInfo = LocalizationManager.instance.current["drawTool_start"];
+                        else
+                            toolInfo = LocalizationManager.instance.current["drawTool_tooltip"];
+                        base.ShowToolInfo(true, toolInfo, toolInfoPos);
+                    }
+                    else if (ProceduralObjectsLogic.tabSwitchTimer != 0f)
                     {
                         switch (ProceduralObjectsLogic.verticesToolType)
                         {

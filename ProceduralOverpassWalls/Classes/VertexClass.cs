@@ -406,6 +406,16 @@ namespace ProceduralObjects.Classes
                 array[i] = objArray[i].m_position;
             return array;
         }
+        public static float SignedAngle(Vector3 from, Vector3 to, Vector3 axis)
+        {
+            float unsignedAngle = Vector3.Angle(from, to);
+
+            float cross_x = from.y * to.z - from.z * to.y;
+            float cross_y = from.z * to.x - from.x * to.z;
+            float cross_z = from.x * to.y - from.y * to.x;
+            float sign = Mathf.Sign(axis.x * cross_x + axis.y * cross_y + axis.z * cross_z);
+            return unsignedAngle * sign;
+        }
         public static Vector2 AsXZVector2(this Vector3 v)
         {
             return new Vector2(v.x, v.z);
@@ -425,11 +435,6 @@ namespace ProceduralObjects.Classes
                     newList.Add(list[i]);
             }
             return newList;
-        }
-        public static Vector3 WorldToLocalVertexPosition(this Vector3 worldCoord, ProceduralObject obj)
-        {
-            return (worldCoord - obj.m_position);
-            // Vector3 vertexWorldPosition = currentlyEditingObject.gameObject.transform.rotation * (Vector3.Scale(temp_storageVertex[editingVertexIndex[0]].Position, currentlyEditingObject.gameObject.transform.localScale)) + currentlyEditingObject.m_position;
         }
         public static Quaternion Rotate(this Quaternion rot, float x, float y, float z)
         {
@@ -451,7 +456,7 @@ namespace ProceduralObjects.Classes
         }
         public static Vector3 PloppableAsphaltPosition(this Vector3 position)
         {
-            return new Vector3(position.x, position.y, (-position.z) * 2.14f);
+            return new Vector3(position.x, position.y, (-position.z) * 2.2173f);
         }
         public static Vector3 NegativeZ(this Vector3 v)
         {

@@ -43,7 +43,7 @@ namespace ProceduralObjects.SelectionMode
         }
         public void SetRenderDistancesAll(float value)
         {
-            value = Mathf.Clamp(Gizmos.ConvertRoundBackToMeters(value), 50f, 16000f);
+            value = Mathf.Clamp(Gizmos.ConvertRoundBackToMeters(value), 50f, 24000f);
             foreach (var obj in POGroup.AllObjectsInSelection(selection, logic.selectedGroup))
             {
                 if (!obj.renderDistLocked)

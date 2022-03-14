@@ -20,12 +20,16 @@ namespace ProceduralObjects.Classes
             this.selection_objects = new Dictionary<CacheProceduralObject, Vector3>();
             for (int i = 0; i < list.Count; i++)
             {
+                var obj = list[i];
                 Vector3 relativePos;
                 if (i == 0)
                     relativePos = Vector3.zero;
                 else
-                    relativePos = list[i].m_position - list[0].m_position;
-                this.selection_objects.Add(new CacheProceduralObject(list[i]), relativePos);
+                    relativePos = obj.m_position - list[0].m_position;
+                var cachePO = new CacheProceduralObject(obj);
+                cachePO.temp_id = obj.id;
+                cachePO.parent = -1;
+                this.selection_objects.Add(cachePO, relativePos);
             }
             if (selectedGroup != null)
             {
@@ -38,15 +42,15 @@ namespace ProceduralObjects.Classes
                 for (int i = 0; i < list.Count; i++)
                 {
                     var obj = list[i];
-                    if (obj.group != null)
-                    {
-                        if (obj.isRootOfGroup)
-                            continue;
-                        if (!list.Contains(obj.group.root))
-                            continue;
-                        groupInformation.Add(selection_objects.Keys.ToList()[i], 
-                            selection_objects.Keys.ToList()[list.IndexOf(obj.group.root)]);
-                    }
+                    if (obj.group == null)
+                        continue;
+                    if (obj.isRootOfGroup)
+                        continue;
+                    if (!list.Contains(obj.group.root))
+                        continue;
+                    groupInformation.Add(selection_objects.Keys.ToList()[i],
+                        selection_objects.Keys.ToList()[list.IndexOf(obj.group.root)]);
+                    selection_objects.Keys.ToList()[i].parent = obj.group.root.id;
                 }
             }
         }
@@ -73,7 +77,6 @@ namespace ProceduralObjects.Classes
                     var group = POGroup.CreateGroupWithRoot(createdObjects[groupInformation[kvp.Key]]);
                     ProceduralObjectsLogic.instance.groups.Add(group);
                 }
-
                 createdObjects[groupInformation[kvp.Key]].group.AddToGroup(kvp.Value);
             }
         }
@@ -103,6 +106,7 @@ namespace ProceduralObjects.Classes
                     tw.WriteLine("relativePosition = " + kvp.Value.ToStringUnrounded());
                 tw.WriteLine("isPloppableAsphalt = " + kvp.Key.isPloppableAsphalt.ToString());
                 //  tw.WriteLine("scale = " + pobj.scale.ToString());
+                tw.WriteLine("parenting = " + kvp.Key.temp_id + ";" + kvp.Key.parent);
                 tw.WriteLine("customTexture = " + ((kvp.Key.customTexture == null) ? "null" : kvp.Key.customTexture.name));
                 tw.WriteLine("renderDistance = " + kvp.Key.renderDistance.ToString());
                 tw.WriteLine("renderDistLocked = " + kvp.Key.renderDistLocked.ToString());
@@ -142,6 +146,8 @@ namespace ProceduralObjects.Classes
                 tw.WriteLine("}");
             }
             tw.Close();
+
+            ProceduralUtils.ExportRequiredAssetsHTML(ProceduralObjectsMod.ExternalsConfigPath + name.ToFileName() + " - required assets.html", selection_objects.Keys.ToList());
         }
 
         public enum ClipboardType

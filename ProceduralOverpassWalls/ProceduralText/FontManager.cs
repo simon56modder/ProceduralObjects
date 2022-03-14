@@ -238,6 +238,7 @@ namespace ProceduralObjects.ProceduralText
                 var kerningNormal = new Dictionary<Vector2, int>();
                 var kerningItalic = new Dictionary<Vector2, int>();
                 var kerningBold = new Dictionary<Vector2, int>();
+                var arabicReplacement = new List<CharArabicCorrespondance>();
                 string[] stylesNames = null;
 
                 for (int i = 0; i < lines.Length; i++)
@@ -265,6 +266,20 @@ namespace ProceduralObjects.ProceduralText
                             orderedChars += "\\u" + charUnicodes[j];
                         }
                         orderedChars = Regex.Unescape(orderedChars);
+                    }
+                    else if (lines[i].Contains("ArabicCharacters"))
+                    {
+                        var chars = lines[i].Replace("ArabicCharacters(", "").Replace(")", "").Trim().Split(new string[] { ";" }, StringSplitOptions.RemoveEmptyEntries);
+                        var correspondance = new CharArabicCorrespondance();
+                        var def = Regex.Unescape("\\u" + chars[0]);
+                        var left = Regex.Unescape("\\u" + chars[1]);
+                        var right = Regex.Unescape("\\u" + chars[2]);
+                        var right_left = Regex.Unescape("\\u" + chars[3]);
+                        correspondance.def = def[0];
+                        correspondance.left = left[0];
+                        correspondance.right = right[0];
+                        correspondance.right_left = right_left[0];
+                        arabicReplacement.Add(correspondance);
                     }
                     else if (lines[i].Contains("stylesNames = "))
                     {
@@ -349,6 +364,7 @@ namespace ProceduralObjects.ProceduralText
                 font.m_kerningNormal = kerningNormal;
                 font.m_kerningItalic = kerningItalic;
                 font.m_kerningBold = kerningBold;
+                font.m_arabic_correspondances = arabicReplacement;
                 font.m_stylesNames = stylesNames;
                 return true;
             }

@@ -662,6 +662,18 @@ namespace ProceduralObjects
                     return Mathf.Round(meters);
             }
         }
+        public static float ConvertToDistanceUnit(float meters)
+        {
+            switch (ProceduralObjectsMod.DistanceUnits.value)
+            {
+                case 1: //ft
+                    return meters * 3.2808f;
+                case 2: //yd
+                    return meters * 1.0936f;
+                default: //m
+                    return meters;
+            }
+        }
         public static float ConvertRoundBackToMeters(float value)
         {
             switch (ProceduralObjectsMod.DistanceUnits.value)
@@ -739,7 +751,6 @@ namespace ProceduralObjects
             data.clickTime = 0f;
             return data;
         }
-
     }
 
     public class VerticesWizardData
@@ -766,6 +777,7 @@ namespace ProceduralObjects
         private float secClicked;
         private LineRenderer[] axis;
         private GameObject[] linesObj;
+        private bool smallAxis;
 
         public void IncrementStep()
         {
@@ -837,7 +849,7 @@ namespace ProceduralObjects
             }
             else if (toolType == 1)
             {
-                if (obj.normalsRecalcMode == NormalsRecalculation.None)
+                if (obj.normalsRecalcMode == NormalsRecalculation.None && !obj.IsPloppableAsphalt())
                 {
                     ProceduralObjectsLogic.PlaySound(2);
                     obj.normalsRecalcMode = NormalsRecalculation.Default;
@@ -859,6 +871,7 @@ namespace ProceduralObjects
             int line = -1;
             if (snapToAxis)
             {
+                smallAxis = Vector3.Distance(ProceduralObjectsLogic.instance.renderCamera.transform.position, originHitPoint) <= 15;
                 Vector3 xSnappedLocal = Vector3.zero, ySnappedLocal = Vector3.zero, zSnappedLocal = Vector3.zero;
                 if (planeUsed > 0)
                     xSnappedLocal = Vector3.Project(newHitPoint - originHitPoint, obj.m_rotation * Vector3.right);
@@ -866,19 +879,19 @@ namespace ProceduralObjects
                     ySnappedLocal = Vector3.Project(newHitPoint - originHitPoint, obj.m_rotation * Vector3.up);
                 if (planeUsed == 0 || planeUsed == 1) 
                     zSnappedLocal = Vector3.Project(newHitPoint - originHitPoint, obj.m_rotation * Vector3.forward);
-
+                float snapThreshold = (smallAxis) ? .7f : 3f;
                 if (planeUsed == 0)
                 {
                     if (ySnappedLocal.sqrMagnitude > zSnappedLocal.sqrMagnitude)
                     {
-                        if (zSnappedLocal.magnitude > 3f)
+                        if (zSnappedLocal.magnitude > snapThreshold)
                             goto finallyNotSnapAxis;
                         newHitPoint = ySnappedLocal + originHitPoint;
                         line = 1;
                     }
                     else
                     {
-                        if (ySnappedLocal.magnitude > 3f)
+                        if (ySnappedLocal.magnitude > snapThreshold)
                             goto finallyNotSnapAxis;
                         newHitPoint = zSnappedLocal + originHitPoint;
                         line = 2;
@@ -888,14 +901,14 @@ namespace ProceduralObjects
                 {
                     if (xSnappedLocal.sqrMagnitude > zSnappedLocal.sqrMagnitude)
                     {
-                        if (zSnappedLocal.magnitude > 3f)
+                        if (zSnappedLocal.magnitude > snapThreshold)
                             goto finallyNotSnapAxis;
                         newHitPoint = xSnappedLocal + originHitPoint;
                         line = 0;
                     }
                     else
                     {
-                        if (xSnappedLocal.magnitude > 3f)
+                        if (xSnappedLocal.magnitude > snapThreshold)
                             goto finallyNotSnapAxis;
                         newHitPoint = zSnappedLocal + originHitPoint;
                         line = 2;
@@ -905,14 +918,14 @@ namespace ProceduralObjects
                 {
                     if (xSnappedLocal.sqrMagnitude > ySnappedLocal.sqrMagnitude)
                     {
-                        if (ySnappedLocal.magnitude > 3f)
+                        if (ySnappedLocal.magnitude > snapThreshold)
                             goto finallyNotSnapAxis;
                         newHitPoint = xSnappedLocal + originHitPoint;
                         line = 0;
                     }
                     else
                     {
-                        if (xSnappedLocal.magnitude > 3f)
+                        if (xSnappedLocal.magnitude > snapThreshold)
                             goto finallyNotSnapAxis;
                         newHitPoint = ySnappedLocal + originHitPoint;
                         line = 1;
@@ -1071,13 +1084,13 @@ namespace ProceduralObjects
                 if (i == j)
                 {
                     var toHighlight = axis[j];
-                    toHighlight.widthMultiplier = 0.26f * AxisWidthFactor;
+                    toHighlight.widthMultiplier = 0.26f * AxisWidthFactor * (smallAxis ? .25f : 1f);
                     toHighlight.startColor = new Color(toHighlight.startColor.r, toHighlight.startColor.g, toHighlight.startColor.b, 0.65f);
                 }
                 else
                 {
                     var toDampen = axis[j];
-                    toDampen.widthMultiplier = 0.12f * AxisWidthFactor;
+                    toDampen.widthMultiplier = 0.12f * AxisWidthFactor * (smallAxis ? .25f : 1f);
                     toDampen.startColor = new Color(toDampen.startColor.r, toDampen.startColor.g, toDampen.startColor.b, 0.2f);
                 }
             }
@@ -1089,6 +1102,154 @@ namespace ProceduralObjects
                 return ((ProceduralObjectsMod.GizmoSize.value - 1f) / 2f) + 1f;
             }
         } 
+    }
+
+    public class DrawWizardData
+    {
+        public DrawWizardData(ProceduralObject obj)
+        {
+            zeroLevelPlane = new Plane(obj.m_rotation * Vector3.up, obj.m_position);
+            this.obj = obj;
+        }
+
+        public Plane zeroLevelPlane;
+        public List<Vector3> points;
+        public ProceduralObject obj;
+
+        public void Update()
+        {
+            Vector3 pos = Vector3.zero;
+            if (points != null)
+            {
+                var ray = ProceduralObjectsLogic.instance.renderCamera.ScreenPointToRay(Input.mousePosition);
+                float enter;
+                if (zeroLevelPlane.Raycast(ray, out enter))
+                {
+                    pos = ray.GetPoint(enter);
+                    SetVertices(pos, true);
+                }
+            }
+            if (Input.GetMouseButtonDown(0))
+            {
+                if (points == null)
+                {
+                    ProceduralObjectsLogic.PlaySound();
+                    obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, obj.vertices);
+                    points = new List<Vector3>();
+                }
+                else
+                {
+                    ProceduralObjectsLogic.PlaySound(3);
+                    obj.historyEditionBuffer.ConfirmNewStep(obj.vertices);
+                    points.Add(pos);
+                    if (points.Count == 28)
+                        Confirm();
+                }
+            }
+            else if (points != null)
+            {
+                if (points.Count > 0)
+                {
+                    if (Input.GetMouseButtonDown(1))
+                    {
+                        ProceduralObjectsLogic.PlaySound(3);
+                        obj.historyEditionBuffer.ConfirmNewStep(obj.vertices);
+                        points.RemoveAt(points.Count - 1);
+                        obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, obj.vertices);
+                    }
+                }
+            }
+            if (Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Return))
+                Confirm();
+        }
+        public void Confirm()
+        {
+            ProceduralObjectsLogic.PlaySound();
+            SetVertices(Vector3.zero, false);
+            points = null;
+            obj.historyEditionBuffer.ConfirmNewStep(obj.vertices);
+            ProceduralObjectsLogic.verticesToolType = 0;
+            ProceduralObjectsLogic.instance.drawWizardData = null;
+        }
+        public void SetVertices(Vector3 worldPos, bool useEditingPos)
+        {
+            var pointsWithMouse = new List<Vector3>(points);
+            if (useEditingPos)
+                pointsWithMouse.Add(worldPos);
+            if (IsClockwise(pointsWithMouse))
+            {
+                for (int i = 0; i < 28; i ++ )
+                {
+                    if (i < pointsWithMouse.Count - 1)
+                    {
+                        var localPos = getLocalPloppablePos(pointsWithMouse[i]);
+                        foreach (Vertex v in obj.vertices.Where(v => v.Index == i || (v.IsDependent && v.DependencyIndex == i)))
+                            obj.vertices[v.Index].Position = localPos;
+                    }
+                    else
+                    {
+                        var localPos = getLocalPloppablePos(pointsWithMouse[pointsWithMouse.Count - 1]);
+                        foreach (Vertex v in obj.vertices.Where(v => v.Index == i || (v.IsDependent && v.DependencyIndex == i)))
+                            obj.vertices[v.Index].Position = localPos;
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < 28; i++)
+                {
+                    if (i < 29 - pointsWithMouse.Count)
+                    {
+                        var localPos = getLocalPloppablePos(pointsWithMouse[pointsWithMouse.Count - 1]);
+                        foreach (Vertex v in obj.vertices.Where(v => v.Index == i || (v.IsDependent && v.DependencyIndex == i)))
+                            obj.vertices[v.Index].Position = localPos;
+                    }
+                    else
+                    {
+                        var localPos = getLocalPloppablePos(pointsWithMouse[27 - i]);
+                        foreach (Vertex v in obj.vertices.Where(v => v.Index == i || (v.IsDependent && v.DependencyIndex == i)))
+                            obj.vertices[v.Index].Position = localPos;
+                    }
+                }
+            }
+            obj.ApplyModelChange();
+            SetCenterVertex();
+        }
+        private void SetCenterVertex()
+        {
+            if (points.Count <= 2)
+            {
+                foreach (Vertex v in obj.vertices.Where(v => v.Index == 28 || (v.IsDependent && v.DependencyIndex == 28)))
+                    obj.vertices[v.Index].Position = obj.vertices[0].Position;
+                ProceduralUtils.SetObjOrigin(obj, obj.vertices, obj.vertices[0].Position, false);
+            }
+            else
+            {
+                Bounds b = new Bounds();
+                for (int i = 0; i < 28; i++)
+                    b.Encapsulate(obj.vertices[i].Position);
+                var center = b.center;
+                foreach (Vertex v in obj.vertices.Where(v => v.Index == 28 || (v.IsDependent && v.DependencyIndex == 28)))
+                    obj.vertices[v.Index].Position = center;
+
+                ProceduralUtils.SetObjOrigin(obj, obj.vertices, center, false);
+            }
+        }
+        private bool IsClockwise(List<Vector3> vertices)
+        {
+            if (vertices == null) return false;
+            if (vertices.Count <= 2) return true;
+            float signedTotal = 0f;
+            for (int i = 0; i < vertices.Count - 1; i ++ )
+                signedTotal += VertexUtils.SignedAngle(getLocalPloppablePos(vertices[i]), getLocalPloppablePos(vertices[i + 1]), Vector3.up);
+            return signedTotal < 0f;
+        }
+        private Vector3 getLocalPloppablePos(Vector3 pos)
+        {
+            Vector3 v = Quaternion.Inverse(obj.m_rotation) * (pos - obj.m_position);
+            v.z /= -2.2173f;
+            return v;
+        }
     }
 }
  

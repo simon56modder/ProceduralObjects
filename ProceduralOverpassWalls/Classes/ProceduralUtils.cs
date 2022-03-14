@@ -93,23 +93,32 @@ namespace ProceduralObjects.Classes
         }
         public static void RecenterObjOrigin(ProceduralObject obj, Vertex[] buffer)
         {
-            obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, buffer);
             var bounds = new Bounds(buffer.First().Position, Vector3.zero);
             foreach (Vertex v in buffer)
                 bounds.Encapsulate(v.Position);
 
             var bottomPoint = bounds.center;
             bottomPoint.y -= bounds.extents.y;
-            var centerWorldSpace = VertexWorldPosition(bottomPoint, obj);
 
+            SetObjOrigin(obj, buffer, bottomPoint, true);
+        }
+        public static void SetObjOrigin(ProceduralObject obj, Vertex[] buffer, Vector3 center, bool registerHistory)
+        {
+            if (registerHistory)
+                obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, buffer);
+            var centerWorldSpace = VertexWorldPosition(center, obj);
             foreach (Vertex v in buffer)
             {
-                v.Position -= bottomPoint;
+                v.Position -= center;
             }
-            obj.historyEditionBuffer.ConfirmNewStep(buffer);
-            obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, buffer);
+            if (registerHistory)
+            {
+                obj.historyEditionBuffer.ConfirmNewStep(buffer);
+                obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.position, buffer);
+            }
             obj.SetPosition(centerWorldSpace);
-            obj.historyEditionBuffer.ConfirmNewStep(buffer);
+            if (registerHistory)
+                obj.historyEditionBuffer.ConfirmNewStep(buffer);
         }
 
         public static Color GetColor(this BuildingInfo info)
@@ -252,7 +261,7 @@ namespace ProceduralObjects.Classes
 
             obj.meshStatus = 2;
             obj.m_mesh = obj.m_mesh.InstantiateMesh();
-            obj.allVertices = obj.m_mesh.vertices;
+            obj.vertices = Vertex.CreateVertexList(obj);
             //  obj.m_mesh.SetVertices(new List<Vector3>(obj.allVertices));
         } 
         public static Mesh InstantiateMesh(this Mesh source)
@@ -391,15 +400,49 @@ namespace ProceduralObjects.Classes
         }
         public static bool IsPloppableAsphalt(this PropInfo sourceProp)
         {
-            return (sourceProp.m_mesh.name == "ploppableasphalt-prop") ||
-                (sourceProp.m_mesh.name == "ploppablecliffgrass") ||
-                (sourceProp.m_mesh.name == "ploppablegravel");
+            string name = "";
+            try { name = sourceProp.m_mesh.name; }
+            catch { return false; }
+            return ((name == "ploppableasphalt-prop") ||
+                (name == "ploppablecliffgrass") ||
+                (name == "ploppablegravel"));
         }
-        public static Color GetPloppableAsphaltCfg()
+        public static bool IsPloppableAsphalt(this ProceduralObject obj)
+        {
+            string name = "";
+            try { name = obj._baseProp.m_mesh.name; }
+            catch { return false; }
+            return ((name == "ploppableasphalt-prop") ||
+                (name == "ploppablecliffgrass") ||
+                (name == "ploppablegravel"));
+        }
+        public static bool IsPloppableSrfCircle(this ProceduralObject obj)
+        {
+            if (!obj.basePrefabName.Contains(".")) return false;
+            string postPoint = obj.basePrefabName.Split(new string[] { "." }, StringSplitOptions.RemoveEmptyEntries)[1];
+            return (postPoint == "R69 Ploppable Gravel Circle16_Data") ||
+                (postPoint == "R69 Ploppable Pavement Circle8_Data") ||
+                (postPoint == "R69 Ploppable Cliff Circle16_Data") ||
+                (postPoint == "R69 Ploppable Pavement Circle_Data") ||
+                (postPoint == "R69 Ploppable Asphalt Circle_Data") ||
+                (postPoint == "R69 Ploppable Grass Circle8_Data") ||
+                (postPoint == "R69 Ploppable Gravel Circle8_Data") ||
+                (postPoint == "R69 Ploppable Asphalt Circle8_Data") ||
+                (postPoint == "R69 Ploppable Cliff Circle8_Data") ||
+                (postPoint == "R69 Ploppable Asphalt Circle16_Data") ||
+                (postPoint == "R69 Ploppable Pavement Circle16_Data");
+        }
+        private static Color ploppableAsphaltColor;
+        private static bool isPAsphColorSetup = false;
+        public static void UpdatePloppableAsphaltCfg()
         {
             string path = Path.Combine(DataLocation.localApplicationData, "PloppableAsphalt.xml");
             if (!File.Exists(path))
-                return new Color(.5f, .5f, .5f, 1f);
+            {
+                Debug.LogWarning("[ProceduralObjects] No PloppableAsphalt.xml config was found in order to retrieve the Ploppable Asphalt color setup in the mod (harmless issue)");
+                ploppableAsphaltColor = new Color(.5f, .5f, .5f, 1f);
+                return;
+            }
 
             string r = "", g = "", b = "";
             using (XmlReader reader = XmlReader.Create(path))
@@ -423,7 +466,12 @@ namespace ProceduralObjects.Classes
                     }
                 }
             }
-            return new Color(int.Parse(r) / 255f, int.Parse(g) / 255f, int.Parse(b) / 255f, 1f);
+            ploppableAsphaltColor = new Color(int.Parse(r) / 255f, int.Parse(g) / 255f, int.Parse(b) / 255f, 1f);
+        }
+        public static Color GetPloppableAsphaltCfg()
+        {
+            if (!isPAsphColorSetup) UpdatePloppableAsphaltCfg();
+            return ploppableAsphaltColor;
         }
         public static Color ApplyPloppableColor(this Material mat)
         {
@@ -434,6 +482,38 @@ namespace ProceduralObjects.Classes
             mat.SetColor("_ColorV3", color);
             mat.color = color;
             return color;
+        }
+        public static void ExportRequiredAssetsHTML(string path, List<CacheProceduralObject> list )
+        {
+            if (File.Exists(path)) File.Delete(path);
+
+            var reqAssets = new Dictionary<uint, string>();
+            foreach (var obj in list)
+            {
+                if (!obj.basePrefabName.Contains("_Data")) continue;
+                if (!obj.basePrefabName.Contains(".")) continue;
+                uint id;
+                var split = obj.basePrefabName.Split(new string[]{"."}, StringSplitOptions.RemoveEmptyEntries);
+                if (uint.TryParse(split[0], out id))
+                {
+                    if (reqAssets.ContainsKey(id)) continue;
+                    PrefabInfo info = (obj.baseInfoType == "PROP") ? (PrefabInfo)(obj._baseProp) : (PrefabInfo)(obj._baseBuilding);
+                    var name = "";
+                    if (info == null)
+                        name = split[1].Replace("_Data", "");
+                    else
+                        name = info.GetLocalizedTitle();
+                    reqAssets.Add(id, name);
+                }
+            }
+            if (reqAssets.Count == 0) return;
+
+            TextWriter tw = new StreamWriter(path);
+            tw.WriteLine("<html><head><style>table, td { border: 1px solid black; }</style></head><body><table style=\"width:25%\"><thead><tr><th colspan=\"2\">Required assets for PO export</th></tr></thead><tbody>");
+            foreach (var req in reqAssets)
+                tw.WriteLine("<tr><td>" + req.Value + "</td><td style=\"text-align:center;\"><input type=button onClick=\"parent.open('https://steamcommunity.com/sharedfiles/filedetails/?id="
+                    + req.Key.ToString() + "')\" value='Show on the workshop'></td></tr>");
+            tw.Close();
         }
     }
 }

@@ -38,19 +38,21 @@ namespace ProceduralObjects.SelectionMode
             logic.showMoreTools = false;
         }
 
-        public static Dictionary<string, Type> SelectionModeActions;
+        public static List<SMActionPrefab> SelectionModeActions;
         public static void InitializeSMActions()
         {
-            SelectionModeActions = new Dictionary<string, Type>();
-            SelectionModeActions.Add("align_heights", typeof(AlignHeights));
-            SelectionModeActions.Add("align_rotations", typeof(AlignRotations));
-            SelectionModeActions.Add("randomize_rot", typeof(RandomizeRotation));
-            SelectionModeActions.Add("align_between2", typeof(AlignBetween2));
-            SelectionModeActions.Add("equal_slope", typeof(EqualSlope));
-            SelectionModeActions.Add("snapToGround", typeof(SnapToGround));
-            SelectionModeActions.Add("set_render_dists", typeof(SetRenderDistances));
-            SelectionModeActions.Add("replace_by_copy", typeof(ReplaceByCopy));
-            SelectionModeActions.Add("color_gradient", typeof(ColorGradient));
+            if (SelectionModeActions != null) return;
+
+            SelectionModeActions = new List<SMActionPrefab>();
+            SelectionModeActions.Add(new SMActionPrefab("align_heights", typeof(AlignHeights)));
+            SelectionModeActions.Add(new SMActionPrefab("align_rotations", typeof(AlignRotations)));
+            SelectionModeActions.Add(new SMActionPrefab("randomize_rot", typeof(RandomizeRotation)));
+            SelectionModeActions.Add(new SMActionPrefab("align_between2", typeof(AlignBetween2)));
+            SelectionModeActions.Add(new SMActionPrefab("equal_slope", typeof(EqualSlope)));
+            SelectionModeActions.Add(new SMActionPrefab("snapToGround", typeof(SnapToGround)));
+            SelectionModeActions.Add(new SMActionPrefab("set_render_dists", typeof(SetRenderDistances)));
+            SelectionModeActions.Add(new SMActionPrefab("replace_by_copy", typeof(ReplaceByCopy)));
+            SelectionModeActions.Add(new SMActionPrefab("color_gradient", typeof(ColorGradient)));
         }
         public static void CloseAction()
         {
@@ -62,11 +64,11 @@ namespace ProceduralObjects.SelectionMode
             var tools = SelectionModeActions.ToList();
             for (int i = 0; i < SelectionModeActions.Count; i++)
             {
-                var kvp = tools[i];
-                if (GUI.Button(new Rect(position.x, position.y + i * 23, 180, 22), LocalizationManager.instance.current[kvp.Key]))
+                var smprefab = tools[i];
+                if (GUI.Button(new Rect(position.x, position.y + i * 23, 180, 22), LocalizationManager.instance.current[smprefab.id]))
                 {
                     ProceduralObjectsLogic.PlaySound();
-                    var action = (SelectionModeAction)Activator.CreateInstance(kvp.Value);
+                    var action = (SelectionModeAction)Activator.CreateInstance(smprefab.type);
                     action.logic = ProceduralObjectsLogic.instance;
                     ProceduralObjectsLogic.instance.selectionModeAction = action;
                     action.OnOpen(new List<ProceduralObject>(ProceduralObjectsLogic.instance.pObjSelection));
@@ -84,5 +86,24 @@ namespace ProceduralObjects.SelectionMode
         {
             return new Vector2(180, 23 * SelectionModeActions.Count);
         }
+    }
+    public class SMActionPrefab
+    {
+        public SMActionPrefab() { }
+        public SMActionPrefab(string id, Type type, KeyBindingInfo keyBinding)
+        {
+            this.id = id;
+            this.type = type;
+            this.keyBinding = keyBinding;
+        }
+        public SMActionPrefab(string id, Type type)
+        {
+            this.id = id;
+            this.type = type;
+            this.keyBinding = KeyBindingsManager.instance.GetBindingFromName(id);
+        }
+        public string id;
+        public Type type;
+        public KeyBindingInfo keyBinding;
     }
 }

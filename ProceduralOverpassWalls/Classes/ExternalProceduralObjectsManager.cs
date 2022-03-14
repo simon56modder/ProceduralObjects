@@ -18,9 +18,11 @@ namespace ProceduralObjects.Classes
         public ExternalProceduralObjectsManager()
         {
             m_externals = new List<ExternalInfo>();
+            m_defaultPOsUponConversion = new Dictionary<string, ExternalInfo>();
         }
 
         public List<ExternalInfo> m_externals;
+        public Dictionary<string, ExternalInfo> m_defaultPOsUponConversion;
 
         public void SaveToExternal(string name, CacheProceduralObject pobj)
         {
@@ -84,6 +86,8 @@ namespace ProceduralObjects.Classes
                 return;
 
             File.Delete(info.m_filePath);
+            if (File.Exists(info.m_filePath.Replace(".pobj", " - required assets.html")))
+                File.Delete(info.m_filePath.Replace(".pobj", " - required assets.html"));
             if (m_externals.Contains(info))
                 m_externals.Remove(info);
         }
@@ -112,6 +116,7 @@ namespace ProceduralObjects.Classes
         public void LoadExternals(FontManager fManager)
         {
             m_externals = new List<ExternalInfo>();
+            m_defaultPOsUponConversion = new Dictionary<string, ExternalInfo>();
 
             // local externals
             if (!Directory.Exists(ProceduralObjectsMod.ExternalsConfigPath))
@@ -167,15 +172,26 @@ namespace ProceduralObjects.Classes
                 var first10lines = GUIUtils.GetFirstLinesOfFile(path, 12);
                 bool isStatic = first10lines.Any(line => line.Contains("externaltype = static"));
                 bool isPlopSelection = first10lines.Any(line => line.Contains("externaltype = selection"));
+                bool isSubstitute = first10lines.Any(line => line.ToLower().Contains("substituteforconversionof"));
                 string name = first10lines.First(line => line.StartsWith("name = ")).Replace("name = ", "").Trim();
+
+                if (isStatic && isSubstitute)
+                {
+                    Debug.LogError("[ProceduralObjects] A PO  export named \"" + name + "\" was not loaded. Exported POs cannot be both static and substitutes for conversion !");
+                    return;
+                }
 
                 ExternalInfo info = new ExternalInfo(name, path,
                     (isStatic || isPlopSelection) ? ClipboardProceduralObjects.ClipboardType.Selection : ClipboardProceduralObjects.ClipboardType.Single, isStatic, fromWorkshop);
-                m_externals.Add(info);
+
+                if (isSubstitute)
+                    m_defaultPOsUponConversion.Add(first10lines.First(line => line.ToLower().Contains("substituteforconversionof")).GetStringAfter(" = "),  info);
+                else
+                    m_externals.Add(info);
             }
             catch
             {
-                Debug.LogError("[ProceduralObjects] Couldn't load an External Procedural Object : Invalid, corrupted or edited file at path : " + path);
+                Debug.LogError("[ProceduralObjects] Couldn't load an External Procedural Object : Invalid or corrupted file at path : " + path);
             }
         }
     }
@@ -373,6 +389,7 @@ namespace ProceduralObjects.Classes
                         obj = new CacheProceduralObject();
                         obj.tilingFactor = 8;
                         obj.m_color = Color.white;
+                        obj.parent = -1;
                         obj.meshStatus = 2;
                         relativePos = Vector3.zero;
                         modulesData = new List<Dictionary<string, string>>();
@@ -405,6 +422,12 @@ namespace ProceduralObjects.Classes
                         obj.disableRecalculation = bool.Parse(fileLines[i].Replace("disableRecalculation = ", ""));
                     else if (fileLines[i].Contains("tilingFactor = "))
                         obj.tilingFactor = int.Parse(fileLines[i].Replace("tilingFactor = ", ""));
+                    else if (fileLines[i].Contains("parenting = "))
+                    {
+                        var splited = fileLines[i].Replace("parenting = ", "").Trim().Split(new string[] { ";" }, StringSplitOptions.RemoveEmptyEntries);
+                        obj.temp_id = int.Parse(splited[0]);
+                        obj.parent = int.Parse(splited[1]);
+                    }
                     else if (fileLines[i].Contains("disableRecalculation = "))
                         obj.disableRecalculation = bool.Parse(fileLines[i].Replace("disableRecalculation = ", ""));
                     else if (fileLines[i].Contains("flipFaces = "))
@@ -464,6 +487,20 @@ namespace ProceduralObjects.Classes
             }
             ClipboardProceduralObjects selec = new ClipboardProceduralObjects(ClipboardProceduralObjects.ClipboardType.Selection);
             selec.selection_objects = objects;
+            var groupInfo = new Dictionary<CacheProceduralObject, CacheProceduralObject>();
+            var objlist = objects.Keys.ToList();
+            foreach (var o in objlist)
+            {
+                if (o.parent == -1) continue;
+                try
+                {
+                    var parent = objlist.First(po => po.temp_id == o.parent);
+                    groupInfo.Add(o, parent);
+                }
+                catch { continue; }
+            }
+            if (groupInfo.Count > 0) 
+                selec.groupInformation = groupInfo;
             this.m_name = name;
             this.m_selection = selec;
             this.m_externalType = ClipboardProceduralObjects.ClipboardType.Selection;

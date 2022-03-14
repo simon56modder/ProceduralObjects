@@ -19,16 +19,28 @@ namespace ProceduralObjects.Classes
         }
         public List<Layer> m_layers;
 
-        public Rect winRect = new Rect(155, 500, 320, 350);
+        public Rect winRect = new Rect(155, 500, 320, 360);
         public bool showWindow = false;
         private Vector2 scrollLayers = Vector2.zero;
         private string newLayerText;
         private ProceduralObjectsLogic logic;
+        private bool expandingWindow = false;
 
         public void DrawWindow()
         {
             if (showWindow)
                 winRect = GUIUtils.ClampRectToScreen(GUIUtils.Window(99045, winRect, draw, LocalizationManager.instance.current["layers"]));
+        }
+        public void Update()
+        {
+            if (!showWindow) return;
+            if (expandingWindow)
+            {
+                var mouseposy = GUIUtils.MousePos.y;
+                winRect.height = Mathf.Max(250, mouseposy - winRect.yMin);
+                if (Input.GetMouseButtonUp(0))
+                    expandingWindow = false;
+            }
         }
         void draw(int id)
         {
@@ -36,10 +48,11 @@ namespace ProceduralObjects.Classes
             if (GUIUtils.CloseHelpButtons(winRect, "Layers"))
             {
                 showWindow = false;
+                expandingWindow = false;
             }
             GUI.Label(new Rect(5, 22, 310, 28), LocalizationManager.instance.current["layers_desc"]);
-            GUI.Box(new Rect(10, 50, 300, 295), string.Empty);
-            scrollLayers = GUI.BeginScrollView(new Rect(7, 52, 306, 291), scrollLayers, new Rect(0, 0, 282, m_layers.Count * 26 + 32));
+            GUIUtils.DrawSeparator(new Vector2(7, 46), 306);
+            scrollLayers = GUI.BeginScrollView(new Rect(7, 52, 306, winRect.height - 69), scrollLayers, new Rect(0, 0, 282, m_layers.Count * 26 + 32));
             for (int i = 0; i < m_layers.Count; i++)
             {
                 if (GUI.Button(new Rect(9, i * 26 + 1, 24, 24), ProceduralObjectsMod.Icons[m_layers[i].m_isHidden ? 3 : 4]))
@@ -83,6 +96,9 @@ namespace ProceduralObjects.Classes
                 AddLayer(newLayerText);
             }
             GUI.EndScrollView();
+
+            if (GUI.RepeatButton(new Rect(120, winRect.height - 14, 80, 10), string.Empty))
+                expandingWindow = true;
         }
 
 

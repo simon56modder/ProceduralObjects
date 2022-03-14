@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Reflection;
-// using MoveItIntegration;
 using UnityEngine;
 
 namespace ProceduralObjects.Classes
@@ -62,10 +61,11 @@ namespace ProceduralObjects.Classes
             return true;
         }
         #endregion
-
         // new MI integration
         public static Assembly MIAssembly;
         static Type t_MIPOLogic, t_MIPOobj, t_MIPOManager;
+        public static PropInfo[] props;
+        public static BuildingInfo[] buildings;
         static bool isSetup = false;
         static object MIPOLogic;
         static object MIPOManager;
@@ -74,6 +74,9 @@ namespace ProceduralObjects.Classes
         public static void SetupMoveIt()
         {
             if (isSetup) return;
+
+            props = Resources.FindObjectsOfTypeAll<PropInfo>();
+            buildings = Resources.FindObjectsOfTypeAll<BuildingInfo>();
 
             foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -108,6 +111,7 @@ namespace ProceduralObjects.Classes
             var obj = t_MIPOobj.GetField("procObj", flags).GetValue(MIPO_obj);
             return (ProceduralObject)obj;
         }
+
         public static void ClonePO(InstanceID original, InstanceID target)
         {
             var clone = ProceduralObjectsLogic.instance.CloneObject(GetPO(original));
@@ -151,8 +155,7 @@ namespace ProceduralObjects.Classes
         public bool failed;
         public ProceduralObject converted;
     }
-
-    /* 
+    /*
     public class MoveItIntegrationFactory : IMoveItIntegrationFactory
     {
         public MoveItIntegrationBase GetInstance()
@@ -191,21 +194,11 @@ namespace ProceduralObjects.Classes
         {
             if (record == null)
                 return;
-
-            if (record is InstanceID)
-            {
-                if (((InstanceID)record).Type != InstanceType.NetLane)
-                    return;
-                PO_MoveIt.SetupMoveIt();
-                PO_MoveIt.ClonePO((InstanceID)record, targetInstanceID);
-            }
-            else if (record is ProceduralObject)
+            if (record is ProceduralObject)
             {
                 PO_MoveIt.SetupMoveIt();
-                var obj = (ProceduralObject)record;
-                obj.id = ProceduralObjectsLogic.instance.proceduralObjects.GetNextUnusedId();
-                ProceduralObjectsLogic.instance.proceduralObjects.Add(obj);
-                PO_MoveIt.InitializeAsPO(targetInstanceID, obj);
+                var obj = PO_MoveIt.GetPO(targetInstanceID);
+                ProceduralObjectsLogic.instance.CloneIntoObject((ProceduralObject)record, obj);
             }
         }
         public override string Encode64(object record)
@@ -228,7 +221,7 @@ namespace ProceduralObjects.Classes
                 return null;
             try
             {
-                var obj = new ProceduralObject((ProceduralObjectContainer)decoded, ProceduralObjectsLogic.instance.layerManager);
+                var obj = new ProceduralObject((ProceduralObjectContainer)decoded, ProceduralObjectsLogic.instance.layerManager, PO_MoveIt.props, PO_MoveIt.buildings);
                 return obj;
             }
             catch (Exception e)
@@ -237,6 +230,5 @@ namespace ProceduralObjects.Classes
                 return null;
             }
         }
-    }
-     * */
+    } */
 }

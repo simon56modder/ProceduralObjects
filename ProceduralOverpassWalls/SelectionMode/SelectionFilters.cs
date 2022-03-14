@@ -20,12 +20,12 @@ namespace ProceduralObjects.SelectionMode
             c_decals = true;
             c_surfaces = true;
             c_groups = true;
-            pickerPrefabName = "";
+            pickerPrefabNames = new List<string>();
             timer = 0f;
         }
 
         public bool c_picker, c_props, c_buildings, c_decals, c_surfaces, c_groups;
-        public string pickerPrefabName;
+        public List<string> pickerPrefabNames;
         public float timer;
 
         public static readonly float doubleClickTime = .25f;
@@ -44,8 +44,11 @@ namespace ProceduralObjects.SelectionMode
             }
             if (c_picker)
             {
-                if (pickerPrefabName == obj.basePrefabName)
-                    return true;
+                if (pickerPrefabNames.Count > 0)
+                {
+                    if (pickerPrefabNames.Any(s => s == obj.basePrefabName))
+                        return true;
+                }
             }
             if (obj.baseInfoType == "PROP")
             {
@@ -79,8 +82,21 @@ namespace ProceduralObjects.SelectionMode
         public bool DrawFilters(Rect rect)
         {
             GUI.Label(new Rect(2, 0, 90, 24), "<b>" + LocalizationManager.instance.current["filters"] + " :</b>");
+            string pickerLabel = " " + (pickerPrefabNames.Count == 0 ? "<i>" : "") + LocalizationManager.instance.current["filters_picker"] + (pickerPrefabNames.Count == 0 ? "</i>" : " (<i>" + GetShowName() + "</i>)");
+            GUI.Label(new Rect(128, 0, 240, 21), pickerLabel);
+            if (pickerPrefabNames.Count > 0)
+            {
+                float width = GUI.skin.label.CalcSize(new GUIContent(pickerLabel)).x + 132f;
+                if (GUI.Button(new Rect(Mathf.Min(width, 360), 1, 20, 20), "x"))
+                {
+                    ProceduralObjectsLogic.PlaySound();
+                    pickerPrefabNames.Clear();
+                    if (c_picker && !(c_buildings || c_decals || c_groups || c_props || c_surfaces))
+                        EnableAll();
+                }
+            }
             var newvalues = new bool[] { 
-                GUI.Toggle(new Rect(95, 0, 225, 21), c_picker, " " + (pickerPrefabName == "" ? "<i>" : "") + LocalizationManager.instance.current["filters_picker"] + (pickerPrefabName == "" ? "</i>" : " (<i>" + GetShowName() + "</i>)")),
+                GUI.Toggle(new Rect(95, 0, 90, 21), c_picker, ProceduralObjectsMod.Icons[12]),
                 GUI.Toggle(new Rect(95, 22, 95, 21), c_buildings, " " + LocalizationManager.instance.current["filters_buildings"]),
                 GUI.Toggle(new Rect(200, 22, 95, 21), c_props, " " + LocalizationManager.instance.current["filters_props"]),
                 GUI.Toggle(new Rect(95, 43, 95, 21), c_decals, " " + LocalizationManager.instance.current["filters_decals"]),
@@ -119,7 +135,8 @@ namespace ProceduralObjects.SelectionMode
         }
         public void Pick(ProceduralObject obj)
         {
-            pickerPrefabName = obj.basePrefabName;
+            if (!pickerPrefabNames.Contains(obj.basePrefabName))
+                pickerPrefabNames.Add(obj.basePrefabName);
             DisableAll();
             c_picker = true;
         }
@@ -141,13 +158,21 @@ namespace ProceduralObjects.SelectionMode
             c_surfaces = true;
             c_groups = true;
         }
-        public string GetShowName()
+        private string GetShowName()
         {
-            if (pickerPrefabName.Length < 5)
-                return pickerPrefabName;
-            return pickerPrefabName.Substring(pickerPrefabName.IndexOf(".") + 1).Replace("_Data", "");
+            if (pickerPrefabNames.Count == 1)
+            {
+                var pickerPrefabName = pickerPrefabNames[0];
+                if (pickerPrefabName.Length < 5)
+                    return pickerPrefabName;
+                return pickerPrefabName.Substring(pickerPrefabName.IndexOf(".") + 1).Replace("_Data", "");
+            }
+            else
+            {
+                return string.Format(LocalizationManager.instance.current["filters_pickertypes"], pickerPrefabNames.Count.ToString());
+            }
         }
-        public void DisableAllButChanged(bool[] newValues)
+        private void DisableAllButChanged(bool[] newValues)
         {
             string changed = "";
             if (c_picker != newValues[0]) changed = "pick";

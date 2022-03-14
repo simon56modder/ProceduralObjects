@@ -31,50 +31,60 @@ namespace ProceduralObjects.Classes
                 this.isPloppableAsphalt = sourceProp.IsPloppableAsphalt();
                 m_position = container.position.ToVector3();
                 m_rotation = container.rotation.ToQuaternion();
-                if (container.meshStatus == 0)
+                m_material = GameObject.Instantiate(sourceProp.m_material); // overkil ??
+                if (container.meshStatus == 0 && container.vertices != null)
                 {
                     // CHECK FOR MESH REPETITION
                     if (ProceduralUtils.CheckMeshEquivalence(container.vertices, sourceProp.m_mesh.vertices))
                     {
                         meshStatus = 1;
                         m_mesh = sourceProp.m_mesh;
-                        allVertices = sourceProp.m_mesh.vertices;
+                        vertices = Vertex.CreateVertexList(sourceProp);
                     }
                     else
                     {
                         meshStatus = 2;
                         m_mesh = sourceProp.m_mesh.InstantiateMesh();
-                        allVertices = SerializableVector3.ToStandardVector3Array(container.vertices);
+                        var vert = SerializableVector3.ToStandardVector3Array(container.vertices);
                         if (container.scale != 0)
                         {
-                            for (int i = 0; i < allVertices.Count(); i++)
+                            for (int i = 0; i < vert.Count(); i++)
                             {
-                                allVertices[i] = new Vector3(allVertices[i].x * container.scale, allVertices[i].y * container.scale, allVertices[i].z * container.scale);
+                                vert[i] = new Vector3(vert[i].x * container.scale, vert[i].y * container.scale, vert[i].z * container.scale);
                             }
                         }
-                        m_mesh.SetVertices(new List<Vector3>(allVertices));
+                        m_mesh.SetVertices(new List<Vector3>(vert));
+                        vertices = Vertex.CreateVertexList(this);
                     }
                 }
                 else if (container.meshStatus == 1)
                 {
+                    meshStatus = 1;
                     m_mesh = sourceProp.m_mesh;
-                    allVertices = sourceProp.m_mesh.vertices;
+                    vertices = Vertex.CreateVertexList(sourceProp);
                 }
-                else
+                else // meshstatus2
                 {
                     meshStatus = 2;
                     m_mesh = sourceProp.m_mesh.InstantiateMesh();
-                    allVertices = SerializableVector3.ToStandardVector3Array(container.vertices);
-                    if (container.scale != 0)
+                    if (container.serializedMeshData != null)
+                        container.serializedMeshData.ApplyDataToObject(this);
+                    else if (container.vertices != null)
                     {
-                        for (int i = 0; i < allVertices.Count(); i++)
+                        var vert = SerializableVector3.ToStandardVector3Array(container.vertices);
+                        if (container.scale != 0)
                         {
-                            allVertices[i] = new Vector3(allVertices[i].x * container.scale, allVertices[i].y * container.scale, allVertices[i].z * container.scale);
+                            for (int i = 0; i < vert.Count(); i++)
+                            {
+                                vert[i] = new Vector3(vert[i].x * container.scale, vert[i].y * container.scale, vert[i].z * container.scale);
+                            }
                         }
+                        m_mesh.SetVertices(new List<Vector3>(vert));
                     }
-                    m_mesh.SetVertices(new List<Vector3>(allVertices));
+                    else
+                        throw new Exception("[ProceduralObjects] Loading failure : Missing mesh data !");
+                    vertices = Vertex.CreateVertexList(this);
                 }
-                m_material = GameObject.Instantiate(sourceProp.m_material); // overkil ??
                 if (sourceProp.m_mesh.name == "ploppableasphalt-prop" || sourceProp.m_mesh.name == "ploppableasphalt-decal")
                     m_color = m_material.ApplyPloppableColor();
                 if (container.hasCustomTexture && TextureManager.instance != null)
@@ -95,20 +105,28 @@ namespace ProceduralObjects.Classes
                 m_position = container.position.ToVector3();
                 m_rotation = container.rotation.ToQuaternion();
                 meshStatus = 2;
+                m_material = GameObject.Instantiate(sourceProp.m_material); // overkill ??
                 m_mesh = sourceProp.m_mesh.InstantiateMesh();
-                allVertices = SerializableVector3.ToStandardVector3Array(container.vertices);
-                if (container.scale != 0)
+                if (container.serializedMeshData != null)
+                    container.serializedMeshData.ApplyDataToObject(this);
+                else if (container.vertices != null)
                 {
-                    for (int i = 0; i < allVertices.Count(); i++)
+                    var vert = SerializableVector3.ToStandardVector3Array(container.vertices);
+                    if (container.scale != 0)
                     {
-                        allVertices[i] = new Vector3(allVertices[i].x * container.scale, allVertices[i].y * container.scale, allVertices[i].z * container.scale);
+                        for (int i = 0; i < vert.Count(); i++)
+                        {
+                            vert[i] = new Vector3(vert[i].x * container.scale, vert[i].y * container.scale, vert[i].z * container.scale);
+                        }
                     }
+                    m_mesh.SetVertices(new List<Vector3>(vert));
                 }
-                m_mesh.SetVertices(new List<Vector3>(allVertices));
+                else
+                    throw new Exception("[ProceduralObjects] Loading failure : Missing mesh data !");
+                vertices = Vertex.CreateVertexList(this);
                 m_mesh.colors = new Color[] { };
                 m_mesh.colors32 = new Color32[] { };
 
-                m_material = GameObject.Instantiate(sourceProp.m_material); // overkill ??
                 if (container.hasCustomTexture && TextureManager.instance != null)
                 {
                     var customTex = TextureManager.instance.FindTexture(container.customTextureName);
@@ -206,19 +224,20 @@ namespace ProceduralObjects.Classes
                 this.basePrefabName = sourceCacheObj.basePrefabName;
                 this.baseInfoType = "PROP";
                 this.isPloppableAsphalt = sourceProp.IsPloppableAsphalt();
+                m_material = GameObject.Instantiate(sourceProp.m_material);
                 if (sourceCacheObj.meshStatus == 2)
                 {
                     m_mesh = sourceProp.m_mesh.InstantiateMesh();
-                    allVertices = sourceCacheObj.allVertices;
-                    m_mesh.SetVertices(new List<Vector3>(allVertices));
+                    m_mesh.SetVertices(new List<Vector3>(sourceCacheObj.allVertices));
+                    vertices = Vertex.CreateVertexList(this);
                     meshStatus = 2;
                 }
                 else
                 {
                     meshStatus = 1;
                     m_mesh = sourceProp.m_mesh;
+                    vertices = Vertex.CreateVertexList(sourceProp);
                 }
-                m_material = GameObject.Instantiate(sourceProp.m_material);
                 if (sourceProp.m_mesh.name == "ploppableasphalt-prop" || sourceProp.m_mesh.name == "ploppableasphalt-decal")
                     m_color = m_material.ApplyPloppableColor();
             }
@@ -232,13 +251,13 @@ namespace ProceduralObjects.Classes
                 this.basePrefabName = sourceCacheObj.basePrefabName;
                 this.baseInfoType = "BUILDING";
                 this.isPloppableAsphalt = false;
+                m_material = GameObject.Instantiate(sourceBuilding.m_material);
                 m_mesh = sourceBuilding.m_mesh.InstantiateMesh();
-                allVertices = sourceCacheObj.allVertices;
                 meshStatus = 2;
-                m_mesh.SetVertices(new List<Vector3>(allVertices));
+                m_mesh.SetVertices(new List<Vector3>(sourceCacheObj.allVertices));
+                vertices = Vertex.CreateVertexList(this);
                 m_mesh.colors = new Color[] { };
                 m_mesh.colors32 = new Color32[] { };
-                m_material = GameObject.Instantiate(sourceBuilding.m_material);
             }
             if (sourceCacheObj.customTexture != null)
             {
@@ -311,22 +330,23 @@ namespace ProceduralObjects.Classes
             m_rotation = Quaternion.identity;
            // Mesh mesh = sourceProp.m_mesh.InstantiateMesh();
             // meshStatus = 1;
+            m_material = GameObject.Instantiate(sourceProp.m_material);
             if (sourceProp.m_isDecal && ProceduralObjectsMod.AutoResizeDecals.value && !skipDecalShrink)
             {
                 m_mesh = sourceProp.m_mesh.InstantiateMesh();
                 m_mesh.SetVertices(m_mesh.vertices.ResizeDecal());
-                allVertices = sourceProp.m_mesh.vertices;
+                vertices = Vertex.CreateVertexList(this);
                 meshStatus = 2;
             }
             else
             {
                 m_mesh = sourceProp.m_mesh;
+                vertices = Vertex.CreateVertexList(sourceProp);
                 meshStatus = 1;
                 if (isPloppableAsphalt)
                     RecalculateBoundsNormalsExtras(1);
             }
             this.renderDistance = RenderOptions.instance.CalculateRenderDistance(this, true);
-            m_material = GameObject.Instantiate(sourceProp.m_material);
             m_visibility = ProceduralObjectVisibility.Always;
             historyEditionBuffer = new HistoryBuffer(this);
             normalsRecalcMode = NormalsRecalculation.None;
@@ -367,7 +387,7 @@ namespace ProceduralObjects.Classes
             m_mesh = sourceBuilding.m_mesh.InstantiateMesh();
             m_mesh.colors = new Color[] { };
             m_mesh.colors32 = new Color32[] { };
-            allVertices = m_mesh.vertices;
+            vertices = Vertex.CreateVertexList(sourceBuilding);
             meshStatus = 2;
             this.renderDistance = RenderOptions.instance.CalculateRenderDistance(this, true);
             m_material = GameObject.Instantiate(sourceBuilding.m_material);
@@ -413,6 +433,37 @@ namespace ProceduralObjects.Classes
             }
         SetRot:
             m_rotation = rot;
+        }
+
+        public void ApplyModelChange()
+        {
+            List<Vector3> posArray = new List<Vector3>(vertices.GetPositionsArray());
+            // sets mesh renderer vertices
+            m_mesh.SetVertices(posArray);
+            RecalculateBoundsNormalsExtras(meshStatus);
+
+            // call Modules' OnApplyModelChange()
+            if (m_modules != null)
+            {
+                if (m_modules.Count > 0)
+                {
+                    foreach (var m in m_modules)
+                    {
+                        try { m.OnApplyModelChange(vertices); }
+                        catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module OnApplyModelChange() method!\n" + e); }
+                    }
+                }
+            }
+
+            // UV map recalculation
+            if (RequiresUVRecalculation && !disableRecalculation)
+            {
+                try { m_mesh.uv = Vertex.RecalculateUVMap(this, vertices); }
+                catch { Debug.LogError("[ProceduralObjects] Error : Couldn't recalculate UV map on a procedural object of type " + basePrefabName + " (" + baseInfoType + ")"); }
+            }
+
+            // render distance calculation
+            renderDistance = RenderOptions.instance.CalculateRenderDistance(this, false);
         }
 
         public void ChangeNormalsRecalc()
@@ -476,13 +527,13 @@ namespace ProceduralObjects.Classes
         public Vector3 m_position;
         public Quaternion m_rotation;
         public Texture customTexture;
-        public Vector3[] allVertices;
+        public Vertex[] vertices;
         public Layer layer;
         public string basePrefabName, baseInfoType;
         public int id, tilingFactor; 
         // mesh status : 0=undefined ; 1=equivalent to source; 2=custom (see m_mesh)
         public byte meshStatus;
-        public float renderDistance, m_scale, halfOverlayDiam;
+        public float renderDistance, m_scale, halfOverlayDiam, _squareDistToCam;
         public bool isPloppableAsphalt, disableRecalculation, renderDistLocked, flipFaces, _insideRenderView, _insideUIview, _selected;
         public ProceduralObjectVisibility m_visibility;
         public NormalsRecalculation normalsRecalcMode;
@@ -559,8 +610,8 @@ namespace ProceduralObjects.Classes
                     _baseProp = sourceObj._baseProp;
                     break;
                 case "BUILDING":
-                        _baseBuilding = sourceObj._baseBuilding;
-                        break;
+                    _baseBuilding = sourceObj._baseBuilding;
+                    break;
             }
             visibility = sourceObj.m_visibility;
             textParam = TextParameters.Clone(sourceObj.m_textParameters, false);
@@ -583,7 +634,7 @@ namespace ProceduralObjects.Classes
         public Layer layer;
         public float renderDistance;
         public bool isPloppableAsphalt, disableRecalculation, renderDistLocked, flipFaces;
-        public int tilingFactor;
+        public int tilingFactor, temp_id, parent;
         public byte meshStatus;
         public Quaternion m_rotation;
         public Vector3 _staticPos;

@@ -202,6 +202,7 @@ namespace ProceduralObjects
         public SerializableVector3 position;
         public SerializableQuaternion rotation;
         public SerializableVector3[] vertices;
+        public POSerializableMeshData serializedMeshData;
         public SerializableColor color;
         public ProceduralObjectVisibility visibility;
         public NormalsRecalculation normalsRecalculation;
@@ -235,9 +236,28 @@ namespace ProceduralObjects
             // if (meshStatus > 0)
             meshStatus = baseObject.meshStatus;
             if (meshStatus != 1)
+            {
+                /*
+                try
+                {
+                    serializedMeshData = new POSerializableMeshData(baseObject);
+                    vertices = null;
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning("[ProceduralObjects] Warning : error while compressing Mesh data for object #" + baseObject.id + " (" + baseObject.baseInfoType + ", " + baseObject.basePrefabName + "). Saving uncompressed raw data instead\n" + e);
+                 
+                 * 
+                 * */
                 vertices = SerializableVector3.ToSerializableArray(baseObject.m_mesh.vertices);
+                    serializedMeshData = null;
+             //   }
+            }
             else
+            {
+                serializedMeshData = null;
                 vertices = null;
+            }
             hasCustomTexture = baseObject.customTexture != null;
             visibility = baseObject.m_visibility;
             disableRecalculation = baseObject.disableRecalculation;
@@ -277,19 +297,35 @@ namespace ProceduralObjects
             y = source.y;
             z = source.z;
         }
+        public SerializableVector3(float x, float y, float z)
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
         public static SerializableVector3[] ToSerializableArray(Vector3[] source)
         {
-            var list = new List<SerializableVector3>();
-            for (int i = 0; i < source.Count(); i++)
-                list.Add(new SerializableVector3(source[i]));
-            return list.ToArray();
+            int count = source.Count();
+            SerializableVector3[] list = new SerializableVector3[count];
+            for (int i = 0; i < count; i++)
+                list[i] = new SerializableVector3(source[i]);
+            return list;
         }
         public static Vector3[] ToStandardVector3Array(SerializableVector3[] source)
         {
-            var list = new List<Vector3>();
-            for (int i = 0; i < source.Count(); i++)
-                list.Add(new Vector3(source[i].x, source[i].y, source[i].z));
-            return list.ToArray();
+            int count = source.Count();
+            Vector3[] list = new Vector3[count];
+            for (int i = 0; i < count; i++)
+                list[i] = new Vector3(source[i].x, source[i].y, source[i].z);
+            return list;
+        }
+        public static implicit operator SerializableVector3(Vector3 value)
+        {
+            return new SerializableVector3(value);
+        }
+        public static implicit operator Vector3(SerializableVector3 value)
+        {
+            return new Vector3(value.x, value.y, value.z);
         }
     }
     [Serializable]
@@ -371,5 +407,57 @@ namespace ProceduralObjects
             return A.a != B.a || A.r != B.r || A.g != B.g || A.b != B.b;
         }
 
+    }
+
+    [Serializable]
+    public class POSerializableMeshData
+    {
+        public POSerializableMeshData(ProceduralObject obj)
+        {
+            if (obj.meshStatus == 1)
+                data = null;
+            else
+                this.BuildData(obj);
+        }
+
+        public Dictionary<SerializableVector3, List<int>> data;
+        public void BuildData(ProceduralObject obj)
+        {
+            data = new Dictionary<SerializableVector3, List<int>>();
+            var original = obj.baseInfoType == "PROP" ? obj._baseProp.m_mesh.vertices : obj._baseBuilding.m_mesh.vertices;
+            for (int i = 0; i < obj.vertices.Length; i++)
+            {
+                var v = obj.vertices[i];
+                if (v.Position == original[v.Index])
+                    continue;
+                List<int> list;
+                if (data.TryGetValue(v.Position, out list))
+                {
+                    list.Add(v.Index);
+                }
+                else
+                {
+                    list = new List<int>();
+                    list.Add(v.Index);
+                    data.Add(v.Position, list);
+                }
+            }
+        }
+        public void ApplyDataToObject(ProceduralObject obj)
+        {
+            if (data == null) return;
+            if (data.Count == 0) return;
+            var vertices = obj.m_mesh.vertices;
+            foreach (var kvp in data)
+            {
+                if (kvp.Value == null) return;
+                if (kvp.Value.Count == 0) return;
+                for (int i = 0; i < kvp.Value.Count; i++)
+                {
+                    vertices[kvp.Value[i]] = kvp.Key;
+                }
+            }
+            obj.m_mesh.SetVertices(new List<Vector3>(vertices));
+        }
     }
 } 

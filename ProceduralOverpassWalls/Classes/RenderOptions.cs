@@ -68,13 +68,13 @@ namespace ProceduralObjects.Classes
             {
                 GUI.Label(new Rect(5, 65, 380, 25), string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"],
                     Gizmos.ConvertRoundToDistanceUnit(ProceduralObjectsMod.PropRenderDistance.value).ToString()) + ProceduralObjectsMod.distanceUnit);
-                var slider = Mathf.Round(GUI.HorizontalSlider(new Rect(5, 91, 380, 22), ProceduralObjectsMod.PropRenderDistance.value, 10, 16000) / 10f) * 10f;
+                var slider = Mathf.Round(GUI.HorizontalSlider(new Rect(5, 91, 380, 22), ProceduralObjectsMod.PropRenderDistance.value, 10, 24000) / 10f) * 10f;
                 if (slider != ProceduralObjectsMod.PropRenderDistance.value)
                     ProceduralObjectsMod.PropRenderDistance.value = slider;
 
                 GUI.Label(new Rect(5, 110, 380, 25), string.Format(LocalizationManager.instance.current["settings_RD_BUILDING_label"],
                     Gizmos.ConvertRoundToDistanceUnit(ProceduralObjectsMod.BuildingRenderDistance.value).ToString()) + ProceduralObjectsMod.distanceUnit);
-                var slider2 = Mathf.Round(GUI.HorizontalSlider(new Rect(5, 136, 380, 22), ProceduralObjectsMod.BuildingRenderDistance.value, 10, 16000) / 10f) * 10f;
+                var slider2 = Mathf.Round(GUI.HorizontalSlider(new Rect(5, 136, 380, 22), ProceduralObjectsMod.BuildingRenderDistance.value, 10, 24000) / 10f) * 10f;
                 if (slider2 != ProceduralObjectsMod.BuildingRenderDistance.value)
                     ProceduralObjectsMod.BuildingRenderDistance.value = slider2;
             }
@@ -125,7 +125,7 @@ namespace ProceduralObjects.Classes
             float max1 = Mathf.Max(size.x, size.y, size.z);
             float max2 = SecondMax(size.x, size.y, size.z);
 
-            return Mathf.Clamp(Mathf.Ceil((multiplier * (max1 + max2) + supp) / 10f) * 10f, threshold, 16000);
+            return Mathf.Clamp(Mathf.Ceil((multiplier * (max1 + max2) + supp) / 10f) * 10f, threshold, 24000);
         }
         public void RecalculateAll()
         {

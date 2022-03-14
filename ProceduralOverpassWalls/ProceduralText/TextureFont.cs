@@ -24,6 +24,7 @@ namespace ProceduralObjects.ProceduralText
             m_textureNormal = texNormal;
             m_charTexturesNormal = new Dictionary<char, Texture2D>();
             m_kerningNormal = new Dictionary<Vector2, int>();
+            m_arabic_correspondances = new List<CharArabicCorrespondance>();
             m_spaceWidth = spaceWidth;
             m_italicExists = false;
             m_boldExists = false;
@@ -81,6 +82,7 @@ namespace ProceduralObjects.ProceduralText
         public uint m_spaceWidth, m_defaultSpacing, m_charSize;
         public bool m_italicExists, m_boldExists, m_disableColorOverwriting;
         public Dictionary<Vector2, int> m_kerningNormal, m_kerningItalic, m_kerningBold;
+        public List<CharArabicCorrespondance> m_arabic_correspondances;
         public PublishedFileId file_id;
         
         public void PrintString(Texture2D originalTex, string str, FontStyle style, Vector2 position, uint spacing, uint size, Color fontColor, byte rotation, out int width, out int height, float scaleX = 1f, float scaleY = 1f)
@@ -130,11 +132,14 @@ namespace ProceduralObjects.ProceduralText
         }
         private int kerning(int i, string s, FontStyle style)
         {
-            if (i == 0)
+            if (i == 0) return 0;
+            return kerning(getArabicReplaced(i - 1, s), getArabicReplaced(i, s), style);
+        }
+        private int kerning(char prev, char next, FontStyle style)
+        {
+            if (!m_orderedChars.Contains(next) || !m_orderedChars.Contains(prev))
                 return 0;
-            if (!m_orderedChars.Contains(s[i]) || !m_orderedChars.Contains(s[i - 1]))
-                return 0;
-            Vector2 chars = new Vector2(m_orderedChars.IndexOf(s[i - 1]), m_orderedChars.IndexOf(s[i]));
+            Vector2 chars = new Vector2(m_orderedChars.IndexOf(prev), m_orderedChars.IndexOf(next));
             if (style == FontStyle.Bold)
             {
                 if (m_kerningBold.ContainsKey(chars))
@@ -175,7 +180,7 @@ namespace ProceduralObjects.ProceduralText
                 }
                 else
                 {
-                    var chartex = charTextures[str[i]];
+                    var chartex = charTextures[getArabicReplaced(i, str)];
                     var k = kerning(i, str, style);
                     for (int y = 0; y < m_charSize; y++)
                     {
@@ -204,8 +209,9 @@ namespace ProceduralObjects.ProceduralText
 
             for (int i = 0; i < str.Length; i++)
             {
-                if (charTextures.ContainsKey(str[i]))
-                    length += charTextures[str[i]].width + (int)spacing - kerning(i, str, style);
+                var character = getArabicReplaced(i, str);
+                if (charTextures.ContainsKey(character))
+                    length += charTextures[character].width + (int)spacing - kerning(i, str, style);
                 else if (!charTextures.ContainsKey(str[i]))
                 {
                     str.Replace(str[i], ' ');
@@ -295,6 +301,26 @@ namespace ProceduralObjects.ProceduralText
             if (style == FontStyle.Bold)
                 return this.m_charTexturesBold;
             return this.m_charTexturesNormal;
+        }
+        private char getArabicReplaced(int i, string s)
+        {
+            // Used for Arabic writing which requires special attention
+            // method that returns a replacement character for a given character at index i in a string s
+            // depending on whether it has to be connected on the left, right, both or none.
+            // see class CharArabicCorrespondance            
+            if (m_arabic_correspondances == null) return s[i];
+            if (m_arabic_correspondances.Count == 0) return s[i];
+            if (!m_arabic_correspondances.Any(corres => corres.def == s[i])) return s[i];
+            var correspondance = m_arabic_correspondances.FirstOrDefault(corres => corres.def == s[i]);
+            bool connectLeft = false, connectRight = false;
+            if (i > 0)
+            { if (s[i - 1] != ' ') connectLeft = true; }
+            if (i < s.Length - 2)
+            { if (s[i + 1] != ' ') connectRight = true; }
+            if (connectLeft && connectRight) return correspondance.right_left;
+            else if (!connectLeft && connectRight) return correspondance.right;
+            else if (connectLeft && !connectRight) return correspondance.left;
+            else return correspondance.def;
         }
 
         public void ExportKerning(string excludedCharacters)
@@ -623,5 +649,11 @@ namespace ProceduralObjects.ProceduralText
                 }
             }
         }
+    }
+    public class CharArabicCorrespondance
+    {
+        public CharArabicCorrespondance() { }
+
+        public char def, right, left, right_left;
     }
 }

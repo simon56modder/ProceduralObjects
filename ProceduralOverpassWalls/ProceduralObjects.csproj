@@ -60,6 +60,7 @@
     <Compile Include="Classes\AdvancedEdition.cs" />
     <Compile Include="Classes\ClipboardProceduralObjects.cs" />
     <Compile Include="Classes\ExternalProceduralObjectsManager.cs" />
+    <Compile Include="Classes\MeasurementsManager.cs" />
     <Compile Include="Classes\POGroup.cs" />
     <Compile Include="Classes\RenderOptions.cs" />
     <Compile Include="Classes\StatisticsManager.cs" />
@@ -79,6 +80,7 @@
     <Compile Include="SelectionMode\SelectionModeAction.cs" />
     <Compile Include="SelectionMode\SelectionModeTabs.cs" />
     <Compile Include="SelectionMode\SetRenderDistance.cs" />
+    <Compile Include="UI\ExtUITabStrip.cs" />
     <Compile Include="UI\GUIUtils.cs" />
     <Compile Include="Classes\ProceduralUtils.cs" />
     <Compile Include="Classes\KeyBindings.cs" />
@@ -91,6 +93,7 @@
     <Compile Include="Classes\TextureManager.cs" />
     <Compile Include="Classes\TimeUtils.cs" />
     <Compile Include="UI\GUIPainter.cs" />
+    <Compile Include="UI\OptionsKeymapping.cs" />
     <Compile Include="UI\UIMainButton.cs" />
     <Compile Include="Classes\UpdateInformant.cs" />
     <Compile Include="Classes\VertexClass.cs" />
@@ -183,6 +186,23 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Icons\CTA_alignVertices.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\CursorDraw.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\angle.png" />
+    <EmbeddedResource Include="Icons\distance.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\main_measures.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\copy.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\CursorColorRect.png" />
+    <EmbeddedResource Include="Icons\CursorText.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
