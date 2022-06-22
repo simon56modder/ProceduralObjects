@@ -34,7 +34,7 @@ namespace ProceduralObjects
         }
 
 
-        public static readonly string VERSION = "1.7.6";
+        public static readonly string VERSION = "1.7.8";
         public static readonly string DOCUMENTATION_URL = "http://proceduralobjects.shoutwiki.com/wiki/";
         public static readonly string SETTINGS_FILENAME = "ProceduralObjectsSettings";
         public static SettingsFile SettingsFile;
@@ -196,7 +196,7 @@ namespace ProceduralObjects
                     }
                     gameLogicObject = new GameObject("Logic_ProceduralObjects");
                     ProceduralObjectsLogic.instance = gameLogicObject.AddComponent<ProceduralObjectsLogic>();
-                    gameLogicObject.AddComponent<UpdateInformant>();
+                    gameLogicObject.AddComponent<PopupStart>();
                 }
             }
             else if (mode == LoadMode.NewAsset || mode == LoadMode.LoadAsset)
@@ -266,7 +266,7 @@ namespace ProceduralObjects
         private UISlider confirmDelThresholdSlider, gizmoSizeSlider, gizmoOpacitySlider;  // propRenderSlider, buildingRenderSlider 
         private UILabel confirmDelThresholdLabel, gizmoSizeLabel, gizmoOpacityLabel; // propRenderLabel, buildingRenderLabel
         private UICheckBox confirmDelCheckbox, showDevCheckbox, hideDisLayerIconCheckbox, useUINightModeCheckbox, autoResizeDecalsCheckbox, includeSubBuildingsCheckbox, useColorVariationCheckbox;
-        private UIButton openKeybindingsButton;
+        private UIButton openKeybindingsButton, genTabButton, kbTabButton;
 
         public void OnSettingsUI(UIHelperBase helper)
         {
@@ -276,10 +276,10 @@ namespace ProceduralObjects
 
             ExtUITabstrip tabStrip = ExtUITabstrip.Create((UIHelper)helper);
 
-            UIHelper gentab = tabStrip.AddTabPage("  " + LocalizationManager.instance.current["settings_GENERAL"] + "  ");
-            UIHelperBase group = gentab.AddGroup("");
-            UIHelper keybindingsTab = tabStrip.AddTabPage(" " + LocalizationManager.instance.current["settings_KB"] + " ");
-            UIHelperBase kbGroup = keybindingsTab.AddGroup("");
+            UIHelper gentab = tabStrip.AddTabPage("  " + LocalizationManager.instance.current["settings_GENERAL"] + "  ", out genTabButton);
+            UIHelperBase group = gentab.AddGroup(LocalizationManager.instance.current["settings_GENERAL"]);
+            UIHelper keybindingsTab = tabStrip.AddTabPage(" " + LocalizationManager.instance.current["settings_KB"] + " ", out kbTabButton);
+            UIHelperBase kbGroup = keybindingsTab.AddGroup(LocalizationManager.instance.current["settings_KB"]);
            // UIHelperBase group = helper.AddGroup("    Procedural Objects");
 
             // KEY BINDINGS TAB
@@ -448,6 +448,8 @@ namespace ProceduralObjects
         {
             LocalizationManager.instance.SetCurrent(value);
             LanguageUsed.value = LocalizationManager.instance.current.identifier;
+            genTabButton.text = "  " + LocalizationManager.instance.current["settings_GENERAL"] + "  ";
+            kbTabButton.text = " " + LocalizationManager.instance.current["settings_KB"] + " ";
             openKeybindingsButton.text = LocalizationManager.instance.current["open_kbd_cfg"];
          // propRenderLabel.text = string.Format(LocalizationManager.instance.current["settings_RD_PROP_label"], Gizmos.ConvertRoundToDistanceUnit(PropRenderDistance.value).ToString()) + distanceUnit;
             confirmDelThresholdLabel.text = string.Format(LocalizationManager.instance.current["settings_CONFDEL_SLIDER_label"], ConfirmDeletionThreshold.value.ToString());

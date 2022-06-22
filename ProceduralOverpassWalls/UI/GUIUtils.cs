@@ -261,6 +261,18 @@ namespace ProceduralObjects.UI
         {
             GUI.DrawTexture(new Rect(leftEndPos.x, leftEndPos.y, length, thickness), greyTex, ScaleMode.StretchToFill);
         }
+        public static void ColorizeIf(Color c, bool condition, Action ui)
+        {
+            if (condition)
+            {
+                var color = GUI.color;
+                GUI.color = c;
+                ui.Invoke();
+                GUI.color = color;
+            }
+            else
+                ui.Invoke();
+        }
         public static void Setup()
         {
             greyTex = TextureUtils.PlainTexture(2, 2, new Color(.7f, .7f, .7f, 1f));
@@ -340,11 +352,12 @@ namespace ProceduralObjects.UI
                     else if (s.Last() == '.')
                         returnValue = float.Parse(s.TrimEnd('.'));
                     else
-                        returnValue = float.Parse(s);
+                        returnValue = f;
                 }
                 catch
                 {
-                    inputString = returnValue.ToString();
+                    inputString = s;
+                    returnValue = f;
                 }
             }
             public FloatInputField DrawField(Rect rect, float value, bool allowNegatives = true)
@@ -357,6 +370,24 @@ namespace ProceduralObjects.UI
                 }
                 else
                     SetString(str, allowNegatives);
+                return this;
+            }
+            public FloatInputField DrawField(Rect rect, string controlName, float value, bool allowNegatives = true)
+            {
+                GUI.SetNextControlName(controlName);
+                var str = GUI.TextField(rect, inputString);
+                if (GUI.GetNameOfFocusedControl() == controlName)
+                {
+                    SetString(str, allowNegatives);
+                    if (Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Return))
+                        GUI.FocusControl(null);
+                }
+                else if (returnValue != value)
+                {
+                    returnValue = value;
+                    inputString = value.ToString();
+                }
+
                 return this;
             }
             public FloatInputField DrawField(Rect rect, float value, bool allowNegatives, float sliderMin, float sliderMax, bool showMaxButton, float maxValue)

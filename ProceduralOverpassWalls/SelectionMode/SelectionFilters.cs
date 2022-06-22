@@ -161,16 +161,9 @@ namespace ProceduralObjects.SelectionMode
         private string GetShowName()
         {
             if (pickerPrefabNames.Count == 1)
-            {
-                var pickerPrefabName = pickerPrefabNames[0];
-                if (pickerPrefabName.Length < 5)
-                    return pickerPrefabName;
-                return pickerPrefabName.Substring(pickerPrefabName.IndexOf(".") + 1).Replace("_Data", "");
-            }
+                return ProceduralUtils.GetDisplayableAssetname(pickerPrefabNames[0]);
             else
-            {
                 return string.Format(LocalizationManager.instance.current["filters_pickertypes"], pickerPrefabNames.Count.ToString());
-            }
         }
         private void DisableAllButChanged(bool[] newValues)
         {

@@ -85,6 +85,14 @@ namespace ProceduralObjects
                 ModuleManager.instance.RemoveModule(this);
             }
         }
+        /// <summary>
+        /// Runs in OnGUI() in parallel of DrawCustomizationWindow(int id) when the module window is open.
+        /// </summary>
+        public virtual void OnGUI() { }
+        /// <summary>
+        /// Update method, runs in Update() if the module is enabled regardless of object visibility.
+        /// </summary>
+        public virtual void UpdateModule(ProceduralObjectsLogic logic, bool simulationPaused, bool layerVisible) { }
 
         /// <summary>
         /// Invoked when the module is enabled (turned on).
@@ -112,11 +120,12 @@ namespace ProceduralObjects
         /// Invoked when the module window is closed.
         /// </summary>
         public virtual void OnModuleWindowClose(ProceduralObjectsLogic logic) { }
-
+        
         /// <summary>
-        /// Update method, runs in Update() if the module is enabled regardless of object visibility.
+        /// Run through before every rendering. If false then object rendering is cancelled for the frame, regardless if other modules return true. Default always returns true
         /// </summary>
-        public virtual void UpdateModule(ProceduralObjectsLogic logic, bool simulationPaused, bool layerVisible) { }
+        /// <returns></returns>
+        public virtual bool RenderParentThisFrame(ProceduralObjectsLogic logic) { return true; }
 
         /// <summary>
         /// Overwrite this to provide a deeper copy of the module instance when cloned. If not overwritten this method uses MemberwiseClone() (see Microsoft Docs MemberwiseClone() documentation)

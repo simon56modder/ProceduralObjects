@@ -37,7 +37,7 @@ namespace ProceduralObjects.Classes
             if (expandingWindow)
             {
                 var mouseposy = GUIUtils.MousePos.y;
-                winRect.height = Mathf.Max(250, mouseposy - winRect.yMin);
+                winRect.height = Mathf.Max(190, mouseposy - winRect.yMin);
                 if (Input.GetMouseButtonUp(0))
                     expandingWindow = false;
             }

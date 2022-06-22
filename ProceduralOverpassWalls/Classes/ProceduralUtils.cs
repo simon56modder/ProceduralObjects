@@ -67,7 +67,14 @@ namespace ProceduralObjects.Classes
         }
         public static Vector3 NearestGroundPointVertical(Vector3 pos, bool andNetBuildings = false)
         {
-            ToolBase.RaycastInput rayInput = new ToolBase.RaycastInput(new Ray(pos, Vector3.down), 10000);
+            Vector3 hit = pos;
+            if (TryRaycastTerrain(pos, Vector3.down, out hit, andNetBuildings))
+                return hit;
+            return pos;
+        }
+        public static bool TryRaycastTerrain(Vector3 pos, Vector3 direction, out Vector3 hitpoint, bool andNetBuildings = false)
+        {
+            ToolBase.RaycastInput rayInput = new ToolBase.RaycastInput(new Ray(pos, direction), 10000);
             if (andNetBuildings)
             {
                 // BloodyPenguin's code
@@ -82,14 +89,34 @@ namespace ProceduralObjects.Classes
             }
             ToolBase.RaycastOutput rayOutput;
             if (ProceduralTool.TerrainRaycast(rayInput, out rayOutput))
-                return rayOutput.m_hitPos;
+            {
+                hitpoint = rayOutput.m_hitPos;
+                return true;
+            }
             else
             {
-                rayInput = new ToolBase.RaycastInput(new Ray(pos, Vector3.up), 10000);
+                rayInput = new ToolBase.RaycastInput(new Ray(pos, -direction), 10000);
                 if (ProceduralTool.TerrainRaycast(rayInput, out rayOutput))
-                    return rayOutput.m_hitPos;
+                {
+                    hitpoint = rayOutput.m_hitPos;
+                    return true;
+                }
             }
-            return pos;
+            hitpoint = pos;
+            return false;
+        }
+        public static void InvertSelection(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer)
+        {
+            var logic = ProceduralObjectsLogic.instance;
+            foreach (Vertex v in buffer)
+            {
+                if (v.IsDependent) continue;
+                if (editingVertexIndex.Contains(v.Index))
+                    editingVertexIndex.Remove(v.Index);
+                else
+                    editingVertexIndex.Add(v.Index);
+            }
+            ProceduralUtils.UpdateVertexSelectedState(editingVertexIndex, obj);
         }
         public static void RecenterObjOrigin(ProceduralObject obj, Vertex[] buffer)
         {
@@ -150,6 +177,24 @@ namespace ProceduralObjects.Classes
             {
                 list.Add(new ProceduralObjectContainer(obj));
             }
+            try
+            {
+                if (PopupStart.loading_failures.Count > 0)
+                {
+                    foreach (var f in PopupStart.loading_failures)
+                    {
+                        if (!f.keep) continue;
+                        for (int i = 0; i < f.containers.Count; i++)
+                        {
+                            list.Add(f.containers.Keys.ToList()[i]);
+                        }
+                    }
+                }
+            } 
+            catch (Exception e)
+            {
+                Debug.LogError("[ProceduralObjects] Error implementing the POs that failed to load back into saving\n" + e.ToString());
+            }
             return list.ToArray();
         }
         public static void LoadContainerData(this ProceduralObjectsLogic logic, ProceduralObjectContainer[] containerArray)
@@ -182,9 +227,11 @@ namespace ProceduralObjects.Classes
                 catch (Exception e)
                 {
                     Debug.LogError("[ProceduralObjects] Failed to load a Procedural Object : \n" + e.GetType().ToString() + " : " + e.Message + "\n" + e.StackTrace);
+                    PopupStart.RegisterFailure(c, e, props, buildings);
                     logic.failedToLoadObjects += 1;
                 }
             }
+            PopupStart.LoadingDoneShowPopup();
         }
         public static List<POGroup> BuildGroupsFromData(this ProceduralObjectsLogic logic)
         {
@@ -240,6 +287,29 @@ namespace ProceduralObjects.Classes
             }
             prevSelection = newSelection;
         }
+        public static void UpdateVertexSelectedState(List<int> editingVertices, ProceduralObject obj)
+        {
+            if (editingVertices == null)
+            {
+                ClearVertexSelection(obj);
+                return;
+            }
+            foreach (Vertex v in obj.vertices)
+            {
+                if (v.IsDependent) continue;
+                if (editingVertices.Contains(v.Index))
+                    v._selected = true;
+                else
+                    v._selected = false;
+            }
+        }
+        public static void ClearVertexSelection(ProceduralObject obj)
+        {
+            foreach (Vertex v in obj.vertices)
+            {
+                v._selected = false;
+            }
+        }
 
         public static void RecalculateNormals(this ProceduralObject obj)
         {
@@ -254,14 +324,15 @@ namespace ProceduralObjects.Classes
             else if (obj.normalsRecalcMode == NormalsRecalculation.Tolerance0)
                 obj.m_mesh.RecalculateNormals(0);
         }
-        public static void MakeUniqueMesh(this ProceduralObject obj)
+        public static void MakeUniqueMesh(this ProceduralObject obj, bool skipVertexListBuild = false)
         {
             if (obj.baseInfoType == "BUILDING" || obj.meshStatus == 2)
                 return;
 
             obj.meshStatus = 2;
             obj.m_mesh = obj.m_mesh.InstantiateMesh();
-            obj.vertices = Vertex.CreateVertexList(obj);
+            if (!skipVertexListBuild)
+                obj.vertices = Vertex.CreateVertexList(obj);
             //  obj.m_mesh.SetVertices(new List<Vector3>(obj.allVertices));
         } 
         public static Mesh InstantiateMesh(this Mesh source)
@@ -299,7 +370,15 @@ namespace ProceduralObjects.Classes
             // return true if everything is equivalent
             return true;
         } 
-
+        public static void ResetOriginalMesh(this ProceduralObject obj)
+        {
+            var originalVertices = (obj.baseInfoType == "PROP") ? obj._baseProp.m_mesh.vertices : obj._baseBuilding.m_mesh.vertices;
+            for (int i = 0; i < obj.vertices.Length; i++)
+            {
+                obj.vertices[i].Position = originalVertices[i];
+            }
+            obj.ApplyModelChange();
+        }
         public static POGroup ConstructSubBuildings(ProceduralObject obj)
         {
             var logic = ProceduralObjectsLogic.instance;
@@ -351,6 +430,7 @@ namespace ProceduralObjects.Classes
             var group = POGroup.MakeGroup(logic, pos, pos[0]);
             return group;
         }
+
         public static ProceduralInfo[] ToProceduralInfoArray(this IEnumerable<PropInfo> source)
         {
             var list = new List<ProceduralInfo>();
@@ -371,6 +451,20 @@ namespace ProceduralObjects.Classes
             }
             return list.ToArray();
         }
+        public static List<ProceduralInfo> CreateProceduralInfosList()
+        {
+            try
+            {
+                return new List<ProceduralInfo>(new List<ProceduralInfo>(Resources.FindObjectsOfTypeAll<PropInfo>().ToProceduralInfoArray())
+                    .Concat(new List<ProceduralInfo>(Resources.FindObjectsOfTypeAll<BuildingInfo>().ToProceduralInfoArray())));
+            }
+            catch
+            {
+                Debug.LogError("[ProceduralObjects] Fatal Loading exception : couldn't find all assets and make them procedural objects !");
+            }
+            return new List<ProceduralInfo>();
+        }
+
         public static Texture GetOriginalTexture(ProceduralObject obj)
         {
             if (obj.customTexture)
@@ -385,19 +479,7 @@ namespace ProceduralObjects.Classes
             else
                 return obj._baseBuilding.m_material.mainTexture;
         }
-        public static List<ProceduralInfo> CreateProceduralInfosList()
-        {
-            try
-            {
-                return new List<ProceduralInfo>(new List<ProceduralInfo>(Resources.FindObjectsOfTypeAll<PropInfo>().ToProceduralInfoArray())
-                    .Concat(new List<ProceduralInfo>(Resources.FindObjectsOfTypeAll<BuildingInfo>().ToProceduralInfoArray())));
-            }
-            catch
-            {
-                Debug.LogError("[ProceduralObjects] Fatal Loading exception : couldn't find all assets and make them procedural objects !");
-            }
-            return new List<ProceduralInfo>();
-        }
+
         public static bool IsPloppableAsphalt(this PropInfo sourceProp)
         {
             string name = "";
@@ -420,17 +502,18 @@ namespace ProceduralObjects.Classes
         {
             if (!obj.basePrefabName.Contains(".")) return false;
             string postPoint = obj.basePrefabName.Split(new string[] { "." }, StringSplitOptions.RemoveEmptyEntries)[1];
-            return (postPoint == "R69 Ploppable Gravel Circle16_Data") ||
-                (postPoint == "R69 Ploppable Pavement Circle8_Data") ||
-                (postPoint == "R69 Ploppable Cliff Circle16_Data") ||
-                (postPoint == "R69 Ploppable Pavement Circle_Data") ||
+            return ((postPoint == "R69 Ploppable Pavement Circle_Data") ||
                 (postPoint == "R69 Ploppable Asphalt Circle_Data") ||
                 (postPoint == "R69 Ploppable Grass Circle8_Data") ||
                 (postPoint == "R69 Ploppable Gravel Circle8_Data") ||
+                (postPoint == "R69 Ploppable Pavement Circle8_Data") ||
                 (postPoint == "R69 Ploppable Asphalt Circle8_Data") ||
                 (postPoint == "R69 Ploppable Cliff Circle8_Data") ||
+                (postPoint == "R69 Ploppable Grass Circle16_Data") ||
+                (postPoint == "R69 Ploppable Gravel Circle16_Data") ||
+                (postPoint == "R69 Ploppable Cliff Circle16_Data") ||
                 (postPoint == "R69 Ploppable Asphalt Circle16_Data") ||
-                (postPoint == "R69 Ploppable Pavement Circle16_Data");
+                (postPoint == "R69 Ploppable Pavement Circle16_Data"));
         }
         private static Color ploppableAsphaltColor;
         private static bool isPAsphColorSetup = false;
@@ -483,7 +566,14 @@ namespace ProceduralObjects.Classes
             mat.color = color;
             return color;
         }
-        public static void ExportRequiredAssetsHTML(string path, List<CacheProceduralObject> list )
+
+        public static string GetDisplayableAssetname(string basePrefabName)
+        {
+            if (basePrefabName.Length < 5)
+                return basePrefabName;
+            return basePrefabName.Substring(basePrefabName.IndexOf(".") + 1).Replace("_Data", "");
+        }
+        public static void ExportRequiredAssetsHTML(string path, List<CacheProceduralObject> list)
         {
             if (File.Exists(path)) File.Delete(path);
 

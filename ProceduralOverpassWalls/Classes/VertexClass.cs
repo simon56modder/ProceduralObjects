@@ -16,8 +16,9 @@ namespace ProceduralObjects.Classes
             this.IsDependent = source.IsDependent;
             this.Index = source.Index;
             this.DependencyIndex = source.DependencyIndex;
+            this._selected = false;
         }
-        public bool IsDependent, Locked;
+        public bool IsDependent, Locked, _selected;
         public int DependencyIndex, Index;
         public Vector3 Position;
 
@@ -69,7 +70,6 @@ namespace ProceduralObjects.Classes
             {
                 dependencyData = dependencyData.Replace("[ProceduralObj]", "");
                 loadDependencyData = true;
-                Debug.Log("data found for object " + source.name + " : " + dependencyData);
             }
             for (int i = 0; i < sourceVertices.Count(); i++)
             {
@@ -191,7 +191,18 @@ namespace ProceduralObjects.Classes
     {
         public static readonly Texture2D[] vertexIcons = new Texture2D[] { TextureUtils.LoadTextureFromAssembly("vertexUnselected"), TextureUtils.LoadTextureFromAssembly("vertexSelected") };
 
-
+        public static void SplitSelectedVertex(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer)
+        {
+            foreach (Vertex v in buffer)
+            {
+                if (!v.IsDependent) continue;
+                if (!editingVertexIndex.Contains(v.DependencyIndex)) continue;
+                v.DependencyIndex = 0;
+                v.IsDependent = false;
+                ProceduralObjectsLogic.instance.editingVertexIndex.Add(v.Index);
+            }
+            ProceduralUtils.UpdateVertexSelectedState(ProceduralObjectsLogic.instance.editingVertexIndex, obj);
+        }
         public static void FlattenSelection(ProceduralObject obj, List<int> editingVertexIndex, Vertex[] buffer)
         {
             obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, buffer);
@@ -241,6 +252,8 @@ namespace ProceduralObjects.Classes
             {
                 var worldPos = ProceduralUtils.NearestGroundPointVertical(ProceduralUtils.VertexWorldPosition(v, obj));
                 v.Position = Quaternion.Inverse(obj.m_rotation) * (worldPos - obj.m_position);
+                if (obj.isPloppableAsphalt)
+                    v.Position = v.Position.RevertPloppableAsphaltPosition();
             }
 
             obj.historyEditionBuffer.ConfirmNewStep(buffer);
@@ -263,6 +276,8 @@ namespace ProceduralObjects.Classes
                 var worldPos = ProceduralUtils.VertexWorldPosition(v, obj);
                 worldPos.y -= yWorldDiff;
                 v.Position = Quaternion.Inverse(obj.m_rotation) * (worldPos - obj.m_position);
+                if (obj.isPloppableAsphalt)
+                    v.Position = v.Position.RevertPloppableAsphaltPosition();
             }
 
             obj.historyEditionBuffer.ConfirmNewStep(buffer);
@@ -294,6 +309,8 @@ namespace ProceduralObjects.Classes
                 worldPos = ProceduralUtils.NearestGroundPointVertical(worldPos + boundsOffset, andNetBuildings);
                 worldPos.y += yDiff;
                 v.Position = Quaternion.Inverse(obj.m_rotation) * (worldPos - obj.m_position);
+                if (obj.isPloppableAsphalt)
+                    v.Position = v.Position.RevertPloppableAsphaltPosition();
             }
             obj.historyEditionBuffer.ConfirmNewStep(buffer);
         }
@@ -304,6 +321,9 @@ namespace ProceduralObjects.Classes
                 vertices[i].Position.x = -vertices[i].Position.x;
             obj.flipFaces = !obj.flipFaces;
             VertexUtils.flipFaces(obj);
+            if (obj.normalsRecalcMode == NormalsRecalculation.None && !obj.IsPloppableAsphalt())
+                obj.normalsRecalcMode = NormalsRecalculation.Default;
+            obj.RecalculateNormals();
         }
         public static void MirrorY(Vertex[] vertices, ProceduralObject obj)
         {
@@ -311,6 +331,9 @@ namespace ProceduralObjects.Classes
                 vertices[i].Position.y = -vertices[i].Position.y;
             obj.flipFaces = !obj.flipFaces;
             VertexUtils.flipFaces(obj);
+            if (obj.normalsRecalcMode == NormalsRecalculation.None && !obj.IsPloppableAsphalt())
+                obj.normalsRecalcMode = NormalsRecalculation.Default;
+            obj.RecalculateNormals();
         }
         public static void MirrorZ(Vertex[] vertices, ProceduralObject obj)
         {
@@ -318,6 +341,9 @@ namespace ProceduralObjects.Classes
                 vertices[i].Position.z = -vertices[i].Position.z;
             obj.flipFaces = !obj.flipFaces;
             VertexUtils.flipFaces(obj);
+            if (obj.normalsRecalcMode == NormalsRecalculation.None && !obj.IsPloppableAsphalt())
+                obj.normalsRecalcMode = NormalsRecalculation.Default;
+            obj.RecalculateNormals();
         }
 
         public static void StretchX(Vertex[] vertices, float factor)
@@ -458,6 +484,10 @@ namespace ProceduralObjects.Classes
         {
             return new Vector3(position.x, position.y, (-position.z) * 2.2173f);
         }
+        public static Vector3 RevertPloppableAsphaltPosition(this Vector3 position)
+        {
+            return new Vector3(position.x, position.y, position.z / -2.2173f);
+        }
         public static Vector3 NegativeZ(this Vector3 v)
         {
             return new Vector3(v.x, v.y, -v.z);
@@ -531,6 +561,12 @@ namespace ProceduralObjects.Classes
                     }
                 }
             }
+            if (outmost.Key == null && outmost.Value == null)
+                return new KeyValuePair<ProceduralObject, ProceduralObject>(points[0], points[0]);
+            if (outmost.Key == null && outmost.Value != null)
+                return new KeyValuePair<ProceduralObject, ProceduralObject>(outmost.Value, outmost.Value);
+            if (outmost.Key != null && outmost.Value == null)
+                return new KeyValuePair<ProceduralObject, ProceduralObject>(outmost.Key, outmost.Key);
             return outmost;
         }
         public static KeyValuePair<Vector3, Vector3> OutmostPoints(params Vertex[] points)

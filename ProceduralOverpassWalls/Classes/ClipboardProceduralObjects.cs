@@ -116,6 +116,7 @@ namespace ProceduralObjects.Classes
                     tw.WriteLine("tilingFactor = " + kvp.Key.tilingFactor.ToString());
                 tw.WriteLine("color = " + ((SerializableColor)kvp.Key.m_color).ToString());
                 tw.WriteLine("flipFaces = " + kvp.Key.flipFaces.ToString());
+                tw.WriteLine("disableCastShadows = " + kvp.Key.disableCastShadows.ToString());
                 tw.WriteLine("normalsRecalc = " + kvp.Key.normalsRecalculation.ToString());
                 tw.WriteLine("visibility = " + kvp.Key.visibility.ToString());
                 if (kvp.Key.textParam != null)

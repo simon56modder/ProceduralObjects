@@ -254,13 +254,7 @@ namespace ProceduralObjects.ProceduralText
                 ProceduralObjectsLogic.PlaySound();
                 textManager.parameters.AddField(TextField.Clone(this, false));
             }
-            /*
-            if (GUI.Button(new Rect(298, 3, 25, 25), ProceduralObjectsMod.Icons[minimized ? 1 : 2]))
-            {
-                ProceduralObjectsLogic.PlaySound();
-                minimized = !minimized;
-            }
-             * */
+
             if (showDelete)
             {
                 GUI.color = Color.red;
@@ -305,10 +299,6 @@ namespace ProceduralObjects.ProceduralText
             }
             else // if m_type == 1
             {
-                /*
-                GUI.color = m_fontColor;
-                GUI.Label(new Rect(3, 4, 25, 24), "██");
-                GUI.color = Color.white; */
                 painter = GUIPainter.DrawPainterSampleOnly(painter, new Vector2(3, 4), m_fontColor,
                     (c) => { m_fontColor = c.KeepAlphaFrom(m_fontColor); },
                     () =>
@@ -391,11 +381,11 @@ namespace ProceduralObjects.ProceduralText
                     heightField = new GUIUtils.FloatInputField(m_height);
                 m_height = (uint)heightField.DrawField(new Rect(74, 117, 170, 35), m_height, false, 0f, 1024f, true, Mathf.Abs(Mathf.Round(textManager.windowTex.height - y))).returnValue;
 
-                GUI.Label(new Rect(4, 154, 100, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_opacity"] + " : " + ((int)(m_fontColor.a * 100)).ToString() + "%</size>");
+                GUI.Label(new Rect(4, 154, 200, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_opacity"] + " : " + ((int)(m_fontColor.a * 100)).ToString() + "%</size>");
                 m_fontColor.a = GUI.HorizontalSlider(new Rect(4, 176, 200, 25), m_fontColor.a, 0f, 1f);
 
                 if (borderColor == null) borderColor = Color.white;
-                GUI.Label(new Rect(4, 193, 100, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_border"] + " : " + borderSize.ToString() + " px</size>");
+                GUI.Label(new Rect(4, 193, 200, 22), "<size=12>" + LocalizationManager.instance.current["colorRect_border"] + " : " + borderSize.ToString() + " px</size>");
                 borderSize = (uint)Mathf.RoundToInt(GUI.HorizontalSlider(new Rect(4, 215, 200, 25), borderSize, 0f, 20f));
                 borderPainter = GUIPainter.DrawPainterSampleOnly(borderPainter, new Vector2(214, 198), borderColor,
                     (c) => { borderColor = c; },
@@ -420,9 +410,9 @@ namespace ProceduralObjects.ProceduralText
                 posYfield = new GUIUtils.FloatInputField(y);
             }
             GUI.Label(new Rect(3, 51, 24, 22), "<size=12>X :</size>");
-            x = posXfield.DrawField(new Rect(27, 50, 83, 22), x, true).returnValue;
+            x = posXfield.DrawField(new Rect(27, 50, 83, 22), "textPosX", x, true).returnValue;
             GUI.Label(new Rect(111, 51, 24, 22), "<size=12>Y :</size>");
-            y = posYfield.DrawField(new Rect(135, 50, 83, 22), y, true).returnValue;
+            y = posYfield.DrawField(new Rect(135, 50, 83, 22), "textPosY", y, true).returnValue;
 
             // rotation
             if (GUI.Button(new Rect(220, 50, 25, 23), ProceduralObjectsMod.Icons[5]))

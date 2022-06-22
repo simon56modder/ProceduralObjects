@@ -26,7 +26,7 @@ namespace ProceduralObjects.Classes
         public uint counter_POs, counter_layers, counter_ConvProps, counter_ConvBuildings, counter_Decals, counter_PSrfs, counter_PA, counter_customModels;
         public bool showWindow = false;
         public Rect window;
-        
+
         public void DrawWindow()
         {
             if (showWindow)
@@ -71,19 +71,20 @@ namespace ProceduralObjects.Classes
             counter_customModels = 0;
             for (int i = 0; i < counter_POs; i++)
             {
-                if (logic.proceduralObjects[i].baseInfoType == "PROP")
+                var po = logic.proceduralObjects[i];
+                if (po.baseInfoType == "PROP")
                 {
                     counter_ConvProps += 1;
-                    if (logic.proceduralObjects[i].meshStatus != 1)
+                    if (po.meshStatus != 1)
                         counter_customModels += 1;
-                    if (logic.proceduralObjects[i]._baseProp.m_isDecal)
+                    if (po._baseProp.m_isDecal)
                         counter_Decals += 1;
-                    if (logic.proceduralObjects[i]._baseProp.IsPloppableAsphalt())
+                    if (po._baseProp.IsPloppableAsphalt())
                         counter_PSrfs += 1;
-                    if (logic.proceduralObjects[i]._baseProp.m_mesh.name == "ploppableasphalt-prop" || logic.proceduralObjects[i]._baseProp.m_mesh.name == "ploppableasphalt-decal")
+                    if (po._baseProp.m_mesh.name == "ploppableasphalt-prop" || po._baseProp.m_mesh.name == "ploppableasphalt-decal")
                         counter_PA += 1;
                 }
-                else if (logic.proceduralObjects[i].baseInfoType == "BUILDING")
+                else if (po.baseInfoType == "BUILDING")
                 {
                     counter_ConvBuildings += 1;
                     counter_customModels += 1;

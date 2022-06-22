@@ -14,7 +14,7 @@ namespace ProceduralObjects
         {
             if (deletePreviousIfExisting)
                 DestroyGizmo();
-            
+
             GameObject xAxis = new GameObject("ProceduralAxis_X");
             var xCollid = xAxis.AddComponent<BoxCollider>();
             xCollid.size = new Vector3(2, 2, 2);
@@ -90,7 +90,7 @@ namespace ProceduralObjects
             xYellowCube.transform.SetParent(xAxis.transform, true);
             xYellowCube.GetComponent<MeshRenderer>().material = yellow;
             GameObject.Destroy(xYellowCube.GetComponent<MeshCollider>());
-          //  xYellowCube.transform.localScale = new Vector3(3.5f, 3.5f, 3.5f);
+            //  xYellowCube.transform.localScale = new Vector3(3.5f, 3.5f, 3.5f);
 
             GameObject yAxis = new GameObject("ProceduralAxis_Y");
             var yCollid = yAxis.AddComponent<BoxCollider>();
@@ -110,7 +110,7 @@ namespace ProceduralObjects
             yYellowCube.transform.position = yPos[1];
             yYellowCube.transform.SetParent(yAxis.transform, true);
             yYellowCube.GetComponent<MeshRenderer>().material = yellow;
-          //  yYellowCube.transform.localScale = xYellowCube.transform.localScale;
+            //  yYellowCube.transform.localScale = xYellowCube.transform.localScale;
             GameObject.Destroy(yYellowCube.GetComponent<MeshCollider>());
 
             GameObject zAxis = new GameObject("ProceduralAxis_Z");
@@ -131,7 +131,7 @@ namespace ProceduralObjects
             zYellowCube.transform.position = zPos[1];
             zYellowCube.transform.SetParent(zAxis.transform, true);
             zYellowCube.GetComponent<MeshRenderer>().material = yellow;
-          //  zYellowCube.transform.localScale = xYellowCube.transform.localScale;
+            //  zYellowCube.transform.localScale = xYellowCube.transform.localScale;
             GameObject.Destroy(zYellowCube.GetComponent<MeshCollider>());
 
             _gizmo = new GameObject[] { xAxis, yAxis, zAxis };
@@ -144,10 +144,10 @@ namespace ProceduralObjects
                 DestroyGizmo();
 
             GameObject xAxis = new GameObject("ProceduralAxis_X"); // turn around Y
-           /* var xCollid = xAxis.AddComponent<CapsuleCollider>();
-            xCollid.radius = 0;
-            xCollid.height = 2;
-            xCollid.radius = 10; */
+            /* var xCollid = xAxis.AddComponent<CapsuleCollider>();
+             xCollid.radius = 0;
+             xCollid.height = 2;
+             xCollid.radius = 10; */
             LineRenderer xLineComp = xAxis.AddComponent<LineRenderer>();
             xLineComp.material = spriteMat;
             xLineComp.startColor = GizmoRed;
@@ -178,9 +178,9 @@ namespace ProceduralObjects
 
 
             GameObject yAxis = new GameObject("ProceduralAxis_Y"); // turn around Z
-           /* var yCollid = yAxis.AddComponent<CapsuleCollider>();
-            yCollid.radius = 0;
-            yCollid.height = 2; */
+            /* var yCollid = yAxis.AddComponent<CapsuleCollider>();
+             yCollid.radius = 0;
+             yCollid.height = 2; */
             LineRenderer yLineComp = yAxis.AddComponent<LineRenderer>();
             yLineComp.material = spriteMat;
             yLineComp.startColor = GizmoGreen;
@@ -241,7 +241,7 @@ namespace ProceduralObjects
             zAxis.transform.position = position;
             zAxis.transform.localScale = new Vector3(0.5f, 4, 4);
             // pivot the collider !
-             
+
 
             _gizmo = new GameObject[] { xAxis, yAxis, zAxis };
             renderers = new LineRenderer[] { xLineComp, yLineComp, zLineComp };
@@ -331,7 +331,6 @@ namespace ProceduralObjects
             return p;
         }
 
-
         public static void Update(byte actionMode, float distance, Vector3 position, Quaternion rotation, Camera cam/*, LineRenderer xLineComp, LineRenderer yLineComp, LineRenderer zLineComp */)
         {
             /*
@@ -379,7 +378,7 @@ namespace ProceduralObjects
                 xPos[0] = position;
                 xPos[1] = rot * (new Vector3((actionMode == 1 ? 19 : 20) * factor, 0, 0)) + position;
                 renderers[0].SetPositions(xPos);
-                
+
                 Vector3[] yPos = new Vector3[2];
                 yPos[0] = position;
                 yPos[1] = rot * (new Vector3(0, (actionMode == 1 ? 19 : 20) * factor, 0)) + position;
@@ -404,7 +403,7 @@ namespace ProceduralObjects
                 RightMostGUIPosGizmo = new Vector2(rightPos.WorldToGuiPoint().x + 5, position.WorldToGuiPoint().y);
             }
         }
-        
+
         public static void ClickAxis(AxisEditionState axis)
         {
             if (axis == AxisEditionState.none || !Exists)
@@ -472,7 +471,7 @@ namespace ProceduralObjects
         public static Quaternion initialRotationTemp = Quaternion.identity;
         public static Vector3[] tempBuffer = null;
         public static SpaceReferential referential = SpaceReferential.Local;
-        public static float recordingStretch;
+        public static float recordingStretch, recordingAngle;
 
         public static Color GizmoRed = new Color(1f, 0f, 0f, ProceduralObjectsMod.GizmoOpacity.value);
         public static Color GizmoBlue = new Color(0f, 0f, 1f, ProceduralObjectsMod.GizmoOpacity.value);
@@ -716,6 +715,418 @@ namespace ProceduralObjects
             World,
             Local
         }
+
+        public class GrabbablePoints
+        {
+            public GrabbablePoints(Vector3[] points)
+            {
+                this.points = points;
+                this.selected = new bool[points.Length];
+                for (int i = 0; i < points.Length; i++)
+                    this.selected[i] = false;
+                rightClickPos = Vector2.down;
+                kbSlow = KeyBindingsManager.instance.GetBindingFromName("edition_smallMovements");
+                kbSmooth = KeyBindingsManager.instance.GetBindingFromName("edition_smoothMovements");
+                logic = ProceduralObjectsLogic.instance;
+                prevActions = new List<Vector3[]>();
+                nextActions = new List<Vector3[]>();
+                RegisterAction();
+            }
+            public Vector3[] points;
+            public bool[] selected;
+            public KeyBindingInfo kbSmooth, kbSlow;
+            private Vector2 rightClickPos;
+            private ProceduralObjectsLogic logic;
+
+            private float secClicked;
+            private bool enableMovement;
+            private byte planeUsed;
+            public Vector3 originHitPoint;
+            public Vector2 originMousePosition;
+            public Plane movementPlane;
+            public Ray originClickRay;
+            private Vector3[] relativePositions;
+
+            public void Update(Vector3 refCenter, Quaternion refRot, Action processMovement)
+            {
+                bool smooth = kbSmooth.GetBinding();
+                bool slow = kbSlow.GetBinding();
+                if (smooth)
+                {
+                    var bUp = KeyBindingsManager.instance.GetBindingFromName("position_moveUp");
+                    var bDown = KeyBindingsManager.instance.GetBindingFromName("position_moveDown");
+                    var bLeft = KeyBindingsManager.instance.GetBindingFromName("position_moveLeft");
+                    var bRight = KeyBindingsManager.instance.GetBindingFromName("position_moveRight");
+                    var bFwd = KeyBindingsManager.instance.GetBindingFromName("position_moveForward");
+                    var bBwd = KeyBindingsManager.instance.GetBindingFromName("position_moveBackward");
+                    if (bUp.GetBinding())
+                        MovePoints(Vector3.up, slow, true, processMovement);
+                    if (bDown.GetBinding())
+                        MovePoints(Vector3.down, slow, true, processMovement);
+                    if (bLeft.GetBinding())
+                        MovePoints(Vector3.left, slow, true, processMovement);
+                    if (bRight.GetBinding())
+                        MovePoints(Vector3.right, slow, true, processMovement);
+                    if (bFwd.GetBinding())
+                        MovePoints(Vector3.forward, slow, true, processMovement);
+                    if (bBwd.GetBinding())
+                        MovePoints(Vector3.back, slow, true, processMovement);
+
+                    if (bUp.GetBindingUp() || bDown.GetBindingUp() || bLeft.GetBindingUp() || bRight.GetBindingUp() || bFwd.GetBindingUp() || bBwd.GetBindingUp())
+                        RegisterAction();
+                }
+                else
+                {
+                    if (KeyBindingsManager.instance.GetBindingFromName("position_moveUp").GetBindingDown())
+                        MovePoints(Vector3.up, slow, false, processMovement);
+                    if (KeyBindingsManager.instance.GetBindingFromName("position_moveDown").GetBindingDown())
+                        MovePoints(Vector3.down, slow, false, processMovement);
+                    if (KeyBindingsManager.instance.GetBindingFromName("position_moveLeft").GetBindingDown())
+                        MovePoints(Vector3.left, slow, false, processMovement);
+                    if (KeyBindingsManager.instance.GetBindingFromName("position_moveRight").GetBindingDown())
+                        MovePoints(Vector3.right, slow, false, processMovement);
+                    if (KeyBindingsManager.instance.GetBindingFromName("position_moveForward").GetBindingDown())
+                        MovePoints(Vector3.forward, slow, false, processMovement);
+                    if (KeyBindingsManager.instance.GetBindingFromName("position_moveBackward").GetBindingDown())
+                        MovePoints(Vector3.back, slow, false, processMovement);
+                }
+
+                if (Input.GetMouseButtonDown(1))
+                {
+                    var mouse = GUIUtils.MousePos;
+                    if (!logic.IsInWindowElement(mouse))
+                        rightClickPos = mouse;
+                }
+                else if (Input.GetMouseButtonUp(1))
+                {
+                    var rect = GUIUtils.RectFromCorners(rightClickPos, GUIUtils.MousePos, true);
+                    var control = Input.GetKey(KeyCode.LeftControl);
+                    if (!control)
+                        selected = new bool[] { false, false, false, false, false, false, false, false };
+                    for (int i = 0; i < points.Count(); i++)
+                    {
+                        if (rect.Contains((refRot * points[i] + refCenter).WorldToGuiPoint()))
+                            selected[i] = control ? true : !selected[i];
+                    }
+                    rightClickPos = Vector2.down;
+                }
+
+                if (KeyBindingsManager.instance.GetBindingFromName("redo").GetBindingDown())
+                    Redo(processMovement);
+                else if (KeyBindingsManager.instance.GetBindingFromName("undo").GetBindingDown())
+                    Undo(processMovement);
+
+                if (AnySelected())
+                {
+                    if (Input.GetMouseButtonDown(0))
+                        InitialClick();
+                    else if (Input.GetMouseButtonUp(0) || (Gizmos.registeredString != "" && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))))
+                    {
+                        Gizmos.DisableKeyTyping();
+                        VerticesWizardData.DestroyLines();
+                        secClicked = 0f;
+                        if (enableMovement)
+                            RegisterAction();
+                        enableMovement = false;
+                        return;
+                    }
+                    else if (Input.GetMouseButton(0))
+                    {
+                        if (!enableMovement)
+                        {
+                            if (secClicked >= .16f)
+                            {
+                                StoreClickData(refCenter, refRot);
+                                enableMovement = true;
+                            }
+                            secClicked += TimeUtils.deltaTime;
+                        }
+                        else
+                        {
+                            if (Input.GetKeyDown(KeyCode.LeftControl))
+                                VerticesWizardData.HideLines();
+                            else if (Input.GetKeyUp(KeyCode.LeftControl))
+                                VerticesWizardData.ShowLines();
+
+                            Ray ray = logic.renderCamera.ScreenPointToRay(Input.mousePosition);
+                            float enter;
+                            if (movementPlane.Raycast(ray, out enter))
+                            {
+                                var point = ray.GetPoint(enter);
+                                ApplyToNewPosition(point, refRot, !Input.GetKey(KeyCode.LeftControl));
+                                processMovement.Invoke();
+                            }
+                        }
+                    }
+                }
+            }
+            public void OnGUI(Vector3 refCenter, Quaternion refRot)
+            {
+                if (rightClickPos != Vector2.down)
+                {
+                    GUI.color = logic.uiColor;
+                    GUI.Box(GUIUtils.RectFromCorners(rightClickPos, GUIUtils.MousePos, true), "");
+                    GUI.color = Color.white;
+                }
+                for (int i = 0; i < points.Count(); i++)
+                {
+                    if (GUI.Button(new Rect((refRot * points[i] + refCenter).WorldToGuiPoint() + new Vector2(-10, -10), new Vector2(20, 20)), VertexUtils.vertexIcons[selected[i] ? 1 : 0], GUI.skin.label))
+                    {
+                        ProceduralObjectsLogic.PlaySound();
+                        if (!Input.GetKey(KeyCode.LeftControl))
+                        {
+                            for (int j = 0; j < points.Length; j++)
+                                this.selected[j] = false;
+                        }
+                        selected[i] = !selected[i];
+                    }
+                }
+            }
+
+            public bool AnySelected()
+            {
+                if (points == null || selected == null)
+                    return false;
+                for (int i = 0; i < selected.Length; i++)
+                {
+                    if (selected[i])
+                        return true;
+                }
+                return false;
+            }
+            public void ScaleWithPgUpPgDown(Action processScale)
+            {
+                if (points == null || selected == null || kbSmooth == null || kbSlow == null) return;
+
+                var kbScaleUp = KeyBindingsManager.instance.GetBindingFromName("scale_scaleUp");
+                var kbScaleDown = KeyBindingsManager.instance.GetBindingFromName("scale_scaleDown");
+                if (kbSmooth.GetBinding())
+                {
+                    if (kbScaleUp.GetBinding())
+                        ScalePoints(.3f, kbSlow.GetBinding(), true, processScale);
+                    if (kbScaleDown.GetBinding())
+                        ScalePoints(-.3f, kbSlow.GetBinding(), true, processScale);
+
+                    if (kbScaleUp.GetBindingUp() || kbScaleDown.GetBindingUp())
+                        RegisterAction();
+                }
+                else
+                {
+                    if (kbScaleUp.GetBindingDown())
+                        ScalePoints(.2f, kbSlow.GetBinding(), false, processScale);
+                    if (kbScaleDown.GetBindingDown())
+                        ScalePoints(-.2f, kbSlow.GetBinding(), false, processScale);
+                }
+            }
+
+            private void InitialClick()
+            {
+                originClickRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+                originMousePosition = GUIUtils.MousePos;
+            }
+            private void StoreClickData(Vector3 refCenter, Quaternion refRot)
+            {
+                var angToYZPlaneNormal = Vector3.Angle(originClickRay.direction, (refRot * Vector3.right).normalized);
+                if (angToYZPlaneNormal > 90f) angToYZPlaneNormal = 180f - angToYZPlaneNormal;
+                var angToXZPlaneNormal = Vector3.Angle(originClickRay.direction, (refRot * Vector3.up).normalized);
+                if (angToXZPlaneNormal > 90f) angToXZPlaneNormal = 180f - angToXZPlaneNormal;
+                var angToXYPlaneNormal = Vector3.Angle(originClickRay.direction, (refRot * Vector3.forward).normalized);
+                if (angToXYPlaneNormal > 90f) angToXYPlaneNormal = 180f - angToXYPlaneNormal;
+                var min = Mathf.Min(angToXZPlaneNormal, angToXYPlaneNormal, angToYZPlaneNormal);
+                if (min == angToYZPlaneNormal)
+                {
+                    movementPlane = new Plane((refRot * Vector3.right).normalized, refCenter);
+                    planeUsed = 0;
+                }
+                else if (min == angToXZPlaneNormal)
+                {
+                    movementPlane = new Plane((refRot * Vector3.up).normalized, refCenter);
+                    planeUsed = 1;
+                }
+                else if (min == angToXYPlaneNormal)
+                {
+                    movementPlane = new Plane((refRot * Vector3.forward).normalized, refCenter);
+                    planeUsed = 2;
+                }
+                else
+                    movementPlane = new Plane((refRot * Vector3.right).normalized, refCenter);
+
+                float enter;
+                if (movementPlane.Raycast(originClickRay, out enter))
+                    originHitPoint = originClickRay.GetPoint(enter);
+                else
+                    originHitPoint = refCenter;
+                relativePositions = new Vector3[points.Length];
+                for (int i = 0; i < selected.Length; i++)
+                {
+                    if (!selected[i])
+                        relativePositions[i] = Vector3.zero;
+                    else
+                        relativePositions[i] = points[i] - originHitPoint;
+                }
+                VerticesWizardData.SetupLinesPosition(originHitPoint, refRot, planeUsed);
+                if (Input.GetKey(KeyCode.LeftControl))
+                    VerticesWizardData.HideLines();
+            }
+            private void ApplyToNewPosition(Vector3 newHitPoint, Quaternion rot, bool snapToAxis)
+            {
+                if (relativePositions == null)
+                    return;
+                if (relativePositions.Length == 0)
+                    return;
+                int line = -1;
+                if (snapToAxis)
+                {
+                    VerticesWizardData.smallAxis = Vector3.Distance(ProceduralObjectsLogic.instance.renderCamera.transform.position, originHitPoint) <= 15;
+                    Vector3 xSnappedLocal = Vector3.zero, ySnappedLocal = Vector3.zero, zSnappedLocal = Vector3.zero;
+                    if (planeUsed > 0)
+                        xSnappedLocal = Vector3.Project(newHitPoint - originHitPoint, rot * Vector3.right);
+                    if (planeUsed == 0 || planeUsed == 2)
+                        ySnappedLocal = Vector3.Project(newHitPoint - originHitPoint, rot * Vector3.up);
+                    if (planeUsed == 0 || planeUsed == 1)
+                        zSnappedLocal = Vector3.Project(newHitPoint - originHitPoint, rot * Vector3.forward);
+                    float snapThreshold = (VerticesWizardData.smallAxis) ? .7f : 3f;
+                    if (planeUsed == 0)
+                    {
+                        if (ySnappedLocal.sqrMagnitude > zSnappedLocal.sqrMagnitude)
+                        {
+                            if (zSnappedLocal.magnitude > snapThreshold)
+                                goto finallyNotSnapAxis;
+                            newHitPoint = ySnappedLocal + originHitPoint;
+                            line = 1;
+                        }
+                        else
+                        {
+                            if (ySnappedLocal.magnitude > snapThreshold)
+                                goto finallyNotSnapAxis;
+                            newHitPoint = zSnappedLocal + originHitPoint;
+                            line = 2;
+                        }
+                    }
+                    else if (planeUsed == 1)
+                    {
+                        if (xSnappedLocal.sqrMagnitude > zSnappedLocal.sqrMagnitude)
+                        {
+                            if (zSnappedLocal.magnitude > snapThreshold)
+                                goto finallyNotSnapAxis;
+                            newHitPoint = xSnappedLocal + originHitPoint;
+                            line = 0;
+                        }
+                        else
+                        {
+                            if (xSnappedLocal.magnitude > snapThreshold)
+                                goto finallyNotSnapAxis;
+                            newHitPoint = zSnappedLocal + originHitPoint;
+                            line = 2;
+                        }
+                    }
+                    else if (planeUsed == 2)
+                    {
+                        if (xSnappedLocal.sqrMagnitude > ySnappedLocal.sqrMagnitude)
+                        {
+                            if (ySnappedLocal.magnitude > snapThreshold)
+                                goto finallyNotSnapAxis;
+                            newHitPoint = xSnappedLocal + originHitPoint;
+                            line = 0;
+                        }
+                        else
+                        {
+                            if (xSnappedLocal.magnitude > snapThreshold)
+                                goto finallyNotSnapAxis;
+                            newHitPoint = ySnappedLocal + originHitPoint;
+                            line = 1;
+                        }
+                    }
+
+                finallyNotSnapAxis:
+                    VerticesWizardData.HighlightLine(line);
+                    if (line == -1)
+                    {
+                        if (Gizmos.canRegisterTyping)
+                            Gizmos.DisableKeyTyping();
+                    }
+                    else if (!Gizmos.canRegisterTyping)
+                        Gizmos.EnableKeyTyping();
+
+                    if (Gizmos.canRegisterTyping)
+                        Gizmos.RegisterKeyTyping();
+                }
+                if (Gizmos.registeredFloat != 0)
+                {
+                    if (line == 0)
+                        newHitPoint = originHitPoint + (rot * (Vector3.right * Gizmos.GetStoredDistanceValue));
+                    else if (line == 1)
+                        newHitPoint = originHitPoint + (rot * (Vector3.up * Gizmos.GetStoredDistanceValue));
+                    else if (line == 2)
+                        newHitPoint = originHitPoint + (rot * (Vector3.forward * Gizmos.GetStoredDistanceValue));
+                }
+                var referencial = VertexUtils.RotatePointAroundPivot(newHitPoint, originHitPoint, Quaternion.Inverse(rot));
+                for (int i = 0; i < points.Length; i++)
+                {
+                    if (selected[i])
+                        points[i] = relativePositions[i] + referencial;
+                }
+            }
+            private void MovePoints(Vector3 movement, bool slow, bool smooth, Action processMovement)
+            {
+                if (smooth)
+                    movement *= TimeUtils.deltaTime * (slow ? 1f : 8f);
+                else
+                    movement *= slow ? .5f : 4f;
+                bool changedsmth = false;
+                for (int i = 0; i < points.Length; i++)
+                {
+                    if (!selected[i]) continue;
+                    points[i] = points[i] + movement;
+                    changedsmth = true;
+                }
+                if (changedsmth)
+                {
+                    processMovement.Invoke();
+                    if (!smooth) RegisterAction();
+                }
+            }
+            private void ScalePoints(float factor, bool slow, bool smooth, Action processMovement)
+            {
+                if (smooth)
+                    factor = 1 + (TimeUtils.deltaTime * (slow ? (factor / 3f) : factor));
+                else
+                    factor = 1 + (slow ? (factor / 3f) : factor);
+                for (int i = 0; i < points.Length; i++)
+                {
+                    points[i] *= factor;
+                }
+                processMovement.Invoke();
+                if (!smooth) RegisterAction();
+            }
+
+            private List<Vector3[]> prevActions, nextActions;
+            private void RegisterAction()
+            {
+                if (prevActions.Count > 20)
+                    prevActions.RemoveAt(0);
+                prevActions.Add(points.ToArray());
+                nextActions.Clear();
+            }
+            private void Undo(Action processMovement)
+            {
+                if (prevActions.Count <= 1) return;
+                var p = prevActions[prevActions.Count - 2];
+                nextActions.Add(points.ToArray());
+                prevActions.RemoveAt(prevActions.Count - 1);
+                points = p.ToArray();
+                processMovement.Invoke();
+            }
+            private void Redo(Action processMovement)
+            {
+                if (nextActions.Count == 0) return;
+                var p = nextActions[nextActions.Count - 1];
+                prevActions.Add(p.ToArray());
+                nextActions.RemoveAt(nextActions.Count - 1);
+                points = p.ToArray();
+                processMovement.Invoke();
+            }
+        }
     }
 
     public class RotationWizardData
@@ -775,9 +1186,9 @@ namespace ProceduralObjects
         public Dictionary<Vertex, Vertex> rotVertices;
 
         private float secClicked;
-        private LineRenderer[] axis;
-        private GameObject[] linesObj;
-        private bool smallAxis;
+        private static  LineRenderer[] axis;
+        private static GameObject[] linesObj;
+        public static bool smallAxis;
 
         public void IncrementStep()
         {
@@ -857,7 +1268,6 @@ namespace ProceduralObjects
                 }
                 SetupLinesRot(obj);
             }
-
             storedVertices = true;
         }
         // move vertices
@@ -933,7 +1343,7 @@ namespace ProceduralObjects
                 }
 
             finallyNotSnapAxis:
-                this.HighlightLine(line);
+                HighlightLine(line);
                 if (line == -1)
                 {
                     if (Gizmos.canRegisterTyping)
@@ -1008,20 +1418,24 @@ namespace ProceduralObjects
         // Snap to Axis methods
         public void SetupLinesPos(ProceduralObject obj)
         {
+            SetupLinesPosition(originHitPoint, obj.m_rotation, planeUsed);
+        }
+        public static void SetupLinesPosition(Vector3 hitPoint, Quaternion rot, byte planeUsed)
+        {
             linesObj = new GameObject[] { new GameObject("PO_verticesLineX"), new GameObject("PO_verticesLineY"), new GameObject("PO_verticesLineZ") };
             axis = new LineRenderer[] { linesObj[0].AddComponent<LineRenderer>(), linesObj[1].AddComponent<LineRenderer>(), linesObj[2].AddComponent<LineRenderer>() };
 
             setupAxis(0, Color.red);
             if (planeUsed > 0)
-                axis[0].SetPositions(new Vector3[] { originHitPoint + (obj.m_rotation * Vector3.right) * 500f, originHitPoint + (obj.m_rotation * Vector3.left) * 500f });
+                axis[0].SetPositions(new Vector3[] { hitPoint + (rot * Vector3.right) * 500f, hitPoint + (rot * Vector3.left) * 500f });
 
             setupAxis(1, Color.green);
             if (planeUsed == 0 || planeUsed == 2)
-                axis[1].SetPositions(new Vector3[] { originHitPoint + (obj.m_rotation * Vector3.up) * 500f, originHitPoint + (obj.m_rotation * Vector3.down) * 500f });
+                axis[1].SetPositions(new Vector3[] { hitPoint + (rot * Vector3.up) * 500f, hitPoint + (rot * Vector3.down) * 500f });
 
             setupAxis(2, Color.blue);
             if (planeUsed == 0 || planeUsed == 1)
-                axis[2].SetPositions(new Vector3[] { originHitPoint + (obj.m_rotation * Vector3.forward) * 500f, originHitPoint + (obj.m_rotation * Vector3.back) * 500f });
+                axis[2].SetPositions(new Vector3[] { hitPoint + (rot * Vector3.forward) * 500f, hitPoint + (rot * Vector3.back) * 500f });
         }
         public void SetupLinesRot(ProceduralObject obj)
         {
@@ -1041,14 +1455,14 @@ namespace ProceduralObjects
             if (planeUsed == 2)
                 axis[2].SetPositions(new Vector3[] { worldBoundsCenter + (obj.m_rotation * Vector3.forward) * 500f, worldBoundsCenter + (obj.m_rotation * Vector3.back) * 500f });
         }
-        private void setupAxis(int i, Color c)
+        private static void setupAxis(int i, Color c)
         {
             axis[i].startColor = c;
             axis[i].endColor = c;
             axis[i].material = Gizmos.spriteMat;
             axis[i].widthMultiplier = 0.26f * AxisWidthFactor;
         }
-        public void ShowLines()
+        public static void ShowLines()
         {
             if (axis == null)
                 return;
@@ -1057,7 +1471,7 @@ namespace ProceduralObjects
             axis[2].enabled = true;
             Gizmos.EnableKeyTyping();
         }
-        public void HideLines()
+        public static void HideLines()
         {
             if (axis == null)
                 return;
@@ -1066,15 +1480,16 @@ namespace ProceduralObjects
             axis[2].enabled = false;
             Gizmos.DisableKeyTyping();
         }
-        public void DestroyLines()
+        public static void DestroyLines()
         {
             if (linesObj == null)
                 return;
             UnityEngine.Object.Destroy(linesObj[0]);
             UnityEngine.Object.Destroy(linesObj[1]);
             UnityEngine.Object.Destroy(linesObj[2]);
+            linesObj = null;
         }
-        private void HighlightLine(int i)
+        public static void HighlightLine(int i)
         {
             if (axis == null)
                 return;
@@ -1095,7 +1510,7 @@ namespace ProceduralObjects
                 }
             }
         }
-        private float AxisWidthFactor
+        private static float AxisWidthFactor
         {
             get
             {
@@ -1134,6 +1549,7 @@ namespace ProceduralObjects
                 if (points == null)
                 {
                     ProceduralObjectsLogic.PlaySound();
+                    obj.vertices = (obj.baseInfoType == "BUILDING") ? Vertex.CreateVertexList(obj._baseBuilding) : Vertex.CreateVertexList(obj._baseProp);
                     obj.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.vertices, obj.vertices);
                     points = new List<Vector3>();
                 }
@@ -1240,15 +1656,13 @@ namespace ProceduralObjects
             if (vertices == null) return false;
             if (vertices.Count <= 2) return true;
             float signedTotal = 0f;
-            for (int i = 0; i < vertices.Count - 1; i ++ )
+            for (int i = 0; i < vertices.Count - 2; i ++ )
                 signedTotal += VertexUtils.SignedAngle(getLocalPloppablePos(vertices[i]), getLocalPloppablePos(vertices[i + 1]), Vector3.up);
             return signedTotal < 0f;
         }
         private Vector3 getLocalPloppablePos(Vector3 pos)
         {
-            Vector3 v = Quaternion.Inverse(obj.m_rotation) * (pos - obj.m_position);
-            v.z /= -2.2173f;
-            return v;
+            return (Quaternion.Inverse(obj.m_rotation) * (pos - obj.m_position)).RevertPloppableAsphaltPosition();
         }
     }
 }

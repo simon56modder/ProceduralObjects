@@ -57,6 +57,7 @@ namespace ProceduralObjects.Tools
             switch (ProceduralObjectsLogic.toolAction)
             {
                 case ToolAction.none:
+                    bool clicking = false;
                     switch (ProceduralObjectsLogic.axisState)
                     {
                         case AxisEditionState.none:
@@ -75,9 +76,11 @@ namespace ProceduralObjects.Tools
                         case AxisEditionState.X:
                         case AxisEditionState.Z:
                             ToolCursor = terrainLevel;
+                            clicking = true;
                             break;
                         case AxisEditionState.Y:
                             ToolCursor = terrainShift;
+                            clicking = true;
                             break;
                     }
                     if (Gizmos.registeredString != "")
@@ -103,6 +106,24 @@ namespace ProceduralObjects.Tools
                     else if (Gizmos.isSnappingPrevMove)
                     {
                         base.ShowToolInfo(true, LocalizationManager.instance.current["repeatPrevMov"], toolInfoPos);
+                    }
+                    else if (clicking)
+                    {
+                        switch (ProceduralObjectsLogic.actionMode)
+                        {
+                            case 0:
+                                var distance = Vector3.Distance(ProceduralObjectsLogic.instance.currentlyEditingObject.historyEditionBuffer.prevTempPos,
+                                    ProceduralObjectsLogic.instance.currentlyEditingObject.m_position);
+                                toolInfo = Gizmos.ConvertToDistanceUnit(distance).ToString("n3") + ProceduralObjectsMod.distanceUnit;
+                                break;
+                            case 1:
+                                toolInfo = "x" + Gizmos.recordingStretch.ToString("n5");
+                                break;
+                            case 2:
+                                toolInfo = (Gizmos.recordingAngle * (ProceduralObjectsMod.AngleUnits.value == 1 ? Mathf.Deg2Rad : 1f)).ToString("n3") + ProceduralObjectsMod.angleUnit;
+                                break;
+                        }
+                        base.ShowToolInfo(true, toolInfo, toolInfoPos);
                     }
                     else
                         base.ShowToolInfo(false, "", Vector3.zero);

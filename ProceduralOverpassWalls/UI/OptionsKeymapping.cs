@@ -68,12 +68,16 @@ namespace ProceduralObjects.UI
         {
             AddKeymapping(LocalizationManager.instance.current["align_heights"], align_heights, "align_heights");
             AddKeymapping(LocalizationManager.instance.current["align_rotations"], align_rotations, "align_rotations");
-            AddKeymapping(LocalizationManager.instance.current["align_between2"], align_between2, "align_between2");
             AddKeymapping(LocalizationManager.instance.current["equal_slope"], equal_slope, "equal_slope");
+            AddKeymapping(LocalizationManager.instance.current["align_between2"], align_between2, "align_between2");
             AddKeymapping(LocalizationManager.instance.current["snapToGround"], snapToGround, "snapToGround");
+            AddKeymapping(LocalizationManager.instance.current["CTA_recenterObjOrigin"], recenterObjOrigin, "recenterObjOrigin");
             AddKeymapping(LocalizationManager.instance.current["randomize_rot"], randomize_rot, "randomize_rot");
-            AddKeymapping(LocalizationManager.instance.current["set_render_dists"], set_render_dists, "set_render_dists");
+            AddKeymapping(LocalizationManager.instance.current["distort"], distort, "distort");
+            AddKeymapping(LocalizationManager.instance.current["project"], project, "project");
             AddKeymapping(LocalizationManager.instance.current["replace_by_copy"], replace_by_copy, "replace_by_copy");
+            AddKeymapping(LocalizationManager.instance.current["select_tex"], select_tex, "select_tex");
+            AddKeymapping(LocalizationManager.instance.current["set_render_dists"], set_render_dists, "set_render_dists");
             AddKeymapping(LocalizationManager.instance.current["color_gradient"], color_gradient, "color_gradient");
         }
     }
@@ -123,8 +127,12 @@ namespace ProceduralObjects.UI
         public static readonly SavedInputKey equal_slope = new SavedInputKey("KB_equal_slope", ProceduralObjectsMod.SETTINGS_FILENAME, SavedInputKey.Empty, true);
         public static readonly SavedInputKey snapToGround = new SavedInputKey("KB_snapToGround", ProceduralObjectsMod.SETTINGS_FILENAME, SavedInputKey.Empty, true);
         public static readonly SavedInputKey set_render_dists = new SavedInputKey("KB_set_render_dists", ProceduralObjectsMod.SETTINGS_FILENAME, SavedInputKey.Empty, true);
+        public static readonly SavedInputKey select_tex = new SavedInputKey("KB_select_tex", ProceduralObjectsMod.SETTINGS_FILENAME, SavedInputKey.Empty, true);
         public static readonly SavedInputKey replace_by_copy = new SavedInputKey("KB_replace_by_copy", ProceduralObjectsMod.SETTINGS_FILENAME, SavedInputKey.Empty, true);
         public static readonly SavedInputKey color_gradient = new SavedInputKey("KB_color_gradient", ProceduralObjectsMod.SETTINGS_FILENAME, SavedInputKey.Empty, true);
+        public static readonly SavedInputKey distort = new SavedInputKey("KB_distort", ProceduralObjectsMod.SETTINGS_FILENAME, SavedInputKey.Empty, true);
+        public static readonly SavedInputKey project = new SavedInputKey("KB_project", ProceduralObjectsMod.SETTINGS_FILENAME, SavedInputKey.Empty, true);
+        public static readonly SavedInputKey recenterObjOrigin = new SavedInputKey("KB_recenterObjOrigin", ProceduralObjectsMod.SETTINGS_FILENAME, SavedInputKey.Empty, true);
         
         protected int count = 0;
 

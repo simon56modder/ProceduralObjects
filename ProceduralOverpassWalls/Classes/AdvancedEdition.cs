@@ -17,7 +17,7 @@ namespace ProceduralObjects.Classes
         {
             m_object = obj;
             oldTilingFactor = obj.tilingFactor;
-            winRect = new Rect(555, 100, 400, 302);
+            winRect = new Rect(555, 100, 400, 326);
             stretchFactor = 10;
             showWindow = false;
             this.undo = undo;
@@ -81,18 +81,36 @@ namespace ProceduralObjects.Classes
                 VertexUtils.flipFaces(m_object);
             }
 
+            // CAST SHADOWS
+            if (GUI.Button(new Rect(5, 52, 192.5f, 22), string.Format(LocalizationManager.instance.current["castShadows"], (!m_object.disableCastShadows).GetHashCode())))
+            {
+                ProceduralObjectsLogic.PlaySound();
+                m_object.disableCastShadows = !m_object.disableCastShadows;
+            }
+            // RESET 3D MODEL
+            if (GUI.Button(new Rect(202.5f, 52, 192.5f, 22), LocalizationManager.instance.current["resetModel"]))
+            {
+                ProceduralObjectsLogic.PlaySound();
+                GUIUtils.ShowModal(LocalizationManager.instance.current["resetModel"],
+                    LocalizationManager.instance.current["resetModel_confirm"],
+                    (bool ok) =>
+                    {
+                        if (ok)
+                            m_object.ResetOriginalMesh();
+                    });
+            }
 
-            // NORMAL RECALCULATION
-            if (GUI.Button(new Rect(5, 52, 390, 22), LocalizationManager.instance.current.normalsRecalcString(m_object.normalsRecalcMode)))
+            // NORMALS RECALCULATION
+            if (GUI.Button(new Rect(5, 76, 390, 22), LocalizationManager.instance.current.normalsRecalcString(m_object.normalsRecalcMode)))
             {
                 ProceduralObjectsLogic.PlaySound();
                 m_object.ChangeNormalsRecalc();
             }
 
-            GUI.Label(new Rect(5, 79, 390, 27), "<b><size=15>" + LocalizationManager.instance.current["edition_history"] + "</size></b>");
+            GUI.Label(new Rect(5, 103, 390, 27), "<b><size=15>" + LocalizationManager.instance.current["edition_history"] + "</size></b>");
 
             // undo
-            GUI.BeginGroup(new Rect(5, 107, 135, 60));
+            GUI.BeginGroup(new Rect(5, 131, 135, 60));
             if (m_object.historyEditionBuffer.CanUndo)
             {
                 if (GUI.Button(new Rect(0, 0, 135, 60), string.Empty))
@@ -115,7 +133,7 @@ namespace ProceduralObjects.Classes
             GUI.EndGroup();
 
             // redo
-            GUI.BeginGroup(new Rect(145, 107, 135, 60));
+            GUI.BeginGroup(new Rect(145, 131, 135, 60));
             if (m_object.historyEditionBuffer.CanRedo)
             {
                 if (GUI.Button(new Rect(0, 0, 135, 60), string.Empty))
@@ -138,7 +156,7 @@ namespace ProceduralObjects.Classes
             GUI.EndGroup();
 
             // erase history buffer
-            var erase = new Rect(285, 107, 110, 60);
+            var erase = new Rect(285, 131, 110, 60);
             if (GUI.Button(erase, string.Empty))
             {
                 m_object.historyEditionBuffer.stepsDone.Clear();
@@ -147,19 +165,19 @@ namespace ProceduralObjects.Classes
             GUI.Label(erase, LocalizationManager.instance.current["erase_history"]);
 
             // mirror
-            GUI.Label(new Rect(5, 171, 145, 27), "<b><size=15>" + LocalizationManager.instance.current["mirror_mesh"] + "</size></b>");
-            GUI.Label(new Rect(150, 171, 270, 27), "<b><size=15>" + LocalizationManager.instance.current["stretch_mesh"] + "</size></b>");
+            GUI.Label(new Rect(5, 195, 145, 27), "<b><size=15>" + LocalizationManager.instance.current["mirror_mesh"] + "</size></b>");
+            GUI.Label(new Rect(150, 195, 270, 27), "<b><size=15>" + LocalizationManager.instance.current["stretch_mesh"] + "</size></b>");
 
             if (m_object.isPloppableAsphalt)
             {
                 GUI.color = Color.gray;
-                GUI.Box(new Rect(5, 198, 385, 26), "<i>" + LocalizationManager.instance.current["no_mirror_no_stretch"] + "</i>");
+                GUI.Box(new Rect(5, 222, 385, 26), "<i>" + LocalizationManager.instance.current["no_mirror_no_stretch"] + "</i>");
                 GUI.color = Color.white;
             }
             else
             {
                 GUI.color = Color.red;
-                if (GUI.Button(new Rect(5, 198, 35, 25), "<b>X</b>"))
+                if (GUI.Button(new Rect(5, 222, 35, 25), "<b>X</b>"))
                 {
                     m_object.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.mirrorX, m_vertices);
                     VertexUtils.MirrorX(m_vertices, m_object);
@@ -167,7 +185,7 @@ namespace ProceduralObjects.Classes
                     apply.Invoke();
                 }
                 GUI.color = Color.green;
-                if (GUI.Button(new Rect(45, 198, 35, 26), "<b>Y</b>"))
+                if (GUI.Button(new Rect(45, 222, 35, 26), "<b>Y</b>"))
                 {
                     m_object.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.mirrorY, m_vertices);
                     VertexUtils.MirrorY(m_vertices, m_object);
@@ -175,7 +193,7 @@ namespace ProceduralObjects.Classes
                     apply.Invoke();
                 }
                 GUI.color = Color.blue;
-                if (GUI.Button(new Rect(85, 198, 35, 26), "<b>Z</b>"))
+                if (GUI.Button(new Rect(85, 222, 35, 26), "<b>Z</b>"))
                 {
                     m_object.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.mirrorZ, m_vertices);
                     VertexUtils.MirrorZ(m_vertices, m_object);
@@ -185,11 +203,11 @@ namespace ProceduralObjects.Classes
                 GUI.color = Color.white;
 
                 // stretch
-                GUI.Label(new Rect(150, 194, 125, 20), "x" + ((float)stretchFactor / 10f).ToString());
-                stretchFactor = Mathf.FloorToInt(GUI.HorizontalSlider(new Rect(150, 214, 125, 20), stretchFactor, 1f, 30f));
+                GUI.Label(new Rect(150, 218, 125, 20), "x" + ((float)stretchFactor / 10f).ToString());
+                stretchFactor = Mathf.FloorToInt(GUI.HorizontalSlider(new Rect(150, 238, 125, 20), stretchFactor, 1f, 30f));
 
                 GUI.color = Color.red;
-                if (GUI.Button(new Rect(280, 198, 35, 25), "<b>X</b>"))
+                if (GUI.Button(new Rect(280, 222, 35, 25), "<b>X</b>"))
                 {
                     m_object.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.stretchX, (float)stretchFactor / 10f);
                     VertexUtils.StretchX(m_vertices, (float)stretchFactor / 10f);
@@ -197,7 +215,7 @@ namespace ProceduralObjects.Classes
                     apply.Invoke();
                 }
                 GUI.color = Color.green;
-                if (GUI.Button(new Rect(320, 198, 35, 26), "<b>Y</b>"))
+                if (GUI.Button(new Rect(320, 222, 35, 26), "<b>Y</b>"))
                 {
                     m_object.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.stretchY, (float)stretchFactor / 10f);
                     VertexUtils.StretchY(m_vertices, (float)stretchFactor / 10f);
@@ -205,7 +223,7 @@ namespace ProceduralObjects.Classes
                     apply.Invoke();
                 }
                 GUI.color = Color.blue;
-                if (GUI.Button(new Rect(360, 198, 35, 26), "<b>Z</b>"))
+                if (GUI.Button(new Rect(360, 222, 35, 26), "<b>Z</b>"))
                 {
                     m_object.historyEditionBuffer.InitializeNewStep(EditingStep.StepType.stretchZ, (float)stretchFactor / 10f);
                     VertexUtils.StretchZ(m_vertices, (float)stretchFactor / 10f);
@@ -218,10 +236,10 @@ namespace ProceduralObjects.Classes
 
 
             // texture UV
-            GUI.Label(new Rect(5, 228, 390, 27), "<b><size=15>" + LocalizationManager.instance.current["texture_tiling"] + "</size></b>");
+            GUI.Label(new Rect(5, 252, 390, 27), "<b><size=15>" + LocalizationManager.instance.current["texture_tiling"] + "</size></b>");
             if (m_object.RequiresUVRecalculation)
             {
-                if (GUI.Button(new Rect(5, 252, 235, 40), LocalizationManager.instance.current["tex_uv_mode"] + " : " + LocalizationManager.instance.current[(m_object.disableRecalculation ? "uv_stretch" : "uv_repeat")]))
+                if (GUI.Button(new Rect(5, 276, 235, 40), LocalizationManager.instance.current["tex_uv_mode"] + " : " + LocalizationManager.instance.current[(m_object.disableRecalculation ? "uv_stretch" : "uv_repeat")]))
                 {
                     if (m_object.disableRecalculation)
                     {
@@ -234,14 +252,14 @@ namespace ProceduralObjects.Classes
                         m_object.m_mesh.uv = Vertex.DefaultUVMap(m_object);
                     }
                 }
-                GUI.Label(new Rect(245, 251, 150, 22), string.Format(LocalizationManager.instance.current["tiling_factor"], m_object.tilingFactor));
-                m_object.tilingFactor = (int)Mathf.FloorToInt(GUI.HorizontalSlider(new Rect(245, 273, 150, 22), (float)m_object.tilingFactor, 1, 20));
+                GUI.Label(new Rect(245, 275, 150, 22), string.Format(LocalizationManager.instance.current["tiling_factor"], m_object.tilingFactor));
+                m_object.tilingFactor = (int)Mathf.FloorToInt(GUI.HorizontalSlider(new Rect(245, 274, 150, 22), (float)m_object.tilingFactor, 1, 20));
 
             }
             else
             {
                 GUI.color = Color.gray;
-                GUI.Box(new Rect(5, 251, 390, 42), "<i>" + LocalizationManager.instance.current["no_tex_tiling"] + "</i>");
+                GUI.Box(new Rect(5, 275, 390, 42), "<i>" + LocalizationManager.instance.current["no_tex_tiling"] + "</i>");
                 GUI.color = Color.white;
             }
         }

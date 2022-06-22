@@ -25,6 +25,12 @@ namespace ProceduralObjects.Tools
                     throw new ArgumentException("POToolAction \"" + id + "\" Selection action missing");
                 this.SelectionAction = selectionAction;
             }
+            else if (type == POActionType.SingleSelAtLeast)
+            {
+                if (selectionAction == null)
+                    throw new ArgumentException("POToolAction \"" + id + "\" Selection action missing");
+                this.SelectionAction = selectionAction;
+            }
             else
             {
                 if (globalAction == null)
@@ -45,7 +51,8 @@ namespace ProceduralObjects.Tools
         public void ActionButton(Rect rect, ProceduralObject obj, List<int> selected, Vertex[] buffer, Action apply)
         {
             GUI.BeginGroup(rect);
-            if (ctActionType == POActionType.Selection && selected.Count <= 1)
+            var count = selected.Count;
+            if ((ctActionType == POActionType.Selection && count <= 1) || (ctActionType == POActionType.SingleSelAtLeast && count == 0))
             {
                 GUI.color = Color.gray;
                 GUI.Box(new Rect(0, 0, rect.width, 24), string.Empty);
@@ -59,7 +66,7 @@ namespace ProceduralObjects.Tools
                 if (GUI.Button(new Rect(0, 0, rect.width, 24), string.Empty))
                 {
                     ProceduralObjectsLogic.PlaySound();
-                    if (ctActionType == POActionType.Selection)
+                    if (ctActionType == POActionType.Selection || ctActionType == POActionType.SingleSelAtLeast)
                         SelectionAction.Invoke(obj, selected, buffer);
                     else if (ctActionType == POActionType.Global)
                         GlobalAction.Invoke(obj, buffer);
@@ -75,6 +82,7 @@ namespace ProceduralObjects.Tools
     public enum POActionType
     {
         Selection,
+        SingleSelAtLeast,
         Global
     }
 }

@@ -90,9 +90,9 @@ namespace ProceduralObjects.UI
             return scrollablePanel;
         }
 
-        public UIHelper AddTabPage(string name, bool scrollBars = true)
+        public UIHelper AddTabPage(string name, out UIButton tabButton, bool scrollBars = true)
         {
-            UIButton tabButton = base.AddTab(name);
+            tabButton = base.AddTab(name);
             tabButton.normalBgSprite = "SubBarButtonBase";
             tabButton.disabledBgSprite = "SubBarButtonBaseDisabled";
             tabButton.focusedBgSprite = "SubBarButtonBaseFocused";

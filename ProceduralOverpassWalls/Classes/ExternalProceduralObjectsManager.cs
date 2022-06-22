@@ -44,6 +44,7 @@ namespace ProceduralObjects.Classes
                 tw.WriteLine("tilingFactor = " + pobj.tilingFactor.ToString());
             tw.WriteLine("color = " + ((SerializableColor)pobj.m_color).ToString());
             tw.WriteLine("flipFaces = " + pobj.flipFaces.ToString());
+            tw.WriteLine("disableCastShadows = " + pobj.disableCastShadows.ToString());
             tw.WriteLine("normalsRecalc = " + pobj.normalsRecalculation.ToString());
             tw.WriteLine("visibility = " + pobj.visibility.ToString());
             if (pobj.textParam != null)
@@ -295,6 +296,8 @@ namespace ProceduralObjects.Classes
                         obj.m_color = SerializableColor.Parse(lines[i].Replace("color = ", ""));
                     else if (lines[i].Contains("flipFaces = "))
                         obj.flipFaces = bool.Parse(lines[i].Replace("flipFaces = ", ""));
+                    else if (lines[i].Contains("disableCastShadows = "))
+                        obj.disableCastShadows = bool.Parse(lines[i].Replace("disableCastShadows = ", ""));
                     else if (lines[i].Contains("normalsRecalc = "))
                         obj.normalsRecalculation = (NormalsRecalculation)Enum.Parse(typeof(NormalsRecalculation), lines[i].Replace("normalsRecalc = ", ""), true);
                     else if (lines[i].Contains("visibility = "))
@@ -432,6 +435,8 @@ namespace ProceduralObjects.Classes
                         obj.disableRecalculation = bool.Parse(fileLines[i].Replace("disableRecalculation = ", ""));
                     else if (fileLines[i].Contains("flipFaces = "))
                         obj.flipFaces = bool.Parse(fileLines[i].Replace("flipFaces = ", ""));
+                    else if (fileLines[i].Contains("disableCastShadows = "))
+                        obj.disableCastShadows = bool.Parse(fileLines[i].Replace("disableCastShadows = ", ""));
                     else if (fileLines[i].Contains("color = "))
                         obj.m_color = SerializableColor.Parse(fileLines[i].Replace("color = ", ""));
                     else if (fileLines[i].Contains("normalsRecalc = "))

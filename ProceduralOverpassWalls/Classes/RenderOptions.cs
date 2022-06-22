@@ -49,6 +49,7 @@ namespace ProceduralObjects.Classes
                 calculateDynamically = !calculateDynamically;
                 ProceduralObjectsMod.UseDynamicRenderDist.value = calculateDynamically;
             }
+            GUIUtils.DrawSeparator(new Vector2(5, 60), 380);
 
             if (calculateDynamically)
             {
@@ -125,7 +126,7 @@ namespace ProceduralObjects.Classes
             float max1 = Mathf.Max(size.x, size.y, size.z);
             float max2 = SecondMax(size.x, size.y, size.z);
 
-            return Mathf.Clamp(Mathf.Ceil((multiplier * (max1 + max2) + supp) / 10f) * 10f, threshold, 24000);
+            return Mathf.Clamp(Mathf.Ceil((multiplier * (max1 + max2) + supp) / 10f) * 10f, threshold, 16000);
         }
         public void RecalculateAll()
         {
@@ -138,12 +139,30 @@ namespace ProceduralObjects.Classes
             }
         }
 
-        public bool CanRenderSingle(ProceduralObject obj)
+        public bool CanRenderSingle(ProceduralObject obj, bool nightTime)
         {
+            if (obj.m_modules != null)
+            {
+                if (obj.m_modules.Count != 0)
+                {
+                    foreach (var module in obj.m_modules)
+                    {
+                        if (module.enabled)
+                        {
+                            try
+                            {
+                                if (!module.RenderParentThisFrame(ProceduralObjectsLogic.instance))
+                                    return false;
+                            }
+                            catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module RenderParentThisFrame() method!\n" + e); }
+                        }
+                    }
+                }
+            }
+
             if (obj.m_visibility == ProceduralObjectVisibility.Always)
                 return true;
-            var isNightTime = Singleton<SimulationManager>.instance.m_isNightTime;
-            return (obj.m_visibility == ProceduralObjectVisibility.NightOnly && isNightTime) || (obj.m_visibility == ProceduralObjectVisibility.DayOnly && !isNightTime);
+            return (obj.m_visibility == ProceduralObjectVisibility.NightOnly && nightTime) || (obj.m_visibility == ProceduralObjectVisibility.DayOnly && !nightTime);
         }
 
         public float SecondMax(params float[] values)

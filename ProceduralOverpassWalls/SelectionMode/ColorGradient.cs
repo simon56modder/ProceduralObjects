@@ -23,19 +23,19 @@ namespace ProceduralObjects.SelectionMode
         public override void OnOpen(List<ProceduralObject> selection)
         {
             confirmed = false;
-            this.selection = selection = POGroup.AllObjectsInSelection(selection, logic.selectedGroup);
-            if (selection.Count < 2)
+            this.selection = POGroup.AllObjectsInSelection(selection, logic.selectedGroup);
+            if (this.selection.Count < 2)
             {
                 ExitAction();
                 return;
             }
             oldColors = new Dictionary<ProceduralObject, Color>();
-            foreach (var obj in selection)
+            foreach (var obj in this.selection)
             {
                 oldColors.Add(obj, obj.m_color);
             }
             gradientTex = TextureUtils.PlainTexture(100, 22, Color.white);
-            maxObjects = VertexUtils.OutmostPoints(selection.ToArray());
+            maxObjects = VertexUtils.OutmostPoints(this.selection.ToArray());
             gradient = new Gradient();
         }
         public override void OnUpdate()
@@ -88,7 +88,6 @@ namespace ProceduralObjects.SelectionMode
                     gradientTex.SetPixel(x, y, c);
             }
             gradientTex.Apply();
-
             float distDiff = Vector2.Distance(maxObjects.Value.m_position.AsXZVector2(), maxObjects.Key.m_position.AsXZVector2());
             foreach (var po in selection)
             {

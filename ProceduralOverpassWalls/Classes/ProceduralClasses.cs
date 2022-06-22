@@ -136,6 +136,7 @@ namespace ProceduralObjects.Classes
             }
             m_visibility = container.visibility;
             renderDistance = container.renderDistance;
+            MaterialOptions.FixDecalRenderDist(this);
             renderDistLocked = container.renderDistLocked;
             if (container.textParam != null)
             {
@@ -181,6 +182,7 @@ namespace ProceduralObjects.Classes
             disableRecalculation = container.disableRecalculation;
             this.normalsRecalcMode = container.normalsRecalculation;
             this.flipFaces = container.flipFaces;
+            this.disableCastShadows = container.disableCastShadows;
             if (this.flipFaces)
                VertexUtils.flipFaces(this);
             historyEditionBuffer = new HistoryBuffer(this);
@@ -285,10 +287,12 @@ namespace ProceduralObjects.Classes
             m_color = sourceCacheObj.m_color;
             m_material.color = m_color;
             this.flipFaces = sourceCacheObj.flipFaces;
+            this.disableCastShadows = sourceCacheObj.disableCastShadows;
             if (this.flipFaces)
                 VertexUtils.flipFaces(this);
             renderDistance = sourceCacheObj.renderDistance;
             renderDistLocked = sourceCacheObj.renderDistLocked;
+            MaterialOptions.FixDecalRenderDist(this);
             m_position = position;
             m_rotation = sourceCacheObj.m_rotation;
             disableRecalculation = sourceCacheObj.disableRecalculation;
@@ -343,8 +347,7 @@ namespace ProceduralObjects.Classes
                 m_mesh = sourceProp.m_mesh;
                 vertices = Vertex.CreateVertexList(sourceProp);
                 meshStatus = 1;
-                if (isPloppableAsphalt)
-                    RecalculateBoundsNormalsExtras(1);
+                RecalculateBoundsNormalsExtras(1);
             }
             this.renderDistance = RenderOptions.instance.CalculateRenderDistance(this, true);
             m_visibility = ProceduralObjectVisibility.Always;
@@ -511,6 +514,7 @@ namespace ProceduralObjects.Classes
                 m_mesh.bounds = b;
             }
             halfOverlayDiam = Mathf.Max(m_mesh.bounds.extents.x, m_mesh.bounds.extents.z);
+            MaterialOptions.FixDecalRenderDist(this);
         }
         public Mesh overlayRenderMesh
         {
@@ -534,7 +538,7 @@ namespace ProceduralObjects.Classes
         // mesh status : 0=undefined ; 1=equivalent to source; 2=custom (see m_mesh)
         public byte meshStatus;
         public float renderDistance, m_scale, halfOverlayDiam, _squareDistToCam;
-        public bool isPloppableAsphalt, disableRecalculation, renderDistLocked, flipFaces, _insideRenderView, _insideUIview, _selected;
+        public bool isPloppableAsphalt, disableRecalculation, disableCastShadows, renderDistLocked, flipFaces, _insideRenderView, _insideUIview, _selected;
         public ProceduralObjectVisibility m_visibility;
         public NormalsRecalculation normalsRecalcMode;
         public Color m_color;
@@ -602,6 +606,7 @@ namespace ProceduralObjects.Classes
             layer = sourceObj.layer;
             m_color = sourceObj.m_color;
             flipFaces = sourceObj.flipFaces;
+            disableCastShadows = sourceObj.disableCastShadows;
             normalsRecalculation = sourceObj.normalsRecalcMode;
             tilingFactor = sourceObj.tilingFactor;
             switch (baseInfoType)
@@ -633,7 +638,7 @@ namespace ProceduralObjects.Classes
         public Color m_color;
         public Layer layer;
         public float renderDistance;
-        public bool isPloppableAsphalt, disableRecalculation, renderDistLocked, flipFaces;
+        public bool isPloppableAsphalt, disableRecalculation, renderDistLocked, flipFaces, disableCastShadows;
         public int tilingFactor, temp_id, parent;
         public byte meshStatus;
         public Quaternion m_rotation;

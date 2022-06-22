@@ -195,7 +195,7 @@ namespace ProceduralObjects
         public string basePrefabName, objectType, customTextureName;
         public float renderDistance;
         public float scale;
-        public bool hasCustomTexture, disableRecalculation, flipFaces, renderDistLocked;
+        public bool hasCustomTexture, disableRecalculation, flipFaces, disableCastShadows, renderDistLocked;
         public uint layerId;
         public int groupRootId;
         public bool belongsToGroup;
@@ -264,6 +264,7 @@ namespace ProceduralObjects
             normalsRecalculation = baseObject.normalsRecalcMode;
             layerId = (baseObject.layer == null) ? 0 : baseObject.layer.m_id;
             flipFaces = baseObject.flipFaces;
+            disableCastShadows = baseObject.disableCastShadows;
             // recalculateNormals = baseObject.recalculateNormals;
             tilingFactor = baseObject.tilingFactor;
             if (baseObject.m_textParameters != null)

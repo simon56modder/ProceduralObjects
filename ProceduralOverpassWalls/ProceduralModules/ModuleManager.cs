@@ -134,7 +134,7 @@ namespace ProceduralObjects
             catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module OnModuleWindowClose() method!\n" + e); }
             openedUIModules.Remove(m);
         }
-        public void DrawWCustomizationindows()
+        public void DrawCustomizationWindows()
         {
             if (selectedObject != null)
             {
@@ -151,6 +151,9 @@ namespace ProceduralObjects
                 var m = openedUIModules[i];
                 try { m.window = GUIUtils.ClampRectToScreen(GUIUtils.Window(581644838 + i, m.window, m.DrawCustomizationWindow, m.ModuleType.Name)); }
                 catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module DrawCustomizationWindow() method!\n" + e); }
+
+                try { m.OnGUI(); }
+                catch (Exception e) { Debug.LogError("[ProceduralObjects] Error inside module OnGUI() method!\n" + e); }
             }
         }
         private void drawCtWindow(int id)

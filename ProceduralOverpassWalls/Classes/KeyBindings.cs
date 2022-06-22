@@ -115,6 +115,12 @@ namespace ProceduralObjects.Classes
             m_orderedKeys = new KeyCode[] { };
             m_fullKeys = "(none)";
         }
+        public bool IsEmpty()
+        {
+            if (m_orderedKeys == null) return true;
+            if (m_orderedKeys.Length == 0) return true;
+            return false;
+        }
 
         public bool GetBindingDown()
         {

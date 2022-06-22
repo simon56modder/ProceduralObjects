@@ -89,9 +89,9 @@ namespace ProceduralObjects.ProceduralText
 
                 if (dragTimer < .14f && dragTimer != 0f)
                     dragTimer += TimeUtils.deltaTime;
+                cursorIsInsideTextureArea = windowRect.IsMouseInside();
                 if (new Rect(windowRect.x + 5, windowRect.y + 30, windowRect.width - 285, windowRect.height - 80).IsMouseInside())
                 {
-                    cursorIsInsideTextureArea = true;
                     if (Input.GetKey(KeyCode.LeftControl))
                     {
                         zoomFactor *= 1f + Input.mouseScrollDelta.y * 0.3f;
@@ -169,8 +169,6 @@ namespace ProceduralObjects.ProceduralText
                         }
                     }
                 }
-                else
-                    cursorIsInsideTextureArea = false;
 
                 if (Input.GetMouseButton(0))
                 {

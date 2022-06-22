@@ -269,9 +269,11 @@ namespace ProceduralObjects.ProceduralText
                 }
             }
             charTex.Apply();
+            var sub = savedEnd - savedStart;
+            if (sub <= 0) return charTex;
             try
             {
-                var newTex = new Texture2D(savedEnd - savedStart, (int)m_charSize);
+                var newTex = new Texture2D(sub, (int)m_charSize);
                 for (int y = 0; y < m_charSize; y++)
                 {
                     for (int x = 0; x < newTex.width; x++)
