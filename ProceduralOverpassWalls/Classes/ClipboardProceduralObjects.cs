@@ -5,6 +5,14 @@ using UnityEngine;
 using System.IO;
 
 using ProceduralObjects.ProceduralText;
+using System.Reflection;
+using ICities;
+using System.Runtime.InteropServices;
+using ProceduralObjects.SelectionMode;
+//using System.Diagnostics;
+using Epic.OnlineServices.Presence;
+using System.Runtime.InteropServices.ComTypes;
+using System.Text.RegularExpressions;
 
 namespace ProceduralObjects.Classes
 {
@@ -13,6 +21,43 @@ namespace ProceduralObjects.Classes
         public ClipboardProceduralObjects(ClipboardType type)
         {
             this.type = type;
+        }
+        public static Assembly ModToolsAssembly;
+        static Type t_MTFbxConverter;
+        static bool isMTSetup = false;
+
+        public static void SetupModTools()
+        {
+            if (isMTSetup) return;
+
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (assembly.FullName.Substring(0, 8) == "ModTools")
+                {
+                    Debug.Log("[ProceduralObjects][SetupModTools] Found assembly matching ModTools, fetching types....");
+                    if (assembly.GetType("ModTools.FbxUtil.FbxConverter") != null)
+                    {
+                        Debug.Log("[ProceduralObjects][SetupModTools] Found FbxConverter type at \'ModTools.FbxUtil.FbxConverter\'");
+                        ModToolsAssembly = assembly;
+                        t_MTFbxConverter = ModToolsAssembly.GetType("ModTools.FbxUtil.FbxConverter");
+                        break;
+                    } else if (assembly.GetType("FbxUtil.FbxConverter") != null)
+                    {
+                        Debug.Log("[ProceduralObjects][SetupModTools] Found FbxConverter type at \'FbxUtil.FbxConverter\'");
+                        ModToolsAssembly = assembly;
+                        t_MTFbxConverter = ModToolsAssembly.GetType("FbxUtil.FbxConverter");
+                        break;
+                    }
+                }
+            }
+
+            if (ModToolsAssembly == null)
+            {
+                Debug.LogError("[ProceduralObjects] ModTools assembly not found !");
+                return;
+            }
+        
+            isMTSetup = true;
         }
 
         public void MakeSelectionList(List<ProceduralObject> list, POGroup selectedGroup)
@@ -81,8 +126,9 @@ namespace ProceduralObjects.Classes
             }
         }
 
-        public void ExportSelection(string name, ExternalProceduralObjectsManager manager, bool staticImport)
+        public void ExportSelection(string name, ExternalProceduralObjectsManager manager, ExportSelection.ExportMode exportMode)
         {
+            Debug.Log("[ProceduralObjects][ExportSelection] Exporting Selection...");
             if (selection_objects == null)
                 return;
             if (selection_objects.Count <= 1)
@@ -92,15 +138,34 @@ namespace ProceduralObjects.Classes
                 return;
 
             TextWriter tw = new StreamWriter(path);
-            tw.WriteLine("externaltype = " + (staticImport ? "static" : "selection"));
+            string externaltype;
+            switch (exportMode)
+            {
+                case SelectionMode.ExportSelection.ExportMode.Ploppable:
+                    externaltype = "selection";
+                    break;
+                case SelectionMode.ExportSelection.ExportMode.StaticImport:
+                    externaltype = "static";
+                    break;
+                case SelectionMode.ExportSelection.ExportMode.FBX:
+                    Debug.Log("[ProceduralObjects][ExportSelection] Exporting as FBX...");
+                    externaltype = "selection";
+                    break;
+                default:
+                    externaltype = "selection";
+                    break;
+            }
+            tw.WriteLine("externaltype = " + externaltype);
             tw.WriteLine("name = " + name);
+            int objNum = 0;
             foreach (KeyValuePair<CacheProceduralObject, Vector3> kvp in selection_objects)
             {
+                objNum++;
                 tw.WriteLine("OBJECT");
                 tw.WriteLine("{");
                 tw.WriteLine("baseInfoType = " + kvp.Key.baseInfoType);
                 tw.WriteLine("basePrefabName = " + kvp.Key.basePrefabName);
-                if (staticImport)
+                if (exportMode == SelectionMode.ExportSelection.ExportMode.StaticImport) //if (staticImport)
                     tw.WriteLine("absPosition = " + kvp.Key._staticPos.ToStringUnrounded());
                 else
                     tw.WriteLine("relativePosition = " + kvp.Value.ToStringUnrounded());
@@ -134,14 +199,83 @@ namespace ProceduralObjects.Classes
                     if (kvp.Key.modules.Count > 0)
                         ModuleManager.WriteModules(tw, kvp.Key.modules, false);
                 }
-                if (kvp.Key.meshStatus == 1)
-                    tw.WriteLine("ORIGINALMODEL");
+                Debug.Log("[ProceduralObjects][Mesh_Serialization] Attempting to serialize mesh");
+                if (exportMode == SelectionMode.ExportSelection.ExportMode.FBX)
+                {
+                    Debug.Log("[ProceduralObjects][FBX_Export] Attempting to export mesh");
+                    SetupModTools();
+                    if (!isMTSetup)
+                        return;
+
+                    MethodInfo m_ModToolsExportFBXInfo;
+                    m_ModToolsExportFBXInfo = t_MTFbxConverter.GetMethod("ExportAsciiFbx", new Type[] { typeof(Mesh), typeof(Stream) });
+                    if (m_ModToolsExportFBXInfo != null) 
+                        Debug.Log("[ProceduralObjects][FBX_Export] Found ExportAsciiFbx method!");
+
+                    string fbxPath = ProceduralObjectsMod.ExternalsConfigPath + name.ToFileName() + ".base_" + kvp.Key.basePrefabName + ".mesh" + objNum + ".fbx";
+                    fbxPath = sanitizeFileName(name.ToFileName() + ".base_" + kvp.Key.basePrefabName + ".mesh" + objNum);
+                    fbxPath = ProceduralObjectsMod.ExternalsConfigPath + fbxPath + ".fbx";
+                    Debug.LogFormat("[ProceduralObjects][FBX_Export] Checking file: \'{0}\'!", fbxPath);
+                    if (File.Exists(fbxPath))
+                        return;
+
+                    try
+                    {
+                        var stream = new FileStream(fbxPath, FileMode.Create);
+                        Debug.Log("[ProceduralObjects][FBX_Export] Created the File Stream for the mesh");
+                        var m_mesh = kvp.Key.mesh.InstantiateMesh();
+                        Debug.LogFormat("[ProceduralObjects][FBX_Export] Instantiated the Mesh: {0}", m_mesh);
+                        if (kvp.Key.meshStatus == 1)
+                        {
+                            Debug.Log("[ProceduralObjects][FBX_Export] The model is unchanged, trying export anyways!");
+                            m_mesh.SetVertices(new List<Vector3>(m_mesh.vertices));
+                        }
+                        else
+                        {
+                            Debug.Log("[ProceduralObjects][FBX_Export] The model is different. Def need an export!");
+                            m_mesh.SetVertices(new List<Vector3>(kvp.Key.allVertices));
+                        }
+                        Debug.LogFormat("[ProceduralObjects][FBX_Export] Set verts on mesh: \'{0}\'!", m_mesh.name);
+
+                        var meow = m_ModToolsExportFBXInfo.Invoke(m_mesh, new object[] { m_mesh, stream });
+                        if (meow != null)
+                            Debug.LogFormat("[ProceduralObjects][FBX_Export] Invoked `ExportAsciiFbx`!!!!  :::: {0}", meow);
+                        else
+                            Debug.LogFormat("[ProceduralObjects][FBX_Export] Apparently invoke didn't like... do it's thing... This is `ExportAsciiFbx`:: {0}", meow);
+
+                        tw.WriteLine("EXPORTEDMESH");
+                        tw.WriteLine("exportPath = " + fbxPath);
+                    }
+                    catch 
+                    {
+                        Debug.LogError("Failed to invoke modtools method... at least clean up and ensure ploppable export works.");
+                    }
+                    finally
+                    {
+                        if (kvp.Key.meshStatus == 1)
+                            tw.WriteLine("ORIGINALMODEL");
+                        else
+                        {
+                            tw.WriteLine("VERTICES " + kvp.Key.allVertices.Count());
+                            for (int i = 0; i < kvp.Key.allVertices.Count(); i++)
+                            {
+                                tw.WriteLine("vertex " + i.ToString() + " = " + kvp.Key.allVertices[i].ToStringUnrounded());
+                            }
+                        }
+                    }
+
+                }
                 else
                 {
-                    tw.WriteLine("VERTICES " + kvp.Key.allVertices.Count());
-                    for (int i = 0; i < kvp.Key.allVertices.Count(); i++)
+                    if (kvp.Key.meshStatus == 1)
+                        tw.WriteLine("ORIGINALMODEL");
+                    else
                     {
-                        tw.WriteLine("vertex " + i.ToString() + " = " + kvp.Key.allVertices[i].ToStringUnrounded());
+                        tw.WriteLine("VERTICES " + kvp.Key.allVertices.Count());
+                        for (int i = 0; i < kvp.Key.allVertices.Count(); i++)
+                        {
+                            tw.WriteLine("vertex " + i.ToString() + " = " + kvp.Key.allVertices[i].ToStringUnrounded());
+                        }
                     }
                 }
                 tw.WriteLine("}");
@@ -150,11 +284,21 @@ namespace ProceduralObjects.Classes
 
             ProceduralUtils.ExportRequiredAssetsHTML(ProceduralObjectsMod.ExternalsConfigPath + name.ToFileName() + " - required assets.html", selection_objects.Keys.ToList());
         }
-
         public enum ClipboardType
         {
             Single,
             Selection
         }
+
+        private static string sanitizeFileName(string fileName)
+        {
+            string invalidChars = Regex.Escape(new string(Path.GetInvalidFileNameChars()));
+            string invalidRegStr = string.Format(@"([{0}]*\.+$)|([{0}]+)", invalidChars);
+            string newFileName = Regex.Replace(fileName, invalidRegStr, "_");
+            if (newFileName.Length == 0)
+                Debug.Log("File Name " + fileName + " results in a empty fileName!");
+            return newFileName;
+        }
+
     }
 }

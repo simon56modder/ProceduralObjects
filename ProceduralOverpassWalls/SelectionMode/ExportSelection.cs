@@ -10,6 +10,12 @@ namespace ProceduralObjects.SelectionMode
 {
     public class ExportSelection : SelectionModeAction
     {
+        public enum ExportMode
+        {
+            Ploppable = 0,
+            StaticImport = 1,
+            FBX = 3
+        }
         public ClipboardProceduralObjects clipboard;
 
         public override void OnOpen(List<ProceduralObject> selection)
@@ -31,19 +37,25 @@ namespace ProceduralObjects.SelectionMode
         }
         public override void OnActionGUI(Vector2 uiPos)
         {
-            if (GUI.Button(new Rect(uiPos, new Vector2(180, 22)), LocalizationManager.instance.current["export_as_ploppable"]))
+            if (GUI.Button(new Rect(uiPos, new Vector2(180, 22)), LocalizationManager.instance.current["export_as_fbx"]))
             {
                 ProceduralObjectsLogic.PlaySound();
-                clipboard.ExportSelection("Selection " + DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"), logic.ExPObjManager, false);
+                clipboard.ExportSelection("Selection " + DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"), logic.ExPObjManager, ExportMode.FBX);
                 ExitAction();
             }
-            if (GUI.Button(new Rect(uiPos.x, uiPos.y + 23, 180, 22), LocalizationManager.instance.current["export_as_fixed"]))
+            if (GUI.Button(new Rect(uiPos.x, uiPos.y + 23, 180, 22), LocalizationManager.instance.current["export_as_ploppable"]))
             {
                 ProceduralObjectsLogic.PlaySound();
-                clipboard.ExportSelection("Fixed Export " + DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"), logic.ExPObjManager, true);
+                clipboard.ExportSelection("Selection " + DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"), logic.ExPObjManager, ExportMode.Ploppable);
                 ExitAction();
             }
-            if (GUI.Button(new Rect(uiPos.x, uiPos.y + 46, 180, 22), LocalizationManager.instance.current["cancel"]))
+            if (GUI.Button(new Rect(uiPos.x, uiPos.y + 46, 180, 22), LocalizationManager.instance.current["export_as_fixed"]))
+            {
+                ProceduralObjectsLogic.PlaySound();
+                clipboard.ExportSelection("Fixed Export " + DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"), logic.ExPObjManager, ExportMode.StaticImport);
+                ExitAction();
+            }
+            if (GUI.Button(new Rect(uiPos.x, uiPos.y + 69, 180, 22), LocalizationManager.instance.current["cancel"]))
             {
                 ProceduralObjectsLogic.PlaySound();
                 ExitAction();

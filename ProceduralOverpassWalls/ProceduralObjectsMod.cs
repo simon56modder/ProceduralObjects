@@ -110,7 +110,9 @@ namespace ProceduralObjects
                 var subItems = PlatformService.workshop.GetSubscribedItems();
                 if (subItems.Length > 0)
                 {
-                    List<string> paths = new List<string>();
+                    List<string> paths = (Directory.GetDirectories(DataLocation.addonsPath)
+                                            .Concat(Directory.GetDirectories(DataLocation.gameContentPath + (ProceduralObjectsMod.IsLinux ? "/" : @"\") + "Mods")))
+                                            .ToList();
                     foreach (PublishedFileId fileId in subItems)
                     {
                         string path = PlatformService.workshop.GetSubscribedItemPath(fileId);
