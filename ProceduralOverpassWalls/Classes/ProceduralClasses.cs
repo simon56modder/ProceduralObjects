@@ -591,6 +591,7 @@ namespace ProceduralObjects.Classes
         {
             renderDistance = sourceObj.renderDistance;
             renderDistLocked = sourceObj.renderDistLocked;
+            mesh = sourceObj.m_mesh;
             if (sourceObj.meshStatus == 2)
             {
                 allVertices = sourceObj.m_mesh.vertices;
@@ -649,6 +650,7 @@ namespace ProceduralObjects.Classes
         public ProceduralObjectVisibility visibility;
         public NormalsRecalculation normalsRecalculation;
         public TextParameters textParam;
+        public Mesh mesh;
     }
     
     public class ProceduralInfo
