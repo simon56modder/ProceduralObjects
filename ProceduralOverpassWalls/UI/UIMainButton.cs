@@ -57,10 +57,11 @@ namespace ProceduralObjects.UI
 
         private void mainButton_eventClick(UIComponent component, UIMouseEventParameter eventParam)
         {
-            if (logic == null || !eventParam.buttons.IsFlagSet(UIMouseButton.Left))
+            if (!eventParam.buttons.IsFlagSet(UIMouseButton.Left))
                 return;
             logic.MainButtonClick();
         }
+
 
         private Vector3 m_deltaPos;
         protected override void OnMouseDown(UIMouseEventParameter p)
