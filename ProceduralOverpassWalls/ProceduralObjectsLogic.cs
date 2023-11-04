@@ -3365,7 +3365,7 @@ namespace ProceduralObjects
         }
         public void MainButtonClick()
         {
-            if (PopupStart.IsPopupOpen()) return;
+           
 
             var currentToolType = ToolsModifierControl.toolController.CurrentTool.GetType();
             ResetLayerScrollmenu();

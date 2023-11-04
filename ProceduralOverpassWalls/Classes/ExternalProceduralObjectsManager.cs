@@ -515,6 +515,6 @@ namespace ProceduralObjects.Classes
         public CacheProceduralObject m_object;
         public ClipboardProceduralObjects m_selection;
         public ClipboardProceduralObjects.ClipboardType m_externalType;
-        public bool isWorkshop, isStatic, hasClipboard;
+        public bool isWorkshop, isStatic, hasClipboard = true;
     }
 }

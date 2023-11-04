@@ -62,73 +62,7 @@ namespace ProceduralObjects.Classes
                 "1.7 changelog :\n\n■ Added PO Groups\n■ Added PO Modules (external mods that add behaviours to POs)\n■ New Customization Tool actions : 'Conform to Terrain' and 'conform to networks...'\n■ Position fields moved from Adv. Edition tools to General Tool, new Rotation fields\n■ Rendering improvement & Thumbnail/High-res screenshot issue fix thanks to @krzychu124\n■ 'Paste into Selection' turned into an option, disabled by default.\n\nCheckout the full changelog on the wiki"
             };
         }
-        void OnGUI()
-        {
-            if (AllowedToShow)
-            {
-                if (LocalizationManager.instance == null)
-                    return;
-                if (LocalizationManager.instance.current == null)
-                    return;
-                uiRect = GUIUtils.ClampRectToScreen(GUIUtils.Window(this.GetInstanceID(), uiRect, DrawUpdateUI,
-                    "Procedural Objects - " + LocalizationManager.instance.current["installed_version"] + " : " + ProceduralObjectsMod.VERSION));
-            }
-        }
-        void DrawUpdateUI(int id)
-        {
-            GUI.DragWindow(new Rect(0, 0, 575, 22));
-            if (displayChangelog)
-            {
-                GUIUtils.HelpButton(600, "Changelog");
-
-                GUI.Label(new Rect(10, 25, 580, 275), LocalizationManager.instance.current["version"] + " " + Changelog[currentShowingChangelogIndex]);
-
-                if (currentShowingChangelogIndex != 0)
-                {
-                    if (GUI.Button(new Rect(125, 310, 110, 30), LocalizationManager.instance.current["next_version"]))
-                        currentShowingChangelogIndex -= 1;
-                }
-                if (currentShowingChangelogIndex != (Changelog.Length - 1))
-                {
-                    if (GUI.Button(new Rect(5, 310, 120, 30), LocalizationManager.instance.current["prev_version"]))
-                        currentShowingChangelogIndex += 1;
-                }
-                if (GUI.Button(new Rect(235, 310, 215, 30), LocalizationManager.instance.current["ok"]))
-                {
-                    ProceduralObjectsLogic.PlaySound();
-                    if (displayLoadingFailures) displayChangelog = false;
-                    else AllowedToShow = false;
-                }
-            }
-            else if (displayLoadingFailures)
-            {
-                GUI.Label(new Rect(10, 23, 580, 25), LocalizationManager.instance.current["stats_failed"]);
-                GUIUtils.DrawSeparator(new Vector2(10, 47), 580);
-
-                var f = loading_failures[currentFailuresIndex];
-                if (f.DrawUI(new Rect(10, 50, 580, 250)))
-                {
-                    if (f.sameForAllToggle)
-                    {
-                        for (int i = currentFailuresIndex; i < loading_failures.Count; i++)
-                        {
-                            loading_failures[i].keep = f.keep;
-                        }
-                        AllowedToShow = false;
-                        return;
-                    }
-                    if (currentFailuresIndex == loading_failures.Count - 1)
-                    {
-                        AllowedToShow = false;
-                    }
-                    else
-                        currentFailuresIndex += 1;
-                }
-                /*
-                if (GUI.Button(new Rect(235, 310, 215, 30), LocalizationManager.instance.current["ok"]))
-                    AllowedToShow = false; */
-            }
-        }
+       
 
         public static List<POLoadingFailureGroup> loading_failures = new List<POLoadingFailureGroup>();
         public static void RegisterFailure(ProceduralObjectContainer container, Exception e, PropInfo[] props, BuildingInfo[] buildings)
